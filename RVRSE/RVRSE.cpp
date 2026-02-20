@@ -110,6 +110,9 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
       mNewSampleReady.store(true, std::memory_order_release);
       mLoadState.store(rvrse::ESampleLoadState::Ready);
 
+      // Feed the sample into the offline pipeline (triggers reverb → reverse → stretch)
+      mProcessor.setSample(newSample);
+
       // Update UI on the main thread via SendControlMsgFromDelegate isn't ideal,
       // so we use GetUI() — this is safe because we check and the UI lambda captures
       // will run on the next UI tick
@@ -161,6 +164,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     }
     mNewSampleReady.store(false, std::memory_order_release);
     mPlaybackPos = -1; // Reset playback when new sample arrives
+  }
+
+  // Check if a new riser buffer is ready from the offline pipeline (lock-free)
+  if (mProcessor.isNewRiserReady())
+  {
+    mRiserBuffer = mProcessor.consumeRiser();
   }
 
   // Get local pointer — no further locking needed
@@ -247,5 +256,8 @@ void RVRSE::OnReset()
   mMidiQueue.Resize(GetBlockSize());
   // Compute fade-out length from sample rate (e.g., 5ms at 44100 Hz = 220 samples)
   mFadeOutLength = std::max(1, static_cast<int>(GetSampleRate() * rvrse::kNoteOffFadeMs / 1000.0));
+
+  // Update the offline pipeline with the current sample rate
+  mProcessor.setSampleRate(GetSampleRate());
 }
 #endif

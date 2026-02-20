@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IPlug_include_in_plug_hdr.h"
+#include "RvrseProcessor.h"
 #include "SampleData.h"
 
 #include <atomic>
@@ -69,4 +70,10 @@ private:
   // --- Note-off fade-out (anti-click) ---
   int mFadeOutRemaining = 0;   ///< Samples remaining in fade-out (0 = no fade active)
   int mFadeOutLength = 0;      ///< Total fade-out length in samples (computed from sample rate)
+
+  // --- Offline pipeline ---
+  rvrse::RvrseProcessor mProcessor;   ///< Offline pipeline orchestrator (reverb → reverse → stretch)
+
+  /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
+  std::shared_ptr<rvrse::RiserData> mRiserBuffer;
 };

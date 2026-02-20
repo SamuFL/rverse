@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Offline-to-realtime handoff: `RvrseProcessor` wired into RVRSE class with lock-free riser buffer consumption (rverse-1na)
 - `RvrseProcessor.h` — offline pipeline orchestrator: reverb → reverse → stretch with generation-based abort and cached intermediate buffers (rverse-62q)
 - `TimeStretch.h` — OLA time-stretcher with Hann windowing + `calcStretchFactor()` helper (rverse-07s)
 - `BufferUtils.h` — in-place stereo buffer reversal for the offline pipeline (rverse-cmf)
