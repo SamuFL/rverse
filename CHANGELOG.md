@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Riser + hit dual-voice playback: note-on plays reverse-reverb riser, dry hit fires at beat offset (rverse-djb)
 - Offline-to-realtime handoff: `RvrseProcessor` wired into RVRSE class with lock-free riser buffer consumption (rverse-1na)
 - `RvrseProcessor.h` — offline pipeline orchestrator: reverb → reverse → stretch with generation-based abort and cached intermediate buffers (rverse-62q)
 - `TimeStretch.h` — OLA time-stretcher with Hann windowing + `calcStretchFactor()` helper (rverse-07s)

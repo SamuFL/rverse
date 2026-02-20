@@ -163,7 +163,10 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       mPlaySample = mHitSample;
     }
     mNewSampleReady.store(false, std::memory_order_release);
-    mPlaybackPos = -1; // Reset playback when new sample arrives
+    // Reset all voice state when new sample arrives
+    mRiserPos = -1;
+    mHitPos = -1;
+    mSamplesFromNoteOn = -1;
   }
 
   // Check if a new riser buffer is ready from the offline pipeline (lock-free)
@@ -172,8 +175,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mRiserBuffer = mProcessor.consumeRiser();
   }
 
-  // Get local pointer — no further locking needed
-  const auto& sample = mPlaySample;
+  // Get local pointers — no further locking needed
+  const auto& hit = mPlaySample;
+  const auto& riser = mRiserBuffer;
 
   for (int s = 0; s < nFrames; s++)
   {
@@ -184,62 +188,117 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
       if (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() > 0)
       {
-        // Note-on: restart playback from the beginning
-        mPlaybackPos = 0;
+        // Note-on: start the riser from the beginning
         mVelocityGain = static_cast<float>(msg.Velocity()) / 127.0f;
-        mFadeOutRemaining = 0; // Cancel any active fade-out
+        mRiserFadeRemaining = 0;
+        mHitFadeRemaining = 0;
+
+        if (riser && riser->IsReady())
+        {
+          mRiserPos = 0;
+          mSamplesFromNoteOn = 0;
+          mHitPos = -1; // Hit hasn't fired yet
+
+          // Calculate the hit offset: the riser length IS the riser buffer length
+          // (the OLA stretcher already sized it to riserLengthBeats × samplesPerBeat)
+          mHitOffset = riser->NumFrames();
+        }
+        else if (hit && hit->IsLoaded())
+        {
+          // No riser available yet — fall back to direct hit playback
+          mRiserPos = -1;
+          mSamplesFromNoteOn = -1;
+          mHitPos = 0;
+        }
       }
       else if (msg.StatusMsg() == IMidiMsg::kNoteOff ||
                (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() == 0))
       {
-        // Note-off: begin fade-out instead of hard stop
-        if (mPlaybackPos >= 0)
-        {
-          mFadeOutRemaining = mFadeOutLength;
-        }
+        // Note-off: begin fade-out on both voices
+        if (mRiserPos >= 0)
+          mRiserFadeRemaining = mFadeOutLength;
+        if (mHitPos >= 0)
+          mHitFadeRemaining = mFadeOutLength;
       }
 
       mMidiQueue.Remove();
     }
 
-    // Generate output
-    float outL = 0.0f;
-    float outR = 0.0f;
+    // --- Generate riser output ---
+    float riserL = 0.0f;
+    float riserR = 0.0f;
 
-    if (mPlaybackPos >= 0 && sample && sample->IsLoaded())
+    if (mRiserPos >= 0 && riser && riser->IsReady())
     {
-      if (mPlaybackPos < sample->NumFrames())
+      if (mRiserPos < riser->NumFrames())
       {
-        outL = sample->mLeft[mPlaybackPos] * mVelocityGain;
-        outR = sample->mRight[mPlaybackPos] * mVelocityGain;
+        riserL = riser->mLeft[mRiserPos] * mVelocityGain;
+        riserR = riser->mRight[mRiserPos] * mVelocityGain;
 
-        // Apply fade-out envelope if active
-        if (mFadeOutRemaining > 0)
+        if (mRiserFadeRemaining > 0)
         {
-          const float fadeGain = static_cast<float>(mFadeOutRemaining) / static_cast<float>(mFadeOutLength);
-          outL *= fadeGain;
-          outR *= fadeGain;
-          mFadeOutRemaining--;
-
-          if (mFadeOutRemaining == 0)
-          {
-            // Fade complete — stop playback
-            mPlaybackPos = -1;
-          }
+          const float fadeGain = static_cast<float>(mRiserFadeRemaining) / static_cast<float>(mFadeOutLength);
+          riserL *= fadeGain;
+          riserR *= fadeGain;
+          mRiserFadeRemaining--;
+          if (mRiserFadeRemaining == 0) mRiserPos = -1;
         }
 
-        if (mPlaybackPos >= 0) mPlaybackPos++;
+        if (mRiserPos >= 0) mRiserPos++;
       }
       else
       {
-        // Reached end of sample — stop playback
-        mPlaybackPos = -1;
+        // Riser finished naturally
+        mRiserPos = -1;
       }
     }
 
-    // Apply master volume and write to output
-    if (nChans >= 1) outputs[0][s] = outL * masterVol;
-    if (nChans >= 2) outputs[1][s] = outR * masterVol;
+    // --- Check if it's time to fire the hit ---
+    if (mSamplesFromNoteOn >= 0 && mHitPos < 0)
+    {
+      if (mSamplesFromNoteOn >= mHitOffset && hit && hit->IsLoaded())
+      {
+        mHitPos = 0; // Fire the hit!
+      }
+      mSamplesFromNoteOn++;
+    }
+
+    // --- Generate hit output ---
+    float hitL = 0.0f;
+    float hitR = 0.0f;
+
+    if (mHitPos >= 0 && hit && hit->IsLoaded())
+    {
+      if (mHitPos < hit->NumFrames())
+      {
+        hitL = hit->mLeft[mHitPos] * mVelocityGain;
+        hitR = hit->mRight[mHitPos] * mVelocityGain;
+
+        if (mHitFadeRemaining > 0)
+        {
+          const float fadeGain = static_cast<float>(mHitFadeRemaining) / static_cast<float>(mFadeOutLength);
+          hitL *= fadeGain;
+          hitR *= fadeGain;
+          mHitFadeRemaining--;
+          if (mHitFadeRemaining == 0) mHitPos = -1;
+        }
+
+        if (mHitPos >= 0) mHitPos++;
+      }
+      else
+      {
+        // Hit finished naturally
+        mHitPos = -1;
+        mSamplesFromNoteOn = -1;
+      }
+    }
+
+    // --- Mix and output ---
+    const float outL = (riserL + hitL) * static_cast<float>(masterVol);
+    const float outR = (riserR + hitR) * static_cast<float>(masterVol);
+
+    if (nChans >= 1) outputs[0][s] = outL;
+    if (nChans >= 2) outputs[1][s] = outR;
   }
 
   mMidiQueue.Flush(nFrames);

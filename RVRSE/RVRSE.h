@@ -64,11 +64,19 @@ private:
   // --- Playback state (audio thread only, no locks needed) ---
 
   IMidiQueue mMidiQueue;       ///< Sample-accurate MIDI message queue
-  int mPlaybackPos = -1;       ///< Current playback position in sample frames (-1 = not playing)
   float mVelocityGain = 1.0f;  ///< Velocity-scaled gain for current note (0.0–1.0)
 
+  // --- Riser voice ---
+  int mRiserPos = -1;          ///< Current playback position in riser buffer (-1 = not playing)
+
+  // --- Hit voice ---
+  int mHitPos = -1;            ///< Current playback position in hit sample (-1 = not playing)
+  int mHitOffset = -1;         ///< Sample offset at which hit fires (riser length in samples)
+  int mSamplesFromNoteOn = -1; ///< Counter from note-on to trigger hit at mHitOffset
+
   // --- Note-off fade-out (anti-click) ---
-  int mFadeOutRemaining = 0;   ///< Samples remaining in fade-out (0 = no fade active)
+  int mRiserFadeRemaining = 0; ///< Samples remaining in riser fade-out (0 = no fade active)
+  int mHitFadeRemaining = 0;   ///< Samples remaining in hit fade-out
   int mFadeOutLength = 0;      ///< Total fade-out length in samples (computed from sample rate)
 
   // --- Offline pipeline ---
