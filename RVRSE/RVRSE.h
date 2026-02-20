@@ -81,6 +81,7 @@ private:
 
   // --- Offline pipeline ---
   rvrse::RvrseProcessor mProcessor;   ///< Offline pipeline orchestrator (reverb → reverse → stretch)
+  double mLastBPM = 0.0;              ///< Last BPM sent to the processor (avoids redundant calls)
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
   std::shared_ptr<rvrse::RiserData> mRiserBuffer;

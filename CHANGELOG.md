@@ -12,7 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Offline-to-realtime handoff: `RvrseProcessor` wired into RVRSE class with lock-free riser buffer consumption (rverse-1na)
 - `RvrseProcessor.h` — offline pipeline orchestrator: reverb → reverse → stretch with generation-based abort and cached intermediate buffers (rverse-62q)
 - `TimeStretch.h` — OLA time-stretcher with Hann windowing + `calcStretchFactor()` helper (rverse-07s)
-- `BufferUtils.h` — in-place stereo buffer reversal for the offline pipeline (rverse-cmf)
+- `BufferUtils.h` — in-place stereo buffer reversal, linear resampling, tail fade-out utilities (rverse-cmf)
+
+### Fixed
+- Hit sample now resampled to DAW output rate on load — fixes pitched-down playback with 96kHz+ files (rverse-djb)
+- Offline pipeline resamples source to output rate before processing — riser length now correct regardless of file sample rate (rverse-djb)
+- Riser tail fade-out (1 beat) prevents reversed transient from clashing with hit (rverse-djb)
+- Hit no longer re-triggers on MIDI note-off — `mSamplesFromNoteOn` counter now reset (rverse-djb)
+- Host BPM now read via `GetTempo()` and propagated to offline pipeline — riser re-stretches on tempo change (rverse-djb)
+- `kMaxSampleFrames` now supports up to 192kHz files (was limited to 48kHz) (rverse-djb)
 - Schroeder/Moorer algorithmic reverb in `Reverb.h` — 8 parallel comb filters feeding 4 series allpasses (rverse-6el)
 - `applyReverb()` and `applyReverbStereo()` stateless functions for the offline pipeline
 - Reverb constants in `Constants.h` — room size, feedback, damping, allpass gain

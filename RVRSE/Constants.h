@@ -44,7 +44,7 @@ constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration i
 
 // --- Sample Loading ---
 constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample length in seconds
-constexpr int    kMaxSampleFrames    = 48000 * kMaxSampleLengthSeconds; ///< Max frames at 48 kHz
+constexpr int    kMaxSampleFrames    = 192000 * kMaxSampleLengthSeconds; ///< Max frames at 192 kHz (supports all standard rates)
 constexpr int    kMaxSampleChannels  = 2;                  ///< Stereo max
 
 /// Supported file extensions for the open-file dialog

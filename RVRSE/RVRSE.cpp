@@ -1,5 +1,6 @@
 #include "RVRSE.h"
 #include "IPlug_include_in_plug_src.h"
+#include "BufferUtils.h"
 #include "Constants.h"
 #include "SampleLoader.h"
 
@@ -101,16 +102,34 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
     {
       auto newSample = std::make_shared<rvrse::SampleData>(std::move(result.data));
 
+      // Resample the hit to the DAW's output sample rate if they differ.
+      // This ensures ProcessBlock can play it sample-by-sample at the correct pitch.
+      const double outputSR = GetSampleRate();
+      auto playSample = newSample;
+
+      if (outputSR > 0.0 && std::abs(newSample->mSampleRate - outputSR) > 0.5)
+      {
+        auto resampled = std::make_shared<rvrse::SampleData>();
+        rvrse::resampleLinearStereo(newSample->mLeft, newSample->mRight,
+                                    newSample->mSampleRate, outputSR,
+                                    resampled->mLeft, resampled->mRight);
+        resampled->mSampleRate = outputSR;
+        resampled->mNumChannels = newSample->mNumChannels;
+        resampled->mFilePath = newSample->mFilePath;
+        resampled->mFileName = newSample->mFileName;
+        playSample = resampled;
+      }
+
       {
         std::lock_guard<std::mutex> lock(mSampleMutex);
-        mHitSample = newSample;
+        mHitSample = playSample;
       }
 
       // Signal the audio thread that a new sample is ready
       mNewSampleReady.store(true, std::memory_order_release);
       mLoadState.store(rvrse::ESampleLoadState::Ready);
 
-      // Feed the sample into the offline pipeline (triggers reverb → reverse → stretch)
+      // Feed the ORIGINAL sample into the offline pipeline (it resamples internally)
       mProcessor.setSample(newSample);
 
       // Update UI on the main thread via SendControlMsgFromDelegate isn't ideal,
@@ -154,6 +173,15 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 {
   const int nChans = NOutChansConnected();
   const double masterVol = GetParam(kParamMasterVol)->Value() / 100.0;
+
+  // Read host BPM and propagate to the offline pipeline when it changes.
+  // GetTempo() reads from the host-provided ITimeInfo (populated each block).
+  const double hostBPM = GetTempo();
+  if (hostBPM > 0.0 && std::abs(hostBPM - mLastBPM) > 0.01)
+  {
+    mLastBPM = hostBPM;
+    mProcessor.setBPM(hostBPM);
+  }
 
   // Check if a new sample is ready from the loader thread (lock-free flag)
   if (mNewSampleReady.load(std::memory_order_acquire))
@@ -214,11 +242,14 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       else if (msg.StatusMsg() == IMidiMsg::kNoteOff ||
                (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() == 0))
       {
-        // Note-off: begin fade-out on both voices
+        // Note-off: begin fade-out on both voices and kill the hit trigger
         if (mRiserPos >= 0)
           mRiserFadeRemaining = mFadeOutLength;
         if (mHitPos >= 0)
           mHitFadeRemaining = mFadeOutLength;
+
+        // Stop the hit trigger counter so the hit can't re-trigger after fade-out
+        mSamplesFromNoteOn = -1;
       }
 
       mMidiQueue.Remove();

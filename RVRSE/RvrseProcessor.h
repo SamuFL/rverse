@@ -192,15 +192,36 @@ private:
 
     if (fromStage == EPipelineStage::Reverb || cachedRevL.empty())
     {
+      // --- Stage 0: Resample to output sample rate if needed ---
+      // The loaded sample may be at a different rate (e.g. 96kHz file, 48kHz DAW).
+      // All pipeline processing must happen at the output rate so that frame counts
+      // match what ProcessBlock expects.
+      std::vector<float> srcL, srcR;
+      double processingRate;
+
+      if (std::abs(sample->mSampleRate - sampleRate) > 0.5)
+      {
+        resampleLinearStereo(sample->mLeft, sample->mRight,
+                             sample->mSampleRate, sampleRate,
+                             srcL, srcR);
+        processingRate = sampleRate;
+      }
+      else
+      {
+        srcL = sample->mLeft;
+        srcR = sample->mRight;
+        processingRate = sample->mSampleRate;
+      }
+
       // --- Stage 1: Reverb ---
-      const size_t numFrames = static_cast<size_t>(sample->NumFrames());
+      const size_t numFrames = srcL.size();
       std::vector<float> lushedL(numFrames);
       std::vector<float> lushedR(numFrames);
 
       applyReverbStereo(
-        sample->mLeft.data(), sample->mRight.data(),
+        srcL.data(), srcR.data(),
         lushedL.data(), lushedR.data(),
-        numFrames, sample->mSampleRate, lush
+        numFrames, processingRate, lush
       );
 
       // Abort check
@@ -245,6 +266,13 @@ private:
     stretchBufferStereo(reversedL, reversedR, stretchFactor,
                         riser->mLeft, riser->mRight);
     riser->mSampleRate = sampleRate;
+
+    // --- Stage 4: Tail fade-out (1 beat) ---
+    // Fade the end of the riser to zero over 1 beat so that the reversed
+    // transient doesn't clash with the dry hit that fires immediately after.
+    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
+    const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat));
+    applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
 
     // Final abort check before publishing
     if (mGeneration.load(std::memory_order_acquire) != generation)
