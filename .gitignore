@@ -1,0 +1,36 @@
+# Build output
+build/
+build-*/
+
+# IDE files
+.DS_Store
+*.xcuserdata
+*.xcworkspace/xcuserdata/
+.vs/
+*.suo
+*.user
+*.sdf
+ipch/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled
+*.o
+*.obj
+*.exe
+*.dll
+*.dylib
+*.so
+*.app
+*.vst3
+*.component
+*.clap
+*.aaxplugin
+
+# iPlug2 dependencies (downloaded at build time)
+iPlug2/Dependencies/Build/
+iPlug2/Dependencies/IPlug/

@@ -1,0 +1,137 @@
+import zipfile, os, fileinput, string, sys, shutil
+
+scriptpath = os.path.dirname(os.path.realpath(__file__))
+projectpath = os.path.abspath(os.path.join(scriptpath, os.pardir))
+
+IPLUG2_ROOT = "..\..\iPlug2"
+
+sys.path.insert(0, os.path.join(scriptpath, IPLUG2_ROOT + '\Scripts'))
+
+from get_archive_name import get_archive_name
+
+def add_folder_to_zip(zf, folder_path, archive_base):
+  """Add a folder and its contents to a zip file, preserving structure."""
+  for root, dirs, files in os.walk(folder_path):
+    for file in files:
+      file_path = os.path.join(root, file)
+      arcname = os.path.join(archive_base, os.path.relpath(file_path, folder_path))
+      print("adding " + file_path + " as " + arcname)
+      zf.write(file_path, arcname, zipfile.ZIP_DEFLATED)
+
+def main():
+  if len(sys.argv) != 3:
+    print("Usage: make_zip.py demo[0/1] zip[0/1]")
+    sys.exit(1)
+  else:
+    demo=int(sys.argv[1])
+    zip=int(sys.argv[2])
+
+  # Debug: list build-win contents
+  build_dir = projectpath + "\\build-win"
+  print("=== Contents of build-win ===")
+  if os.path.exists(build_dir):
+    for item in os.listdir(build_dir):
+      item_path = os.path.join(build_dir, item)
+      if os.path.isdir(item_path):
+        print(f"  [DIR] {item}")
+      else:
+        print(f"  {item}")
+  else:
+    print("  build-win directory not found!")
+
+  # Debug: check VST3 bundle structure
+  vst3_bundle = build_dir + "\\RVRSE.vst3"
+  if os.path.exists(vst3_bundle):
+    print("=== VST3 bundle structure ===")
+    for root, dirs, files in os.walk(vst3_bundle):
+      level = root.replace(vst3_bundle, '').count(os.sep)
+      indent = '  ' * level
+      print(f"{indent}{os.path.basename(root)}/")
+      for file in files:
+        print(f"{indent}  {file}")
+
+  dir = projectpath + "\\build-win\\out"
+
+  if os.path.exists(dir):
+    shutil.rmtree(dir)
+
+  os.makedirs(dir)
+
+  zipname = get_archive_name(projectpath, "win", "demo" if demo == 1 else "full" )
+  zf = zipfile.ZipFile(projectpath + "\\build-win\\out\\" + zipname + ".zip", mode="w")
+
+  if not zip:
+    installer = "\\build-win\\installer\\RVRSE Installer.exe"
+
+    if demo:
+      installer = "\\build-win\\installer\\RVRSE Demo Installer.exe"
+
+    files = [
+      projectpath + installer,
+      projectpath + "\\installer\\changelog.txt",
+      projectpath + "\\installer\\known-issues.txt",
+      projectpath + "\\manual\\RVRSE manual.pdf"
+    ]
+
+    for f in files:
+      print("adding " + f)
+      zf.write(f, os.path.basename(f), zipfile.ZIP_DEFLATED)
+  else:
+    # Add VST3 bundle with folder structure preserved
+    vst3_bundle = projectpath + "\\build-win\\RVRSE.vst3"
+    if os.path.exists(vst3_bundle):
+      add_folder_to_zip(zf, vst3_bundle, "RVRSE.vst3")
+
+    # Add standalone executables
+    files = [
+      projectpath + "\\build-win\\RVRSE_x64.exe",
+      projectpath + "\\build-win\\RVRSE_ARM64EC.exe",
+    ]
+
+    for f in files:
+      if os.path.exists(f):
+        print("adding " + f)
+        zf.write(f, os.path.basename(f), zipfile.ZIP_DEFLATED)
+
+    # Add CLAP files - check postbuild location first, then build output
+    clap_files = [
+      # Postbuild locations
+      (projectpath + "\\build-win\\RVRSE_x64.clap", "RVRSE_x64.clap"),
+      (projectpath + "\\build-win\\RVRSE_ARM64EC.clap", "RVRSE_ARM64EC.clap"),
+      # Build output locations (fallback)
+      (projectpath + "\\build-win\\clap\\x64\\Release\\RVRSE.clap", "RVRSE_x64.clap"),
+      (projectpath + "\\build-win\\clap\\ARM64EC\\Release\\RVRSE.clap", "RVRSE_ARM64EC.clap"),
+    ]
+
+    added_claps = set()
+    for clap_path, archive_name in clap_files:
+      if os.path.exists(clap_path) and archive_name not in added_claps:
+        print("adding " + clap_path + " as " + archive_name)
+        zf.write(clap_path, archive_name, zipfile.ZIP_DEFLATED)
+        added_claps.add(archive_name)
+
+  zf.close()
+  print("wrote " + zipname)
+
+  # Create PDB archive
+  zf = zipfile.ZipFile(projectpath + "\\build-win\\out\\" + zipname + "-pdbs.zip", mode="w")
+
+  files = [
+    projectpath + "\\build-win\\pdbs\\RVRSE-vst3_x64.pdb",
+    projectpath + "\\build-win\\pdbs\\RVRSE-vst3_ARM64EC.pdb",
+    projectpath + "\\build-win\\pdbs\\RVRSE-app_x64.pdb",
+    projectpath + "\\build-win\\pdbs\\RVRSE-app_ARM64EC.pdb",
+    projectpath + "\\build-win\\pdbs\\RVRSE-clap_x64.pdb",
+    projectpath + "\\build-win\\pdbs\\RVRSE-clap_ARM64EC.pdb"
+  ]
+
+  for f in files:
+    if os.path.exists(f):
+      print("adding " + f)
+      zf.write(f, os.path.basename(f), zipfile.ZIP_DEFLATED)
+
+  zf.close()
+  print("wrote " + zipname)
+
+if __name__ == '__main__':
+  main()
