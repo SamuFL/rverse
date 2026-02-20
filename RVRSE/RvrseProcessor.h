@@ -267,11 +267,12 @@ private:
                         riser->mLeft, riser->mRight);
     riser->mSampleRate = sampleRate;
 
-    // --- Stage 4: Tail fade-out (1 beat) ---
-    // Fade the end of the riser to zero over 1 beat so that the reversed
-    // transient doesn't clash with the dry hit that fires immediately after.
+    // --- Stage 4: Tail fade-out ---
+    // Short fade at the end of the riser so the reversed transient doesn't
+    // produce a hard click when it meets the dry hit. 1/16 of a beat is
+    // enough to smooth the transition without audibly cutting the riser.
     const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat));
+    const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat / 16.0));
     applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
 
     // Final abort check before publishing
