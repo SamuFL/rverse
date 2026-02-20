@@ -38,6 +38,13 @@ constexpr float kReverbAllpassGain   = 0.5f;    ///< Allpass feedback coefficien
 // --- Time-Stretching (OLA) ---
 constexpr int   kOlaWindowSize       = 2048;    ///< OLA analysis/synthesis window size in samples
 
+// --- Riser Tail Fade-Out ---
+/// Fraction of a beat used for the riser tail fade-out (BPM-adaptive).
+/// Smooths the riser→hit boundary to prevent a click from the reversed transient.
+/// Set to 0.0 to disable the fade-out entirely.
+/// Examples: 1/16 = 0.0625 (subtle), 1/4 = 0.25 (gentle), 1.0 = full beat.
+constexpr double kRiserTailFadeBeats = 0.0625;  ///< 1/16 of a beat
+
 // --- Audio ---
 constexpr double kDefaultBPM         = 120.0;
 constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration in milliseconds (anti-click)

@@ -269,11 +269,14 @@ private:
 
     // --- Stage 4: Tail fade-out ---
     // Short fade at the end of the riser so the reversed transient doesn't
-    // produce a hard click when it meets the dry hit. 1/16 of a beat is
-    // enough to smooth the transition without audibly cutting the riser.
-    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat / 16.0));
-    applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+    // produce a hard click when it meets the dry hit.
+    // Controlled by kRiserTailFadeBeats in Constants.h. Set to 0 to disable.
+    if (kRiserTailFadeBeats > 0.0)
+    {
+      const double samplesPerBeat = (sampleRate * 60.0) / bpm;
+      const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * kRiserTailFadeBeats));
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+    }
 
     // Final abort check before publishing
     if (mGeneration.load(std::memory_order_acquire) != generation)
