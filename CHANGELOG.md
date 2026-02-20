@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `TimeStretch.h` — OLA time-stretcher with Hann windowing + `calcStretchFactor()` helper (rverse-07s)
 - `BufferUtils.h` — in-place stereo buffer reversal for the offline pipeline (rverse-cmf)
 - Schroeder/Moorer algorithmic reverb in `Reverb.h` — 8 parallel comb filters feeding 4 series allpasses (rverse-6el)
 - `applyReverb()` and `applyReverbStereo()` stateless functions for the offline pipeline

@@ -35,6 +35,9 @@ constexpr float kReverbMinDamping    = 0.2f;    ///< Comb LP damping at Lush = 0
 constexpr float kReverbMaxDamping    = 0.5f;    ///< Comb LP damping at Lush = 1
 constexpr float kReverbAllpassGain   = 0.5f;    ///< Allpass feedback coefficient
 
+// --- Time-Stretching (OLA) ---
+constexpr int   kOlaWindowSize       = 2048;    ///< OLA analysis/synthesis window size in samples
+
 // --- Audio ---
 constexpr double kDefaultBPM         = 120.0;
 constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration in milliseconds (anti-click)
