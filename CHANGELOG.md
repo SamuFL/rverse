@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Schroeder/Moorer algorithmic reverb in `Reverb.h` — 8 parallel comb filters feeding 4 series allpasses (rverse-6el)
+- `applyReverb()` and `applyReverbStereo()` stateless functions for the offline pipeline
+- Reverb constants in `Constants.h` — room size, feedback, damping, allpass gain
 - MIDI note-on triggers sample playback with velocity scaling (rverse-p38)
 - Sample-accurate MIDI timing via `IMidiQueue`
 - 5ms note-off fade-out envelope (anti-click)
