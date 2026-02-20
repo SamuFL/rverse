@@ -10,9 +10,19 @@ iplug_add_plugin(${PROJECT_NAME}
   SOURCES
     RVRSE.cpp
     RVRSE.h
+    Constants.h
+    SampleData.h
+    SampleLoader.h
+    SampleLoader.cpp
+    dr_libs_impl.cpp
     resources/resource.h
   RESOURCES
     resources/fonts/Roboto-Regular.ttf
   FORMATS
     MINIMAL_PLUGINS APP
+)
+
+# dr_libs headers live in RVRSE/libs/dr_libs
+target_include_directories(_${PROJECT_NAME}-base INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/dr_libs
 )

@@ -27,4 +27,12 @@ constexpr double kTuneMaxSemitones   =  24.0;
 // --- Audio ---
 constexpr double kDefaultBPM         = 120.0;
 
+// --- Sample Loading ---
+constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample length in seconds
+constexpr int    kMaxSampleFrames    = 48000 * kMaxSampleLengthSeconds; ///< Max frames at 48 kHz
+constexpr int    kMaxSampleChannels  = 2;                  ///< Stereo max
+
+/// Supported file extensions for the open-file dialog
+constexpr const char* kSupportedAudioExts = "wav aif aiff";
+
 } // namespace rvrse
