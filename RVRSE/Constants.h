@@ -26,6 +26,7 @@ constexpr double kTuneMaxSemitones   =  24.0;
 
 // --- Audio ---
 constexpr double kDefaultBPM         = 120.0;
+constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration in milliseconds (anti-click)
 
 // --- Sample Loading ---
 constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample length in seconds

@@ -3,6 +3,7 @@
 #include "Constants.h"
 #include "SampleLoader.h"
 
+#include <algorithm>
 #include <thread>
 
 #if IPLUG_EDITOR
@@ -105,6 +106,8 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
         mHitSample = newSample;
       }
 
+      // Signal the audio thread that a new sample is ready
+      mNewSampleReady.store(true, std::memory_order_release);
       mLoadState.store(rvrse::ESampleLoadState::Ready);
 
       // Update UI on the main thread via SendControlMsgFromDelegate isn't ideal,
@@ -147,24 +150,102 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
 void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 {
   const int nChans = NOutChansConnected();
-  
-  // For now, output silence — sample playback comes in rverse-p38
-  for (int s = 0; s < nFrames; s++) {
-    for (int c = 0; c < nChans; c++) {
-      outputs[c][s] = 0.0;
+  const double masterVol = GetParam(kParamMasterVol)->Value() / 100.0;
+
+  // Check if a new sample is ready from the loader thread (lock-free flag)
+  if (mNewSampleReady.load(std::memory_order_acquire))
+  {
+    {
+      std::lock_guard<std::mutex> lock(mSampleMutex);
+      mPlaySample = mHitSample;
     }
+    mNewSampleReady.store(false, std::memory_order_release);
+    mPlaybackPos = -1; // Reset playback when new sample arrives
   }
+
+  // Get local pointer — no further locking needed
+  const auto& sample = mPlaySample;
+
+  for (int s = 0; s < nFrames; s++)
+  {
+    // Process MIDI events at this sample offset
+    while (!mMidiQueue.Empty() && mMidiQueue.Peek().mOffset <= s)
+    {
+      const IMidiMsg& msg = mMidiQueue.Peek();
+
+      if (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() > 0)
+      {
+        // Note-on: restart playback from the beginning
+        mPlaybackPos = 0;
+        mVelocityGain = static_cast<float>(msg.Velocity()) / 127.0f;
+        mFadeOutRemaining = 0; // Cancel any active fade-out
+      }
+      else if (msg.StatusMsg() == IMidiMsg::kNoteOff ||
+               (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() == 0))
+      {
+        // Note-off: begin fade-out instead of hard stop
+        if (mPlaybackPos >= 0)
+        {
+          mFadeOutRemaining = mFadeOutLength;
+        }
+      }
+
+      mMidiQueue.Remove();
+    }
+
+    // Generate output
+    float outL = 0.0f;
+    float outR = 0.0f;
+
+    if (mPlaybackPos >= 0 && sample && sample->IsLoaded())
+    {
+      if (mPlaybackPos < sample->NumFrames())
+      {
+        outL = sample->mLeft[mPlaybackPos] * mVelocityGain;
+        outR = sample->mRight[mPlaybackPos] * mVelocityGain;
+
+        // Apply fade-out envelope if active
+        if (mFadeOutRemaining > 0)
+        {
+          const float fadeGain = static_cast<float>(mFadeOutRemaining) / static_cast<float>(mFadeOutLength);
+          outL *= fadeGain;
+          outR *= fadeGain;
+          mFadeOutRemaining--;
+
+          if (mFadeOutRemaining == 0)
+          {
+            // Fade complete — stop playback
+            mPlaybackPos = -1;
+          }
+        }
+
+        if (mPlaybackPos >= 0) mPlaybackPos++;
+      }
+      else
+      {
+        // Reached end of sample — stop playback
+        mPlaybackPos = -1;
+      }
+    }
+
+    // Apply master volume and write to output
+    if (nChans >= 1) outputs[0][s] = outL * masterVol;
+    if (nChans >= 2) outputs[1][s] = outR * masterVol;
+  }
+
+  mMidiQueue.Flush(nFrames);
 }
 
 void RVRSE::ProcessMidiMsg(const IMidiMsg& msg)
 {
-  // MIDI handling will be implemented in rverse-p38
-  // For now, just pass through to the base class
+  TRACE
+  mMidiQueue.Add(msg);
 }
 
 void RVRSE::OnReset()
 {
-  // Called when sample rate or block size changes
-  // Will be used to resample loaded samples in future tasks
+  mMidiQueue.Resize(GetBlockSize());
+  // Compute fade-out length from sample rate (e.g., 5ms at 44100 Hz = 220 samples)
+  mFadeOutLength = std::max(1, static_cast<int>(GetSampleRate() * rvrse::kNoteOffFadeMs / 1000.0));
 }
 #endif

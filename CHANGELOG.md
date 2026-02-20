@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- MIDI note-on triggers sample playback with velocity scaling (rverse-p38)
+- Sample-accurate MIDI timing via `IMidiQueue`
+- 5ms note-off fade-out envelope (anti-click)
 - Sample loading via dr_libs (WAV + AIFF support) (rverse-g1x)
 - `SampleData.h` — deinterleaved stereo float32 sample buffer struct
 - `SampleLoader.h/.cpp` — stateless offline loading functions
