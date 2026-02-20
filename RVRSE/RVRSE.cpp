@@ -25,7 +25,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
     const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
     const IRECT titleBounds = innerBounds.GetCentredInside(300, 60).GetVShifted(-80.f);
     const IRECT loadBtnBounds = innerBounds.GetCentredInside(200, 40);
-    const IRECT sampleNameBounds = innerBounds.GetCentredInside(400, 24).GetVShifted(40.f);
+    const IRECT sampleNameBounds = innerBounds.GetCentredInside(600, 24).GetVShifted(40.f);
 
     if (pGraphics->NControls()) {
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
@@ -64,13 +64,11 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pCaller->GetUI()->PromptForFile(fileName, path, EFileAction::Open,
         rvrse::kSupportedAudioExts,
         [this, pCaller](const WDL_String& fileName, const WDL_String& path) {
+          // Note: on macOS, iPlug2 sets fileName to the FULL path,
+          // and path to the directory with trailing slash.
           if (fileName.GetLength() > 0)
           {
-            WDL_String fullPath;
-            fullPath.Set(path.Get());
-            fullPath.Append("/");
-            fullPath.Append(fileName.Get());
-            LoadSampleFromFile(fullPath.Get());
+            LoadSampleFromFile(fileName.Get());
           }
         });
     }, "LOAD SAMPLE", buttonStyle), kCtrlTagLoadButton);
