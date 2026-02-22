@@ -1,3 +1,4 @@
-# RVRSE readme
+# RVRSE — Plugin Source
 
-iPlug2 template project
+This directory contains the RVRSE plugin source code.
+See the [project README](../README.md) for architecture overview, build instructions, and usage.
