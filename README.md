@@ -6,8 +6,9 @@ RVRSE generates a reverse-reverb riser automatically from any loaded hit sample,
 original hit at a tempo-synced beat boundary. One sample in → complete transition out. No manual
 editing, no extra samples needed.
 
-> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline working. Stutter gate, GUI polish,
-> and CI still in progress. See [CHANGELOG.md](./CHANGELOG.md) for details.
+> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline and stutter gate working.
+> GUI, parameter exposure, CI, and release packaging still in progress.
+> See [CHANGELOG.md](./CHANGELOG.md) and the Release Preparation Epic (`rverse-0v6`) for details.
 
 ---
 
@@ -24,8 +25,9 @@ editing, no extra samples needed.
 9. [Plugin Formats](#plugin-formats)
 10. [Usage in a DAW](#usage-in-a-daw)
 11. [Project Structure](#project-structure)
-12. [Contributing](#contributing)
-13. [License](#license)
+12. [Roadmap — v1.0 Release](#roadmap--v10-release)
+13. [Contributing](#contributing)
+14. [License](#license)
 
 ---
 
@@ -357,10 +359,63 @@ rverse/
 ├── build/                    # CMake build output (not committed)
 ├── CMakeLists.txt            # Top-level CMake configuration
 ├── RVRSE_BRIEF.md            # Full product specification
+├── UAT_PLAYBOOK.md           # Manual test scenarios and pass criteria
 ├── CHANGELOG.md              # Release notes (Keep a Changelog format)
 ├── AGENTS.md                 # AI agent instructions and workflow rules
-└── LICENSE                   # Project license
+└── LICENSE                   # MIT license
 ```
+
+---
+
+## Roadmap — v1.0 Release
+
+Tracked as the **Release Preparation Epic** (`rverse-0v6`). Run `bd children rverse-0v6` for
+the full dependency tree.
+
+### Phase 1 — Critical Fixes
+
+| Issue | Priority | Description |
+|-------|----------|-------------|
+| `rverse-g67` | P2 | Replace all AcmeInc placeholder branding with SamuFL identity |
+| `rverse-jwf` | P1 | Replace installer license.rtf placeholder with actual MIT license |
+| `rverse-lxg` | P0 | Set up GitHub Actions CI (Windows + macOS) |
+
+### Phase 2 — Feature Completion
+
+| Issue | Priority | Description | Blocked by |
+|-------|----------|-------------|------------|
+| `rverse-nqg` | P1 | Expose remaining DSP params (Lush, Riser Length, Fade In, Hit Vol, Dry/Wet) | — |
+| `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | `rverse-nqg` |
+| `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | — |
+| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | — |
+
+### Phase 3 — Documentation & Polish
+
+| Issue | Priority | Description | Blocked by |
+|-------|----------|-------------|------------|
+| `rverse-6fl` | P0 | Add Catch2 test framework and tests/ directory | — |
+| `rverse-2uq` | P0 | Unit tests for existing DSP modules | `rverse-6fl` |
+| `rverse-zvc` | P2 | Write user manual (LaTeX → PDF) | `rverse-ebv` |
+| `rverse-jaj` | P2 | Automate version number sync (plists, installer, config.h) | — |
+| `rverse-nwe` | P2 | Add Pluginval to CI pipeline | `rverse-lxg` |
+| `rverse-k4o` | P3 | Add CONTRIBUTING.md and CODE_OF_CONDUCT.md | — |
+
+### Phase 4 — QA & Release
+
+| Issue | Priority | Description | Blocked by |
+|-------|----------|-------------|------------|
+| `rverse-2rc` | P2 | Validate on macOS (Cubase, Studio One, Logic) | — |
+| `rverse-46w` | P2 | Validate on Windows (Cubase, Studio One) | — |
+| `rverse-t28` | P2 | Tag v1.0.0 and publish GitHub release | `rverse-jaj` |
+| `rverse-0iz` | P3 | Set up platform installers (InnoSetup + macOS pkg) | `rverse-g67`, `rverse-jwf` |
+
+### Nice-to-Have (post-v1.0 or if time permits)
+
+| Issue | Priority | Description |
+|-------|----------|-------------|
+| `rverse-0gq` | P3 | Add tempo-synced stutter rate option |
+| `rverse-ttr` | P3 | Clean up Windows packaging scripts |
+| `rverse-rar` | P3 | Fix placeholder content in installer RTFs |
 
 ---
 
