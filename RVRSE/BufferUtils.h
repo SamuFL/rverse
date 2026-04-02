@@ -172,15 +172,21 @@ inline void trimTrailingSilenceStereo(std::vector<float>& left,
 {
   if (left.empty() && right.empty()) return;
 
-  const int len = static_cast<int>(std::max(left.size(), right.size()));
+  // Ensure both channels are the same length (pad shorter with silence)
+  if (left.size() != right.size())
+  {
+    const size_t maxLen = std::max(left.size(), right.size());
+    left.resize(maxLen, 0.0f);
+    right.resize(maxLen, 0.0f);
+  }
+
+  const int len = static_cast<int>(left.size());
   int lastLoud = -1;
 
   for (int i = len - 1; i >= 0; --i)
   {
-    const float absL = (i < static_cast<int>(left.size()))
-                         ? std::abs(left[static_cast<size_t>(i)]) : 0.0f;
-    const float absR = (i < static_cast<int>(right.size()))
-                         ? std::abs(right[static_cast<size_t>(i)]) : 0.0f;
+    const float absL = std::abs(left[static_cast<size_t>(i)]);
+    const float absR = std::abs(right[static_cast<size_t>(i)]);
 
     if (std::max(absL, absR) >= threshold)
     {

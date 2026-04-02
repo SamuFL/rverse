@@ -7,9 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Fixed
-- **Critical:** Reverb tail was truncated — output buffer was same size as input, producing no reverb tail. Now pads source with 5 seconds of silence so the Schroeder reverb rings out naturally, then trims trailing silence. This is the core of the reverse-reverb effect. (rverse-0d0)
-
 ### Added
 - `trimTrailingSilence` / `trimTrailingSilenceStereo` in BufferUtils.h — removes near-silent tail samples below a configurable threshold (rverse-0d0)
 - `kReverbTailSeconds` (5.0s) and `kSilenceThreshold` (-30 dB) constants in Constants.h (rverse-0d0)
@@ -26,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `BufferUtils.h` — in-place stereo buffer reversal, linear resampling, tail fade-out utilities (rverse-cmf)
 
 ### Fixed
+- **Critical:** Reverb tail was truncated — output buffer was same size as input, producing no reverb tail. Now pads source with 5 seconds of silence so the Schroeder reverb rings out naturally, then trims trailing silence. This is the core of the reverse-reverb effect. (rverse-0d0)
 - Hit sample now resampled to DAW output rate on load — fixes pitched-down playback with 96kHz+ files (rverse-djb)
 - Offline pipeline resamples source to output rate before processing — riser length now correct regardless of file sample rate (rverse-djb)
 - Riser tail fade-out (1/16 beat) prevents reversed transient from clashing with hit (rverse-djb)
