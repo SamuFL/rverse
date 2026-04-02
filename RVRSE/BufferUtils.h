@@ -120,4 +120,91 @@ inline void applyTailFadeOutStereo(std::vector<float>& left,
   applyTailFadeOut(right, fadeSamples);
 }
 
+// ---------------------------------------------------------------------------
+// Silence trimming
+// ---------------------------------------------------------------------------
+
+/// Trim trailing near-silent samples from a mono buffer.
+/// Scans from the end and removes samples whose absolute value is below
+/// `threshold`. A small margin of `marginSamples` is kept after the last
+/// above-threshold sample to avoid cutting into the natural decay.
+///
+/// @param buf             Buffer to trim (modified in-place)
+/// @param threshold       Amplitude below which samples count as silent
+/// @param marginSamples   Extra samples to keep beyond the last loud sample
+inline void trimTrailingSilence(std::vector<float>& buf, float threshold,
+                                int marginSamples = 64)
+{
+  if (buf.empty()) return;
+
+  int lastLoud = -1;
+  for (int i = static_cast<int>(buf.size()) - 1; i >= 0; --i)
+  {
+    if (std::abs(buf[static_cast<size_t>(i)]) >= threshold)
+    {
+      lastLoud = i;
+      break;
+    }
+  }
+
+  if (lastLoud < 0)
+  {
+    // Entire buffer is silent — keep at least 1 sample
+    buf.resize(1);
+    return;
+  }
+
+  const int newSize = std::min(static_cast<int>(buf.size()),
+                               lastLoud + 1 + marginSamples);
+  buf.resize(static_cast<size_t>(newSize));
+}
+
+/// Trim trailing near-silent samples from stereo buffers.
+/// Uses the maximum of both channels at each frame to decide the trim point.
+///
+/// @param left / right    Buffers to trim (modified in-place, both resized equally)
+/// @param threshold       Amplitude below which samples count as silent
+/// @param marginSamples   Extra samples to keep beyond the last loud sample
+inline void trimTrailingSilenceStereo(std::vector<float>& left,
+                                      std::vector<float>& right,
+                                      float threshold,
+                                      int marginSamples = 64)
+{
+  if (left.empty() && right.empty()) return;
+
+  // Ensure both channels are the same length (pad shorter with silence)
+  if (left.size() != right.size())
+  {
+    const size_t maxLen = std::max(left.size(), right.size());
+    left.resize(maxLen, 0.0f);
+    right.resize(maxLen, 0.0f);
+  }
+
+  const int len = static_cast<int>(left.size());
+  int lastLoud = -1;
+
+  for (int i = len - 1; i >= 0; --i)
+  {
+    const float absL = std::abs(left[static_cast<size_t>(i)]);
+    const float absR = std::abs(right[static_cast<size_t>(i)]);
+
+    if (std::max(absL, absR) >= threshold)
+    {
+      lastLoud = i;
+      break;
+    }
+  }
+
+  if (lastLoud < 0)
+  {
+    left.resize(1);
+    right.resize(1);
+    return;
+  }
+
+  const int newSize = std::min(len, lastLoud + 1 + marginSamples);
+  left.resize(static_cast<size_t>(newSize));
+  right.resize(static_cast<size_t>(newSize));
+}
+
 } // namespace rvrse

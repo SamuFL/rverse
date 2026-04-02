@@ -213,16 +213,31 @@ private:
         processingRate = sample->mSampleRate;
       }
 
-      // --- Stage 1: Reverb ---
-      const size_t numFrames = srcL.size();
-      std::vector<float> lushedL(numFrames);
-      std::vector<float> lushedR(numFrames);
+      // --- Stage 1: Reverb (with tail extension) ---
+      // The reverb needs room to ring out. We append silence to the source
+      // buffer so the comb/allpass delay lines can decay naturally. Without
+      // this, the reverb tail is truncated and the reversed riser has no
+      // "whoosh" build-up — defeating the entire purpose of the effect.
+      const size_t srcFrames = srcL.size();
+      const size_t tailFrames = static_cast<size_t>(processingRate * kReverbTailSeconds);
+      const size_t totalFrames = srcFrames + tailFrames;
+
+      // Pad source with silence for the reverb tail
+      srcL.resize(totalFrames, 0.0f);
+      srcR.resize(totalFrames, 0.0f);
+
+      std::vector<float> lushedL(totalFrames);
+      std::vector<float> lushedR(totalFrames);
 
       applyReverbStereo(
         srcL.data(), srcR.data(),
         lushedL.data(), lushedR.data(),
-        numFrames, processingRate, lush
+        totalFrames, processingRate, lush
       );
+
+      // Trim trailing silence so the stretcher doesn't waste work on dead air.
+      // The trim is conservative — a small margin ensures no audible decay is lost.
+      trimTrailingSilenceStereo(lushedL, lushedR, kSilenceThreshold);
 
       // Abort check
       if (mGeneration.load(std::memory_order_acquire) != generation)

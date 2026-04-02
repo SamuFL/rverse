@@ -28,6 +28,17 @@ constexpr double kTuneMinSemitones   = -24.0;
 constexpr double kTuneMaxSemitones   =  24.0;
 
 // --- Reverb (Schroeder / Moorer) ---
+/// Maximum reverb tail duration appended to the source sample before processing.
+/// This silence extension allows the reverb to ring out naturally, producing the
+/// characteristic reverse-reverb "whoosh" that builds toward the hit.
+/// A generous value ensures even high-lush settings decay fully.
+constexpr double kReverbTailSeconds  = 5.0;     ///< Seconds of silence appended for reverb tail
+
+/// Amplitude threshold below which trailing samples are considered silent
+/// and trimmed after reverb processing. -30 dB ≈ 0.032.
+/// The riser fade-in envelope masks any residual energy at the trim point.
+constexpr float  kSilenceThreshold   = 0.032f;
+
 constexpr int   kNumCombs            = 8;       ///< Number of parallel comb filters
 constexpr int   kNumAllpasses        = 4;       ///< Number of series allpass filters
 constexpr float kReverbMinRoomFactor = 0.5f;    ///< Room size multiplier at Lush = 0
