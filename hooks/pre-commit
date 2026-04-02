@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# pre-commit hook — Catch common mistakes before they enter history.
+#
+# Checks:
+#   1. No merge conflict markers in staged files
+#   2. No excessively large files (>5 MB)
+#   3. No debug leftovers (std::cout debugging, #pragma message)
+#   4. No secrets patterns (API keys, tokens)
+
+set -euo pipefail
+
+ERRORS=0
+
+# Get list of staged files (added/modified, not deleted)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+
+if [ -z "$STAGED_FILES" ]; then
+    exit 0
+fi
+
+# --- Check 1: Merge conflict markers ---
+CONFLICT_FILES=""
+for file in $STAGED_FILES; do
+    if [ -f "$file" ] && grep -qE "^(<{7}|={7}|>{7})" "$file" 2>/dev/null; then
+        CONFLICT_FILES="$CONFLICT_FILES  $file\n"
+    fi
+done
+
+if [ -n "$CONFLICT_FILES" ]; then
+    echo "❌ Merge conflict markers found in staged files:"
+    echo -e "$CONFLICT_FILES"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# --- Check 2: Large files (>5 MB) ---
+LARGE_FILES=""
+for file in $STAGED_FILES; do
+    if [ -f "$file" ]; then
+        FILE_SIZE=$(wc -c < "$file" 2>/dev/null | tr -d ' ')
+        if [ "$FILE_SIZE" -gt 5242880 ] 2>/dev/null; then
+            SIZE_MB=$(awk "BEGIN {printf \"%.1f\", $FILE_SIZE / 1048576}")
+            LARGE_FILES="$LARGE_FILES  $file (${SIZE_MB} MB)\n"
+        fi
+    fi
+done
+
+if [ -n "$LARGE_FILES" ]; then
+    echo "❌ Large files staged (>5 MB) — consider .gitignore or Git LFS:"
+    echo -e "$LARGE_FILES"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# --- Check 3: Debug leftovers in C++ source files ---
+DEBUG_FILES=""
+for file in $STAGED_FILES; do
+    if echo "$file" | grep -qE '\.(cpp|h|hpp|cc|cxx)$'; then
+        if [ -f "$file" ]; then
+            # Check only the staged content (not working tree)
+            STAGED_CONTENT=$(git show ":$file" 2>/dev/null || true)
+            if echo "$STAGED_CONTENT" | grep -nE '(std::cout\s*<<|printf\s*\(|#pragma\s+message)' 2>/dev/null | head -3 > /dev/null 2>&1; then
+                MATCHES=$(echo "$STAGED_CONTENT" | grep -nE '(std::cout\s*<<|printf\s*\(|#pragma\s+message)' 2>/dev/null | head -3)
+                if [ -n "$MATCHES" ]; then
+                    DEBUG_FILES="$DEBUG_FILES  $file:\n$(echo "$MATCHES" | sed 's/^/    /')\n"
+                fi
+            fi
+        fi
+    fi
+done
+
+if [ -n "$DEBUG_FILES" ]; then
+    echo "⚠️  Possible debug statements in staged C++ files:"
+    echo -e "$DEBUG_FILES"
+    echo "   If intentional, use DBGMSG() (iPlug2) instead of std::cout/printf."
+    echo "   To bypass: git commit --no-verify"
+    # Warning only — don't block the commit
+fi
+
+# --- Check 4: Secrets / API key patterns ---
+SECRET_FILES=""
+for file in $STAGED_FILES; do
+    if [ -f "$file" ]; then
+        STAGED_CONTENT=$(git show ":$file" 2>/dev/null || true)
+        if echo "$STAGED_CONTENT" | grep -qEi '(api[_-]?key|api[_-]?secret|auth[_-]?token|password)\s*[:=]\s*["\x27][^"\x27]{8,}' 2>/dev/null; then
+            SECRET_FILES="$SECRET_FILES  $file\n"
+        fi
+    fi
+done
+
+if [ -n "$SECRET_FILES" ]; then
+    echo "❌ Possible secrets/API keys detected in staged files:"
+    echo -e "$SECRET_FILES"
+    echo "   Move secrets to environment variables or a .env file (in .gitignore)."
+    ERRORS=$((ERRORS + 1))
+fi
+
+# --- Result ---
+if [ "$ERRORS" -gt 0 ]; then
+    echo ""
+    echo "Commit blocked. Fix the issues above or use --no-verify to bypass."
+    exit 1
+fi
+
+exit 0

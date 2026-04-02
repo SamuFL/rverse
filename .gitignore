@@ -1,0 +1,43 @@
+# Build output
+build/
+build-*/
+
+# IDE files
+.DS_Store
+*.xcuserdata
+*.xcworkspace/xcuserdata/
+.vs/
+*.suo
+*.user
+*.sdf
+ipch/
+.vscode/mcp.json
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled
+*.o
+*.obj
+*.exe
+*.dll
+*.dylib
+*.so
+*.app
+*.vst3
+*.component
+*.clap
+*.aaxplugin
+
+# Beads runtime files (NOT the JSONL data — those are tracked)
+.beads/.beads-credential-key
+.beads/dolt-server.*
+.beads/embeddeddolt/
+.beads/backup/
+
+# iPlug2 dependencies (downloaded at build time)
+iPlug2/Dependencies/Build/
+iPlug2/Dependencies/IPlug/

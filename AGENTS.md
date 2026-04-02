@@ -9,7 +9,7 @@ Read it fully before touching any code.
 
 RVRSE is a free, open-source audio plugin (VST3 / AU / CLAP) built with **iPlug2 and C++17**.
 It generates a reverse-reverb riser automatically from any loaded hit sample and fires the hit
-at a tempo-synced beat boundary. Full spec: [`BRIEF.md`](./BRIEF.md).
+at a tempo-synced beat boundary. Full spec: [`RVRSE_BRIEF.md`](./RVRSE_BRIEF.md).
 
 This is a **warmup project** for the larger OpenSampler initiative. Correctness and clean
 architecture matter more than speed of delivery.
@@ -91,7 +91,34 @@ This lets `bd doctor` detect orphaned issues (committed but not closed).
 
 ---
 
-## 3. Architecture Rules — Non-Negotiable
+## 3. Library Documentation — Context7
+
+This project uses the **Context7 MCP server** to provide agents with up-to-date library
+documentation. Before implementing any call to an external library or framework, **check
+Context7 first** to verify the correct API.
+
+### When to use Context7
+
+- **iPlug2 API calls** — `IPlug`, `IGraphics`, `IControl`, `IParam`, `IMidiQueue`, etc.
+- **dr_libs** — `dr_wav`, `dr_flac` header-only audio codecs.
+- **C++ standard library** — when unsure about C++17 behaviour or edge cases.
+- **CMake** — build system functions, `FetchContent`, target properties.
+- **Any third-party dependency** added in the future.
+
+### Rule
+
+> **Do not guess library APIs.** If you are unsure about a function signature, parameter
+> order, return type, or behaviour, use Context7 to look it up. Incorrect API usage in
+> audio code causes subtle bugs that are painful to diagnose.
+
+### Setup
+
+Context7 is configured in `.vscode/mcp.json` (git-ignored — contains API key).
+See [context7.com](https://context7.com) to obtain an API key.
+
+---
+
+## 4. Architecture Rules — Non-Negotiable
 
 The codebase is split into two strictly separated layers. Violating this causes audio glitches
 and subtle real-time bugs that are painful to debug.
@@ -121,7 +148,7 @@ Runs in `ProcessBlock()` on the **audio thread**. Must be lock-free and allocati
 
 ---
 
-## 4. Code Standards
+## 5. Code Standards
 
 - **Language:** C++17. No newer features unless iPlug2 requires them.
 - **No allocations on the audio thread.** Allocate buffers in the offline layer only.
@@ -135,7 +162,7 @@ Runs in `ProcessBlock()` on the **audio thread**. Must be lock-free and allocati
 
 ---
 
-## 5. Documentation Rules
+## 6. Documentation Rules
 
 Keeping documentation current is **not optional**. It is part of completing any task.
 
@@ -167,7 +194,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/) conventions:
 
 ---
 
-## 6. Build & Test
+## 7. Build & Test
 
 ```bash
 # Configure (first time)
@@ -183,82 +210,108 @@ cmake --build build --config Debug
 ```
 
 There is currently no automated test suite (warmup project scope). Manually validate in a
-DAW after any change to the DSP pipeline. Recommended: REAPER (fast plugin reload).
+DAW after any change to the DSP pipeline. Recommended DAWs: **Cubase**, **Studio One**,
+**Logic** (macOS only).
 
 ---
 
-## 7. Initial Work Plan
+## 8. Git-Flow Branching Strategy
 
-The tasks below represent the full MVP build sequence. They should be created in Beads at the
-start of the first session using `bd create`. Dependencies are listed so the agent can wire
-them with `bd dep add`.
+This project uses a standard **git-flow** branching model. Follow it without exception.
 
-**Bootstrap first (no dependencies):**
+| Branch | Purpose | Merges into |
+|---|---|---|
+| `main` | Production-ready releases only. Tagged with version numbers. | — |
+| `develop` | Integration branch. All feature work merges here first. | `main` (via release branch) |
+| `feature/<name>` | One branch per task/feature. Short-lived. | `develop` |
+| `release/<version>` | Release candidate. Only bug fixes, no new features. | `main` + `develop` |
+| `hotfix/<name>` | Emergency fixes against `main`. | `main` + `develop` |
 
-| Priority | Title | Type | Notes |
-|---|---|---|---|
-| P0 | Set up iPlug2OOS repo and CMake build | task | Use iPlug2OOS template. Verify empty plugin builds on Windows + macOS. |
-| P0 | Set up GitHub Actions CI (Windows + macOS) | task | Build artefacts on every push. |
+### Workflow Rules
 
-**Core DSP (depends on build working):**
+1. **Never commit directly to `main` or `develop`.** Always use a feature branch.
+2. **Feature branches** are created from `develop` and merged back via PR or fast-forward:
+   ```bash
+   git checkout develop
+   git pull
+   git checkout -b feature/<beads-id>-short-description
+   # ... do work, commit with beads ID in message ...
+   git checkout develop
+   git merge feature/<beads-id>-short-description
+   git branch -d feature/<beads-id>-short-description
+   git push
+   ```
+3. **Release branches** are created from `develop` when all planned features are merged:
+   ```bash
+   git checkout develop
+   git checkout -b release/0.1.0
+   # ... UAT, bug fixes only ...
+   git checkout main
+   git merge release/0.1.0
+   git tag -a v0.1.0 -m "Release v0.1.0"
+   git checkout develop
+   git merge release/0.1.0
+   git branch -d release/0.1.0
+   git push --all && git push --tags
+   ```
+4. **Name feature branches** using the Beads ID: `feature/rverse-uj4-cpp-environment`.
 
-| Priority | Title | Type | Notes |
-|---|---|---|---|
-| P0 | Implement sample loading with dr_libs | task | WAV + AIFF. Store as float32 stereo buffer. |
-| P0 | Implement Schroeder algorithmic reverb | task | Stateless function. Lush param = room size + wet gain. |
-| P0 | Implement buffer reversal | task | In-place reverse of the lushed buffer. |
-| P0 | Implement OLA time-stretcher | task | Stateless. Stretch factor from Riser Length + host BPM. |
-| P1 | Implement offline pipeline orchestrator (RvrseProcessor) | task | Chains: load → reverb → reverse → stretch. Runs off audio thread. Invalidates and rebuilds on param change. |
-| P0 | Implement real-time stutter gate (Stutter.h) | task | Per-sample gate. Rate + Depth as live params. MIDI CC responsive. Audio thread only. |
-| P0 | Implement RvrseVoice (real-time playback) | task | Reads final_riser[]. Fires hit at calculated offset. Applies stutter + fade envelope. |
-| P1 | Wire offline ↔ real-time buffer handoff | task | Lock-free transfer of final_riser[] from RvrseProcessor to RvrseVoice. |
+---
 
-**MIDI + Parameters (depends on voice working):**
+## 9. Git Hooks
 
-| Priority | Title | Type | Notes |
-|---|---|---|---|
-| P0 | Implement MIDI note-on trigger | task | Starts riser + schedules hit offset from Riser Length + host BPM. |
-| P1 | Implement MIDI CC for Stutter Rate + Depth | task | Hardcoded defaults: CC1 = Rate, CC11 = Depth. |
-| P2 | Implement Riser Tune + Hit Tune (pitch shift) | task | Linear resampling for MVP. |
+This project uses **versioned git hooks** in the `hooks/` directory, activated via
+`git config core.hooksPath hooks`. They are enforced automatically — no manual setup needed
+after cloning (the config is in `.git/config`).
 
-**GUI (depends on parameters working):**
-
-| Priority | Title | Type | Notes |
-|---|---|---|---|
-| P1 | Build basic IGraphics layout (dark theme) | task | Three zones: riser panel, hit panel, bottom bar. |
-| P1 | Implement knobs for all parameters | task | Use IPlug2 IKnobControl. Labels. MIDI CC indicator (◉) for stutter knobs. |
-| P2 | Implement WaveformView control | task | Shows riser → hit as one continuous waveform. Playhead scrubs during playback. |
-
-**Polish + Release (depends on all above):**
-
-| Priority | Title | Type | Notes |
-|---|---|---|---|
-| P1 | Write README.md | task | Installation, build instructions, plugin description, screenshots. |
-| P2 | Validate on Windows (Reaper) | task | Manual QA: load sample, trigger, tweak CC, verify timing. |
-| P2 | Validate on macOS (Reaper + Logic) | task | Same as above plus AU format. |
-| P2 | Tag v0.1.0 and publish GitHub release | task | Attach built artefacts from CI. |
-
-### How to create these in Beads
-
-At the start of your first session, run:
+### Setup (once per clone)
 
 ```bash
-bd prime
-# Then create the bootstrap tasks first:
-bd create "Set up iPlug2OOS repo and CMake build" -t task -p 0
-bd create "Set up GitHub Actions CI" -t task -p 0
-# ... continue for all tasks above
-# Then wire dependencies:
-bd dep add <sample-loading-id> <cmake-id>
-# etc.
+git config core.hooksPath hooks
 ```
 
-Or ask Copilot in VS Code chat: *"Create all the RVRSE initial tasks in Beads as described
-in AGENTS.md, wire their dependencies, and show me the ready queue."*
+### Active Hooks
+
+| Hook | Behaviour | Bypass |
+|---|---|---|
+| **commit-msg** | Requires a Beads issue ID (`bd-xxxx` or `rverse-xxxx`) in every commit message. Exempts merge commits, beads sync, reverts, and version tags. | `--no-verify` |
+| **pre-commit** | Blocks commits containing merge conflict markers, files >5 MB, or possible secrets/API keys. Warns (non-blocking) on `std::cout`/`printf` debug statements in C++ files. | `--no-verify` |
+| **pre-push** | **Blocks** direct pushes to `main` (must use release/ or hotfix/ branches). **Warns** on direct pushes to `develop` (prefer feature branches). Runs `bd doctor` as a non-blocking health check. | `--no-verify` |
+
+### Adding New Hooks
+
+1. Create the hook script in `hooks/` (must be executable: `chmod +x hooks/<name>`)
+2. Follow the naming convention from `githooks(5)`: `pre-commit`, `commit-msg`, `pre-push`, etc.
+3. Document the hook in this table
+4. Commit the hook — it's versioned and shared with all contributors
+
+> **`--no-verify` is for emergencies only.** If you find yourself bypassing hooks regularly,
+> fix the hook or fix your workflow — don't normalise skipping checks.
 
 ---
 
-## 8. What "Done" Means for Any Task
+## 10. Work Plan
+
+All tasks are tracked in Beads. Run `bd ready 2>&1 | cat` to see what's unblocked.
+Run `bd list 2>&1 | cat` to see all tasks with dependency info.
+
+The build sequence follows five phases, each building on the last:
+
+| Phase | Goal | Key Principle |
+|---|---|---|
+| **0 — Setup** | C++ environment, iPlug2OOS scaffold, CI | Get an empty plugin building |
+| **1 — Playable MVP** | Load sample, MIDI trigger, hear sound, initial README | Shortest path to audio output |
+| **2 — Riser Pipeline** | Reverb → reverse → stretch → riser+hit playback | The core feature |
+| **3 — Real-Time FX** | Stutter gate, MIDI CC, pitch shift | Expressiveness layer |
+| **4 — GUI** | Full dark-theme layout, knobs, waveform view | Polish the interface |
+| **5 — Release** | DAW validation (Cubase, Studio One, Logic), v0.1.0 tag | Ship it |
+
+> **Note:** Tasks are fully defined in Beads with descriptions, priorities, and dependency
+> chains. Do not duplicate the task list here — Beads is the single source of truth.
+
+---
+
+## 11. What "Done" Means for Any Task
 
 A task is **done** when all of the following are true:
 
@@ -272,3 +325,29 @@ A task is **done** when all of the following are true:
 ---
 
 *This file is part of the RVRSE project. Keep it accurate as the project evolves.*
+
+## Landing the Plane (Session Completion)
+
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+
+**MANDATORY WORKFLOW:**
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   bd sync
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
+
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# pre-push hook — Enforce git-flow branching rules.
+#
+# Rules:
+#   1. Never push directly to 'main' — use release/ or hotfix/ branches
+#   2. Warn (but allow) pushes to 'develop' — prefer feature/ branches
+#   3. Run 'bd doctor' to surface beads hygiene issues (non-blocking)
+
+set -euo pipefail
+
+REMOTE="$1"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+# --- Rule 1: Block direct pushes to main ---
+if [ "$CURRENT_BRANCH" = "main" ]; then
+    echo ""
+    echo "❌ pre-push hook: Direct push to 'main' is not allowed."
+    echo ""
+    echo "   This project uses git-flow. To get code into main:"
+    echo "     1. Merge your feature branch into 'develop'"
+    echo "     2. Create a release/ branch from 'develop'"
+    echo "     3. Merge the release/ branch into 'main'"
+    echo ""
+    echo "   For emergencies: create a hotfix/ branch from 'main'."
+    echo "   To bypass (emergencies only): git push --no-verify"
+    echo ""
+    exit 1
+fi
+
+# --- Rule 2: Warn on direct push to develop ---
+if [ "$CURRENT_BRANCH" = "develop" ]; then
+    echo ""
+    echo "⚠️  Pushing directly to 'develop'. Prefer feature branches:"
+    echo "   git checkout -b feature/<beads-id>-description"
+    echo ""
+fi
+
+# --- Rule 3: Beads doctor check (non-blocking) ---
+if command -v bd &> /dev/null; then
+    echo "🔍 Running beads doctor..."
+    BD_OUTPUT=$(bd doctor 2>&1 || true)
+    if echo "$BD_OUTPUT" | grep -qiE "(warning|error|orphan|issue)"; then
+        echo "$BD_OUTPUT" | head -20
+        echo ""
+        echo "   ℹ️  Beads issues detected (non-blocking). Run 'bd doctor' for details."
+    else
+        echo "   ✅ Beads health check passed."
+    fi
+    echo ""
+fi
+
+exit 0
