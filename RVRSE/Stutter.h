@@ -20,7 +20,8 @@ namespace rvrse {
 /// Reset this when a new note starts.
 struct StutterState
 {
-  int phase = 0;  ///< Current sample position within the stutter period
+  int phase = 0;          ///< Current sample position within the stutter period
+  float smoothedGain = 1.0f; ///< One-pole smoothed output gain (starts at pass-through)
 };
 
 /// Compute the stutter gate gain for a single sample.
@@ -38,44 +39,60 @@ inline float stutterProcess(StutterState& state,
                             float depth,
                             double sampleRate)
 {
-  // Stutter off or depth at zero → pass through
+  float targetGain;
+
+  // Stutter off or depth at zero → target is pass-through
   if (rateHz <= 0.0f || depth <= 0.0f)
-    return 1.0f;
-
-  // Compute period in samples from Hz
-  const int period = std::max(1, static_cast<int>(sampleRate / static_cast<double>(rateHz)));
-  const int half = period / 2;
-
-  // Ramp length for anti-click fade (trapezoidal wave instead of square)
-  const int ramp = std::max(1, std::min(half / 4,
-    static_cast<int>(sampleRate * kStutterFadeMs / 1000.0)));
-
-  const int pos = state.phase % period;
-
-  // Trapezoidal gate: ramp up → sustain at 1.0 → ramp down → sustain at 0.0
-  float gate;
-  if (pos < ramp)
-    gate = static_cast<float>(pos) / static_cast<float>(ramp);           // ramp up
-  else if (pos < half - ramp)
-    gate = 1.0f;                                                          // open
-  else if (pos < half)
-    gate = static_cast<float>(half - pos) / static_cast<float>(ramp);    // ramp down
+  {
+    targetGain = 1.0f;
+  }
   else
-    gate = 0.0f;                                                          // closed
+  {
+    // Compute period in samples from Hz
+    const int period = std::max(1, static_cast<int>(sampleRate / static_cast<double>(rateHz)));
+    const int half = period / 2;
 
-  // Advance phase (wrap to avoid eventual overflow)
-  state.phase++;
-  if (state.phase >= period)
-    state.phase -= period;
+    // Ramp length for anti-click fade (trapezoidal wave instead of square)
+    const int ramp = std::max(1, std::min(half / 4,
+      static_cast<int>(sampleRate * kStutterFadeMs / 1000.0)));
 
-  // Blend between dry (1.0) and gated signal based on depth
-  return 1.0f - depth * (1.0f - gate);
+    const int pos = state.phase % period;
+
+    // Trapezoidal gate: ramp up → sustain at 1.0 → ramp down → sustain at 0.0
+    float gate;
+    if (pos < ramp)
+      gate = static_cast<float>(pos) / static_cast<float>(ramp);           // ramp up
+    else if (pos < half - ramp)
+      gate = 1.0f;                                                          // open
+    else if (pos < half)
+      gate = static_cast<float>(half - pos) / static_cast<float>(ramp);    // ramp down
+    else
+      gate = 0.0f;                                                          // closed
+
+    // Advance phase (wrap to avoid eventual overflow)
+    state.phase++;
+    if (state.phase >= period)
+      state.phase -= period;
+
+    // Blend between dry (1.0) and gated signal based on depth
+    targetGain = 1.0f - depth * (1.0f - gate);
+  }
+
+  // One-pole smoother — prevents clicks when stutter engages/disengages
+  // or when rate changes cause sudden gain jumps.
+  // Time constant matches kStutterFadeMs for consistent feel.
+  const float alpha = 1.0f / std::max(1.0f,
+    static_cast<float>(sampleRate * kStutterFadeMs / 1000.0));
+  state.smoothedGain += alpha * (targetGain - state.smoothedGain);
+
+  return state.smoothedGain;
 }
 
 /// Reset the stutter state (call on note-on).
 inline void stutterReset(StutterState& state)
 {
   state.phase = 0;
+  state.smoothedGain = 1.0f; // Start at pass-through to avoid click on note-on
 }
 
 } // namespace rvrse
