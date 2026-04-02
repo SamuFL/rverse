@@ -35,8 +35,9 @@ constexpr double kTuneMaxSemitones   =  24.0;
 constexpr double kReverbTailSeconds  = 5.0;     ///< Seconds of silence appended for reverb tail
 
 /// Amplitude threshold below which trailing samples are considered silent
-/// and trimmed after reverb processing. -60 dB ≈ 0.001.
-constexpr float  kSilenceThreshold   = 0.001f;
+/// and trimmed after reverb processing. -30 dB ≈ 0.032.
+/// The riser fade-in envelope masks any residual energy at the trim point.
+constexpr float  kSilenceThreshold   = 0.032f;
 
 constexpr int   kNumCombs            = 8;       ///< Number of parallel comb filters
 constexpr int   kNumAllpasses        = 4;       ///< Number of series allpass filters
