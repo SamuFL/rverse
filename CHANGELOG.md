@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Catch2 v3.7.1 test framework with CTest integration — `cmake --build build --target rvrse_tests && ctest --test-dir build` (rverse-6fl)
+- Smoke tests for DSP headers: Constants, BufferUtils, TimeStretch, Stutter (rverse-6fl)
 - Real-time stutter gate in `Stutter.h` — per-sample trapezoidal gate with continuous Hz rate (0–30 Hz) and anti-click ramps (rverse-n84)
 - Stutter Rate (Hz) and Stutter Depth exposed as DAW-automatable parameters (rverse-n84)
 - MIDI CC control: CC1 (mod wheel) → Stutter Rate, CC11 (expression) → Stutter Depth (rverse-6r2)
