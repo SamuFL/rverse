@@ -91,7 +91,34 @@ This lets `bd doctor` detect orphaned issues (committed but not closed).
 
 ---
 
-## 3. Architecture Rules — Non-Negotiable
+## 3. Library Documentation — Context7
+
+This project uses the **Context7 MCP server** to provide agents with up-to-date library
+documentation. Before implementing any call to an external library or framework, **check
+Context7 first** to verify the correct API.
+
+### When to use Context7
+
+- **iPlug2 API calls** — `IPlug`, `IGraphics`, `IControl`, `IParam`, `IMidiQueue`, etc.
+- **dr_libs** — `dr_wav`, `dr_flac` header-only audio codecs.
+- **C++ standard library** — when unsure about C++17 behaviour or edge cases.
+- **CMake** — build system functions, `FetchContent`, target properties.
+- **Any third-party dependency** added in the future.
+
+### Rule
+
+> **Do not guess library APIs.** If you are unsure about a function signature, parameter
+> order, return type, or behaviour, use Context7 to look it up. Incorrect API usage in
+> audio code causes subtle bugs that are painful to diagnose.
+
+### Setup
+
+Context7 is configured in `.vscode/mcp.json` (git-ignored — contains API key).
+See [context7.com](https://context7.com) to obtain an API key.
+
+---
+
+## 4. Architecture Rules — Non-Negotiable
 
 The codebase is split into two strictly separated layers. Violating this causes audio glitches
 and subtle real-time bugs that are painful to debug.
@@ -121,7 +148,7 @@ Runs in `ProcessBlock()` on the **audio thread**. Must be lock-free and allocati
 
 ---
 
-## 4. Code Standards
+## 5. Code Standards
 
 - **Language:** C++17. No newer features unless iPlug2 requires them.
 - **No allocations on the audio thread.** Allocate buffers in the offline layer only.
@@ -135,7 +162,7 @@ Runs in `ProcessBlock()` on the **audio thread**. Must be lock-free and allocati
 
 ---
 
-## 5. Documentation Rules
+## 6. Documentation Rules
 
 Keeping documentation current is **not optional**. It is part of completing any task.
 
@@ -167,7 +194,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/) conventions:
 
 ---
 
-## 6. Build & Test
+## 7. Build & Test
 
 ```bash
 # Configure (first time)
@@ -188,7 +215,7 @@ DAW after any change to the DSP pipeline. Recommended DAWs: **Cubase**, **Studio
 
 ---
 
-## 7. Git-Flow Branching Strategy
+## 8. Git-Flow Branching Strategy
 
 This project uses a standard **git-flow** branching model. Follow it without exception.
 
@@ -231,7 +258,39 @@ This project uses a standard **git-flow** branching model. Follow it without exc
 
 ---
 
-## 8. Work Plan
+## 9. Git Hooks
+
+This project uses **versioned git hooks** in the `hooks/` directory, activated via
+`git config core.hooksPath hooks`. They are enforced automatically — no manual setup needed
+after cloning (the config is in `.git/config`).
+
+### Setup (once per clone)
+
+```bash
+git config core.hooksPath hooks
+```
+
+### Active Hooks
+
+| Hook | Behaviour | Bypass |
+|---|---|---|
+| **commit-msg** | Requires a Beads issue ID (`bd-xxxx` or `rverse-xxxx`) in every commit message. Exempts merge commits, beads sync, reverts, and version tags. | `--no-verify` |
+| **pre-commit** | Blocks commits containing merge conflict markers, files >5 MB, or possible secrets/API keys. Warns (non-blocking) on `std::cout`/`printf` debug statements in C++ files. | `--no-verify` |
+| **pre-push** | **Blocks** direct pushes to `main` (must use release/ or hotfix/ branches). **Warns** on direct pushes to `develop` (prefer feature branches). Runs `bd doctor` as a non-blocking health check. | `--no-verify` |
+
+### Adding New Hooks
+
+1. Create the hook script in `hooks/` (must be executable: `chmod +x hooks/<name>`)
+2. Follow the naming convention from `githooks(5)`: `pre-commit`, `commit-msg`, `pre-push`, etc.
+3. Document the hook in this table
+4. Commit the hook — it's versioned and shared with all contributors
+
+> **`--no-verify` is for emergencies only.** If you find yourself bypassing hooks regularly,
+> fix the hook or fix your workflow — don't normalise skipping checks.
+
+---
+
+## 10. Work Plan
 
 All tasks are tracked in Beads. Run `bd ready 2>&1 | cat` to see what's unblocked.
 Run `bd list 2>&1 | cat` to see all tasks with dependency info.
@@ -252,7 +311,7 @@ The build sequence follows five phases, each building on the last:
 
 ---
 
-## 9. What "Done" Means for Any Task
+## 11. What "Done" Means for Any Task
 
 A task is **done** when all of the following are true:
 

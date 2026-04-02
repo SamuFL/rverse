@@ -1,0 +1,16 @@
+{
+  // Use CMake Tools as the IntelliSense provider for the C/C++ extension.
+  // This means all include paths, defines, and compiler flags are read
+  // directly from the CMake build — no manual c_cpp_properties.json needed.
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+
+  // Fallback: point directly at compile_commands.json in case CMake Tools
+  // provider isn't active yet.
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+
+  // Point CMake Tools at the existing build directory.
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+
+  // Use Ninja (already installed) for fast builds.
+  "cmake.generator": "Ninja"
+}

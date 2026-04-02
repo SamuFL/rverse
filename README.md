@@ -34,6 +34,7 @@ editing, no extra samples needed.
 ```bash
 git clone --recursive https://github.com/SamuFL/rverse.git
 cd rverse
+git config core.hooksPath hooks   # Enable project git hooks
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ```
