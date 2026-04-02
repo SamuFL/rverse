@@ -32,6 +32,12 @@ Makefile
 *.clap
 *.aaxplugin
 
+# Beads runtime files (NOT the JSONL data — those are tracked)
+.beads/.beads-credential-key
+.beads/dolt-server.*
+.beads/embeddeddolt/
+.beads/backup/
+
 # iPlug2 dependencies (downloaded at build time)
 iPlug2/Dependencies/Build/
 iPlug2/Dependencies/IPlug/
