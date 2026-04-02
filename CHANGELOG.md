@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - Hit sample now resampled to DAW output rate on load — fixes pitched-down playback with 96kHz+ files (rverse-djb)
 - Offline pipeline resamples source to output rate before processing — riser length now correct regardless of file sample rate (rverse-djb)
-- Riser tail fade-out (1 beat) prevents reversed transient from clashing with hit (rverse-djb)
+- Riser tail fade-out (1/16 beat) prevents reversed transient from clashing with hit (rverse-djb)
 - Hit no longer re-triggers on MIDI note-off — `mSamplesFromNoteOn` counter now reset (rverse-djb)
 - Host BPM now read via `GetTempo()` and propagated to offline pipeline — riser re-stretches on tempo change (rverse-djb)
 - `kMaxSampleFrames` now supports up to 192kHz files (was limited to 48kHz) (rverse-djb)

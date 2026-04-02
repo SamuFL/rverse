@@ -14,6 +14,9 @@
 
 namespace rvrse {
 
+/// Portable pi constant (M_PI is not standard C++ and missing on MSVC without _USE_MATH_DEFINES)
+constexpr double kPi = 3.14159265358979323846;
+
 /// Apply Overlap-Add time-stretching to a mono buffer.
 ///
 /// @param input          Source buffer
@@ -49,7 +52,7 @@ inline std::vector<float> stretchBuffer(const std::vector<float>& input,
   for (int i = 0; i < windowSize; ++i)
   {
     const double phase = static_cast<double>(i) / static_cast<double>(windowSize - 1);
-    window[static_cast<size_t>(i)] = static_cast<float>(0.5 * (1.0 - std::cos(2.0 * M_PI * phase)));
+    window[static_cast<size_t>(i)] = static_cast<float>(0.5 * (1.0 - std::cos(2.0 * kPi * phase)));
   }
 
   // Output buffer — zero-initialised for additive overlap

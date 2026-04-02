@@ -47,7 +47,8 @@ SampleLoadResult LoadSample(const std::string& filePath)
     return result;
   }
 
-  if (totalFrames > static_cast<drwav_uint64>(kMaxSampleFrames))
+  const drwav_uint64 maxFramesForRate = static_cast<drwav_uint64>(sampleRate) * kMaxSampleLengthSeconds;
+  if (totalFrames > maxFramesForRate)
   {
     drwav_uninit(&wav);
     result.errorMessage = "Audio file too long (max " + std::to_string(kMaxSampleLengthSeconds) + " seconds at " + std::to_string(sampleRate) + " Hz)";

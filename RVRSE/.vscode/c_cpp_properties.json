@@ -31,7 +31,7 @@
                 "/System/Library/Frameworks",
                 "/Library/Frameworks"
             ],
-            "cppStandard": "c++14"
+            "cppStandard": "c++17"
         },
         {
             "name": "Win32",

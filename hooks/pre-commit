@@ -38,7 +38,7 @@ for file in $STAGED_FILES; do
     if [ -f "$file" ]; then
         FILE_SIZE=$(wc -c < "$file" 2>/dev/null | tr -d ' ')
         if [ "$FILE_SIZE" -gt 5242880 ] 2>/dev/null; then
-            SIZE_MB=$(echo "scale=1; $FILE_SIZE / 1048576" | bc)
+            SIZE_MB=$(awk "BEGIN {printf \"%.1f\", $FILE_SIZE / 1048576}")
             LARGE_FILES="$LARGE_FILES  $file (${SIZE_MB} MB)\n"
         fi
     fi

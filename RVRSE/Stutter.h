@@ -69,10 +69,8 @@ inline float stutterProcess(StutterState& state,
     else
       gate = 0.0f;                                                          // closed
 
-    // Advance phase (wrap to avoid eventual overflow)
-    state.phase++;
-    if (state.phase >= period)
-      state.phase -= period;
+    // Advance phase with modulo wrap (safe even if period shrinks mid-playback)
+    state.phase = (state.phase + 1) % period;
 
     // Blend between dry (1.0) and gated signal based on depth
     targetGain = 1.0f - depth * (1.0f - gate);
