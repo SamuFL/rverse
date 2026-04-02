@@ -19,6 +19,9 @@ constexpr double kRiserLengthDefault = 4.0;    ///< 4 beats
 constexpr double kLushDefault        = 40.0;   ///< Reverb wet amount (0–100%)
 constexpr double kFadeInDefault      = 60.0;   ///< Fade-in shape (0–100%)
 constexpr double kStutterDepthDefault = 50.0;  ///< Stutter wet/dry (0–100%)
+constexpr double kStutterRateMinHz   = 0.0;    ///< Stutter rate minimum (0 = off)
+constexpr double kStutterRateMaxHz   = 30.0;   ///< Stutter rate maximum in Hz
+constexpr double kStutterRateDefaultHz = 0.0;  ///< Stutter rate default (off)
 
 // --- Tuning ---
 constexpr double kTuneMinSemitones   = -24.0;
@@ -48,6 +51,7 @@ constexpr double kRiserTailFadeBeats = 0.0625;  ///< 1/16 of a beat
 // --- Audio ---
 constexpr double kDefaultBPM         = 120.0;
 constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration in milliseconds (anti-click)
+constexpr double kStutterFadeMs      = 2.0;    ///< Stutter gate ramp duration in milliseconds (anti-click)
 
 // --- Sample Loading ---
 constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample length in seconds

@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Real-time stutter gate in `Stutter.h` — per-sample rhythmic gate with tempo-synced subdivisions (1/32 to 1/2 note) (rverse-n84)
-- Stutter Rate and Stutter Depth exposed as DAW-automatable parameters (rverse-n84)
+- Real-time stutter gate in `Stutter.h` — per-sample trapezoidal gate with continuous Hz rate (0–30 Hz) and anti-click ramps (rverse-n84)
+- Stutter Rate (Hz) and Stutter Depth exposed as DAW-automatable parameters (rverse-n84)
 - MIDI CC control: CC1 (mod wheel) → Stutter Rate, CC11 (expression) → Stutter Depth (rverse-6r2)
 - Git hooks: commit-msg (beads ID enforcement), pre-commit (conflict markers, secrets), pre-push (git-flow protection) (rverse-e1u)
 - Riser + hit dual-voice playback: note-on plays reverse-reverb riser, dry hit fires at beat offset (rverse-djb)

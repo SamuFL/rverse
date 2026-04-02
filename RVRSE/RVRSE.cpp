@@ -15,7 +15,8 @@ RVRSE::RVRSE(const InstanceInfo& info)
 : iplug::Plugin(info, MakeConfig(kNumParams, kNumPresets))
 {
   GetParam(kParamMasterVol)->InitDouble("Master Volume", 100., 0., 100.0, 0.01, "%");
-  GetParam(kParamStutterRate)->InitDouble("Stutter Rate", 0., 0., 1.0, 0.01, "");
+  GetParam(kParamStutterRate)->InitDouble("Stutter Rate",
+    rvrse::kStutterRateDefaultHz, rvrse::kStutterRateMinHz, rvrse::kStutterRateMaxHz, 0.1, "Hz");
   GetParam(kParamStutterDepth)->InitDouble("Stutter Depth",
     rvrse::kStutterDepthDefault / 100.0, 0., 1.0, 0.01, "");
 
@@ -176,7 +177,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 {
   const int nChans = NOutChansConnected();
   const double masterVol = GetParam(kParamMasterVol)->Value() / 100.0;
-  const auto stutterRate = rvrse::stutterRateFromNormalised(GetParam(kParamStutterRate)->Value());
+  const auto stutterRateHz = static_cast<float>(GetParam(kParamStutterRate)->Value());
   const float stutterDepth = static_cast<float>(GetParam(kParamStutterDepth)->Value());
   const double sr = GetSampleRate();
 
@@ -264,7 +265,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         const IMidiMsg::EControlChangeMsg cc = msg.ControlChangeIdx();
 
         if (cc == static_cast<IMidiMsg::EControlChangeMsg>(rvrse::CC_STUTTER_RATE))
-          GetParam(kParamStutterRate)->Set(msg.ControlChange(cc));
+          GetParam(kParamStutterRate)->Set(msg.ControlChange(cc) * rvrse::kStutterRateMaxHz);
         else if (cc == static_cast<IMidiMsg::EControlChangeMsg>(rvrse::CC_STUTTER_DEPTH))
           GetParam(kParamStutterDepth)->Set(msg.ControlChange(cc));
       }
@@ -285,7 +286,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
         // Apply stutter gate (per-sample, MIDI CC responsive)
         const float stutterGain = rvrse::stutterProcess(
-          mStutterState, stutterRate, stutterDepth, sr, mLastBPM > 0.0 ? mLastBPM : rvrse::kDefaultBPM);
+          mStutterState, stutterRateHz, stutterDepth, sr);
         riserL *= stutterGain;
         riserR *= stutterGain;
 

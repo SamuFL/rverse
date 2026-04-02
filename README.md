@@ -85,7 +85,8 @@ Runs in `ProcessBlock()` every audio callback. Must be **lock-free** and **alloc
 - Hit playback at calculated beat offset
 - Velocity scaling, fade-out envelopes
 - MIDI message processing (sample-accurate via `IMidiQueue`)
-- *(Future: stutter gate, pitch shift — computed per-sample)*
+- Stutter gate (continuous Hz rate, MIDI CC responsive)
+- *(Future: pitch shift — computed per-sample)*
 
 ### Bridge Between Layers
 
@@ -128,7 +129,7 @@ Every source file belongs to exactly one layer:
 | `BufferUtils.h` | **Offline** | `reverseBuffer`, `resampleLinear`, `applyTailFadeOut` |
 | `TimeStretch.h` | **Offline** | OLA time-stretcher with Hann windowing |
 | `RvrseProcessor.h` | **Offline** | Pipeline orchestrator — chains all offline stages |
-| `Stutter.h` | **Real-Time** | Per-sample rhythmic gate (audio thread only, MIDI CC responsive) |
+| `Stutter.h` | **Real-Time** | Per-sample trapezoidal gate with continuous Hz rate (audio thread only, MIDI CC responsive) |
 | `RVRSE.h` | **Both** | Main plugin class — owns all state, bridges offline ↔ real-time |
 | `RVRSE.cpp` | **Both** | Constructor (GUI), `LoadSampleFromFile`, `ProcessBlock`, `OnReset` |
 | `dr_libs_impl.cpp` | Build | Single translation unit for `DR_WAV_IMPLEMENTATION` |
