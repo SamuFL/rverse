@@ -128,6 +128,7 @@ Every source file belongs to exactly one layer:
 | `BufferUtils.h` | **Offline** | `reverseBuffer`, `resampleLinear`, `applyTailFadeOut` |
 | `TimeStretch.h` | **Offline** | OLA time-stretcher with Hann windowing |
 | `RvrseProcessor.h` | **Offline** | Pipeline orchestrator — chains all offline stages |
+| `Stutter.h` | **Real-Time** | Per-sample rhythmic gate (audio thread only, MIDI CC responsive) |
 | `RVRSE.h` | **Both** | Main plugin class — owns all state, bridges offline ↔ real-time |
 | `RVRSE.cpp` | **Both** | Constructor (GUI), `LoadSampleFromFile`, `ProcessBlock`, `OnReset` |
 | `dr_libs_impl.cpp` | Build | Single translation unit for `DR_WAV_IMPLEMENTATION` |
@@ -326,9 +327,9 @@ Build artefacts are in `build/RVRSE/`.
 
 ### Current Limitations
 
-- No GUI knobs yet — parameters like Lush, Riser Length, and Stutter are not yet exposed in the UI.
+- No GUI knobs yet — parameters like Lush, Riser Length, and Stutter are not yet exposed in the UI (use DAW generic editor or MIDI CC).
 - No preset system.
-- No stutter gate or pitch shift (in progress).
+- No pitch shift (planned).
 - Single-voice only — overlapping notes cut the previous voice.
 
 ---
@@ -347,6 +348,7 @@ rverse/
 │   ├── BufferUtils.h         # Buffer utilities (reverse, resample, fade)
 │   ├── TimeStretch.h         # OLA time-stretcher
 │   ├── RvrseProcessor.h      # Offline pipeline orchestrator
+│   ├── Stutter.h             # Real-time stutter gate (audio thread only)
 │   ├── dr_libs_impl.cpp      # dr_wav implementation unit
 │   ├── libs/dr_libs/         # Header-only audio codec library
 │   └── resources/            # Fonts, images, plugin resources

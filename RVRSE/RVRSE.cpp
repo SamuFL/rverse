@@ -15,6 +15,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
 : iplug::Plugin(info, MakeConfig(kNumParams, kNumPresets))
 {
   GetParam(kParamMasterVol)->InitDouble("Master Volume", 100., 0., 100.0, 0.01, "%");
+  GetParam(kParamStutterRate)->InitDouble("Stutter Rate", 0., 0., 1.0, 0.01, "");
+  GetParam(kParamStutterDepth)->InitDouble("Stutter Depth",
+    rvrse::kStutterDepthDefault / 100.0, 0., 1.0, 0.01, "");
 
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
@@ -173,6 +176,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 {
   const int nChans = NOutChansConnected();
   const double masterVol = GetParam(kParamMasterVol)->Value() / 100.0;
+  const auto stutterRate = rvrse::stutterRateFromNormalised(GetParam(kParamStutterRate)->Value());
+  const float stutterDepth = static_cast<float>(GetParam(kParamStutterDepth)->Value());
+  const double sr = GetSampleRate();
 
   // Read host BPM and propagate to the offline pipeline when it changes.
   // GetTempo() reads from the host-provided ITimeInfo (populated each block).
@@ -220,6 +226,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         mVelocityGain = static_cast<float>(msg.Velocity()) / 127.0f;
         mRiserFadeRemaining = 0;
         mHitFadeRemaining = 0;
+        rvrse::stutterReset(mStutterState);
 
         if (riser && riser->IsReady())
         {
@@ -252,6 +259,16 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         mSamplesFromNoteOn = -1;
       }
 
+      else if (msg.StatusMsg() == IMidiMsg::kControlChange)
+      {
+        const IMidiMsg::EControlChangeMsg cc = msg.ControlChangeIdx();
+
+        if (cc == static_cast<IMidiMsg::EControlChangeMsg>(rvrse::CC_STUTTER_RATE))
+          GetParam(kParamStutterRate)->Set(msg.ControlChange(cc));
+        else if (cc == static_cast<IMidiMsg::EControlChangeMsg>(rvrse::CC_STUTTER_DEPTH))
+          GetParam(kParamStutterDepth)->Set(msg.ControlChange(cc));
+      }
+
       mMidiQueue.Remove();
     }
 
@@ -265,6 +282,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       {
         riserL = riser->mLeft[mRiserPos] * mVelocityGain;
         riserR = riser->mRight[mRiserPos] * mVelocityGain;
+
+        // Apply stutter gate (per-sample, MIDI CC responsive)
+        const float stutterGain = rvrse::stutterProcess(
+          mStutterState, stutterRate, stutterDepth, sr, mLastBPM > 0.0 ? mLastBPM : rvrse::kDefaultBPM);
+        riserL *= stutterGain;
+        riserR *= stutterGain;
 
         if (mRiserFadeRemaining > 0)
         {

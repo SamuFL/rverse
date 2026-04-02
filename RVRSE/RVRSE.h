@@ -3,6 +3,7 @@
 #include "IPlug_include_in_plug_hdr.h"
 #include "RvrseProcessor.h"
 #include "SampleData.h"
+#include "Stutter.h"
 
 #include <atomic>
 #include <memory>
@@ -13,6 +14,8 @@ const int kNumPresets = 1;
 enum EParams
 {
   kParamMasterVol = 0,
+  kParamStutterRate,
+  kParamStutterDepth,
   kNumParams
 };
 
@@ -85,4 +88,7 @@ private:
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
   std::shared_ptr<rvrse::RiserData> mRiserBuffer;
+
+  // --- Stutter gate (audio thread only) ---
+  rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state
 };
