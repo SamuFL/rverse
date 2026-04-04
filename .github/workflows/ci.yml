@@ -30,6 +30,12 @@ jobs:
       - name: Install Ninja
         run: brew install ninja
 
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
+
       - name: Configure (Ninja)
         run: cmake --preset macos-ninja -DCMAKE_BUILD_TYPE=Debug
 
@@ -65,6 +71,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        shell: bash
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
 
       - name: Configure (VS2022)
         run: cmake --preset windows-vs2022
