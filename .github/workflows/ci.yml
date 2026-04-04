@@ -1,0 +1,101 @@
+# CI — Build all plugin formats and run unit tests on macOS + Windows.
+# Triggered on pushes and PRs targeting develop or main.
+
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # macOS — Ninja, NanoVG/Metal
+  # ---------------------------------------------------------------------------
+  macos:
+    runs-on: macos-14          # Apple Silicon runner
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
+
+      - name: Configure (Ninja)
+        run: cmake --preset macos-ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build plugins
+        run: cmake --build build/macos-ninja --config Debug
+
+      - name: Build tests
+        run: cmake --build build/macos-ninja --config Debug --target rvrse_tests
+
+      - name: Run tests
+        run: ctest --test-dir build/macos-ninja --output-on-failure
+
+      - name: Upload artefacts
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-macOS
+          path: |
+            build/macos-ninja/out/*.vst3
+            build/macos-ninja/out/*.component
+            build/macos-ninja/out/*.clap
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Windows — Visual Studio 2022, NanoVG/GL2
+  # ---------------------------------------------------------------------------
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        shell: bash
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
+
+      - name: Configure (VS2022)
+        run: cmake --preset windows-vs2022
+
+      - name: Build plugins
+        run: cmake --build build/windows-vs2022 --config Debug
+
+      - name: Build tests
+        run: cmake --build build/windows-vs2022 --config Debug --target rvrse_tests
+
+      - name: Run tests
+        run: ctest --test-dir build/windows-vs2022 -C Debug --output-on-failure
+
+      - name: Upload artefacts
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-Windows
+          path: |
+            build/windows-vs2022/out/*.vst3
+          retention-days: 14
