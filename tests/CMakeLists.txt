@@ -13,8 +13,17 @@ FetchContent_MakeAvailable(Catch2)
 # Test executable — links Catch2 and includes the RVRSE DSP headers directly.
 # The DSP modules (BufferUtils, Reverb, TimeStretch, Stutter, Constants) are
 # pure C++17 with no iPlug2 dependency, so they compile standalone.
+# SampleLoader + dr_wav are also standalone (header-only codec, no iPlug2).
 add_executable(rvrse_tests
   test_smoke.cpp
+  test_constants.cpp
+  test_buffer_utils.cpp
+  test_reverb.cpp
+  test_time_stretch.cpp
+  test_stutter.cpp
+  test_sample_loader.cpp
+  ${CMAKE_SOURCE_DIR}/RVRSE/SampleLoader.cpp
+  ${CMAKE_SOURCE_DIR}/RVRSE/dr_libs_impl.cpp
 )
 
 target_compile_features(rvrse_tests PRIVATE cxx_std_17)
