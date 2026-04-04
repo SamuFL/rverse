@@ -7,18 +7,35 @@
 
 #include "SampleLoader.h"
 #include "Constants.h"
+#include "test_helpers.h"
 #include "dr_wav.h"
 
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include <process.h>
+#define getpid _getpid
+#else
+#include <unistd.h>
+#endif
+
 using Catch::Approx;
 using namespace rvrse;
 
 namespace {
+
+/// Generate a unique temp filename using PID + a static counter to avoid collisions.
+std::string uniqueTempName(const std::string& prefix, const std::string& ext)
+{
+  static std::atomic<int> counter{0};
+  return prefix + "_" + std::to_string(getpid()) + "_"
+       + std::to_string(counter.fetch_add(1)) + ext;
+}
 
 /// RAII helper that writes a WAV file on construction and deletes it on destruction.
 class TempWav
@@ -36,12 +53,23 @@ public:
     format.bitsPerSample = 32;
 
     drwav wav;
-    drwav_init_file_write(&wav, mPath.string().c_str(), &format, nullptr);
-    drwav_write_pcm_frames(&wav, samples.size() / channels, samples.data());
+    if (!drwav_init_file_write(&wav, mPath.string().c_str(), &format, nullptr))
+      throw std::runtime_error("TempWav: failed to create " + mPath.string());
+
+    const drwav_uint64 expectedFrames = samples.size() / channels;
+    const drwav_uint64 written = drwav_write_pcm_frames(&wav, expectedFrames, samples.data());
     drwav_uninit(&wav);
+
+    if (written != expectedFrames)
+      throw std::runtime_error("TempWav: wrote " + std::to_string(written)
+                               + "/" + std::to_string(expectedFrames) + " frames");
   }
 
-  ~TempWav() { std::filesystem::remove(mPath); }
+  ~TempWav() noexcept
+  {
+    std::error_code ec;
+    std::filesystem::remove(mPath, ec);
+  }
 
   std::string path() const { return mPath.string(); }
 
@@ -64,14 +92,20 @@ TEST_CASE("SampleLoader: empty path returns error", "[sampleloader]")
 
 TEST_CASE("SampleLoader: non-existent file returns error", "[sampleloader]")
 {
-  auto result = LoadSample("/tmp/definitely_does_not_exist_12345.wav");
+  auto path = std::filesystem::temp_directory_path() / "rvrse_nonexistent_9a8b7c6d.wav";
+  // Ensure it truly doesn't exist
+  std::error_code ec;
+  std::filesystem::remove(path, ec);
+
+  auto result = LoadSample(path.string());
   REQUIRE_FALSE(result.success);
   REQUIRE(result.errorMessage.find("Failed to open") != std::string::npos);
 }
 
 TEST_CASE("SampleLoader: unsupported extension returns error", "[sampleloader]")
 {
-  auto result = LoadSample("/tmp/test.mp3");
+  auto path = std::filesystem::temp_directory_path() / "rvrse_test.mp3";
+  auto result = LoadSample(path.string());
   REQUIRE_FALSE(result.success);
   REQUIRE(result.errorMessage.find("Unsupported") != std::string::npos);
 }
@@ -116,14 +150,12 @@ TEST_CASE("SampleLoader: ExtractFileName", "[sampleloader]")
 
 TEST_CASE("SampleLoader: load mono WAV duplicates to stereo", "[sampleloader]")
 {
-  // Generate a 0.1s mono sine at 44100 Hz
+  // Generate a 0.1s mono 440 Hz sine at 44100 Hz
   const unsigned int sr = 44100;
   const unsigned int numFrames = sr / 10; // 4410 frames
-  std::vector<float> samples(numFrames);
-  for (unsigned int i = 0; i < numFrames; ++i)
-    samples[i] = std::sin(2.0f * 3.14159f * 440.0f * i / sr);
+  auto samples = rvrse::test::generateSine(numFrames, 440.0, static_cast<double>(sr));
 
-  TempWav wav("rvrse_test_mono.wav", samples, sr, 1);
+  TempWav wav(uniqueTempName("rvrse_mono", ".wav"), samples, sr, 1);
   auto result = LoadSample(wav.path());
 
   REQUIRE(result.success);
@@ -155,7 +187,7 @@ TEST_CASE("SampleLoader: load stereo WAV deinterleaves correctly", "[sampleloade
     interleaved[i * 2 + 1] = static_cast<float>((i + 1) * 10);
   }
 
-  TempWav wav("rvrse_test_stereo.wav", interleaved, sr, 2);
+  TempWav wav(uniqueTempName("rvrse_stereo", ".wav"), interleaved, sr, 2);
   auto result = LoadSample(wav.path());
 
   REQUIRE(result.success);
@@ -182,7 +214,7 @@ TEST_CASE("SampleLoader: oversized file rejected", "[sampleloader]")
   const unsigned int numFrames = sr * (kMaxSampleLengthSeconds + 1); // 31 seconds
   std::vector<float> samples(numFrames, 0.0f);
 
-  TempWav wav("rvrse_test_oversized.wav", samples, sr, 1);
+  TempWav wav(uniqueTempName("rvrse_oversized", ".wav"), samples, sr, 1);
   auto result = LoadSample(wav.path());
 
   REQUIRE_FALSE(result.success);

@@ -7,6 +7,7 @@
 #include "Stutter.h"
 #include "Constants.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 

@@ -6,6 +6,7 @@
 
 #include "Reverb.h"
 #include "Constants.h"
+#include "test_helpers.h"
 
 #include <algorithm>
 #include <cmath>
@@ -108,11 +109,10 @@ TEST_CASE("Reverb: no NaN/Inf with white noise input", "[reverb]")
 
 TEST_CASE("Reverb: output stays within headroom", "[reverb]")
 {
-  // Unit-amplitude sine wave — reverb should not produce runaway gain
+  // Unit-amplitude 440 Hz sine wave — reverb should not produce runaway gain
   const size_t N = 8192;
-  std::vector<float> input(N);
-  for (size_t i = 0; i < N; ++i)
-    input[i] = std::sin(static_cast<float>(i) * 0.1f);
+  const double sampleRate = 48000.0;
+  auto input = rvrse::test::generateSine(N, 440.0, sampleRate);
 
   std::vector<float> output(N);
   applyReverb(input.data(), output.data(), N, 48000.0, 1.0f);
@@ -129,7 +129,7 @@ TEST_CASE("Reverb: output stays within headroom", "[reverb]")
 // Energy increases with lush
 // ---------------------------------------------------------------------------
 
-TEST_CASE("Reverb: energy increases with lush amount", "[reverb]")
+TEST_CASE("Reverb: tail energy increases with lush amount", "[reverb]")
 {
   const size_t N = 48000; // 1 second
   std::vector<float> input(N, 0.0f);
@@ -139,5 +139,15 @@ TEST_CASE("Reverb: energy increases with lush amount", "[reverb]")
   applyReverb(input.data(), outLow.data(), N, 48000.0, 0.25f);
   applyReverb(input.data(), outHigh.data(), N, 48000.0, 0.75f);
 
-  REQUIRE(rms(outHigh) > rms(outLow));
+  // Compare tail-only energy (skip sample 0 where the dry impulse dominates).
+  // lushAmount controls both wet/dry mix AND room size, so the dry spike at
+  // sample 0 shrinks with higher lush — comparing full RMS would be misleading.
+  auto tailRms = [](const std::vector<float>& buf, size_t start) {
+    double sum = 0.0;
+    for (size_t i = start; i < buf.size(); ++i)
+      sum += static_cast<double>(buf[i]) * buf[i];
+    return static_cast<float>(std::sqrt(sum / (buf.size() - start)));
+  };
+
+  REQUIRE(tailRms(outHigh, 1) > tailRms(outLow, 1));
 }

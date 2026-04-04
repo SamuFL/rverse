@@ -309,12 +309,17 @@ RVRSE includes a Catch2 unit test suite covering all DSP modules (42 tests).
 Tests compile standalone — no iPlug2 or DAW required.
 
 ```bash
-# Build and run tests
+# Single-config generators (Ninja, Make)
 cmake --build build --target rvrse_tests
 ctest --test-dir build
 
+# Multi-config generators (Visual Studio, Xcode)
+cmake --build build --config Debug --target rvrse_tests
+ctest --test-dir build -C Debug
+
 # Or run the test binary directly (verbose output)
-./build/tests/rvrse_tests
+./build/tests/rvrse_tests             # Ninja/Make
+./build/tests/Debug/rvrse_tests       # Visual Studio
 
 # Run a specific test category
 ./build/tests/rvrse_tests "[reverb]"

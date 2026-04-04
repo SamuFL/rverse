@@ -5,6 +5,11 @@
 
 namespace rvrse {
 
+// --- Mathematical constants ---
+/// Portable pi constant (M_PI is not standard C++ and missing on MSVC without _USE_MATH_DEFINES)
+constexpr double kPi = 3.14159265358979323846;
+constexpr double kTwoPi = 2.0 * kPi;
+
 // --- MIDI CC Defaults (MVP: hardcoded, future: user-assignable) ---
 constexpr int CC_STUTTER_RATE  = 1;   ///< Mod wheel → Stutter Rate
 constexpr int CC_STUTTER_DEPTH = 11;  ///< Expression pedal → Stutter Depth
