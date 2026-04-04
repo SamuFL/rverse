@@ -23,9 +23,10 @@ constexpr double kRiserLengthDefault = 4.0;    ///< 4 beats
 // --- Parameter defaults ---
 constexpr double kLushDefault        = 40.0;   ///< Reverb wet amount (0–100%)
 constexpr double kFadeInDefault      = 60.0;   ///< Fade-in shape (0–100%)
+constexpr double kRiserVolumeDefault  = 0.0;    ///< Riser volume in dB (default: unity)
 constexpr double kHitVolumeDefault   = 0.0;    ///< Hit volume in dB (default: unity)
-constexpr double kHitVolumeMinDb     = -60.0;  ///< Hit volume minimum (-60 dB ≈ silence)
-constexpr double kHitVolumeMaxDb     = 6.0;    ///< Hit volume maximum (+6 dB headroom)
+constexpr double kVolumeMinDb        = -60.0;  ///< Voice volume minimum (-60 dB ≈ silence)
+constexpr double kVolumeMaxDb        = 6.0;    ///< Voice volume maximum (+6 dB headroom)
 constexpr double kDryWetDefault      = 100.0;  ///< Dry/Wet mix (0=all dry/hit, 100=all riser)
 constexpr double kStutterDepthDefault = 50.0;  ///< Stutter wet/dry (0–100%)
 constexpr double kStutterRateMinHz   = 0.0;    ///< Stutter rate minimum (0 = off)

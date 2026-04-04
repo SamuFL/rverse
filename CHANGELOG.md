@@ -9,10 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - GitHub Actions CI: macOS (Apple Silicon, Ninja) + Windows (VS2022) — builds all plugin formats and runs 42 unit tests on pushes to develop/main and PRs targeting them (rverse-lxg)
-- Expose 5 new DAW-automatable parameters via generic editor: Lush (0–100%), Riser Length (0.25–16 beats), Fade In (0–100%), Hit Volume (-60 to +6 dB), Dry/Wet (0–100%) (rverse-nqg)
+- Expose 5 new DAW-automatable parameters via generic editor: Lush (0–100%), Riser Length (0.25–16 beats), Fade In (0–100%), Riser Volume (-60 to +6 dB), Hit Volume (-60 to +6 dB) (rverse-nqg)
 - Riser fade-in envelope controlled by Fade In parameter — linear ramp over configurable portion of riser length (rverse-nqg)
-- Dry/Wet mix: 0% = hit only, 100% = riser only, blends both voices (rverse-nqg)
-- Hit Volume with dB scaling — independent level control for the dry hit sample (rverse-nqg)
+- Independent Riser Volume and Hit Volume knobs with dB scaling — both voices fully controllable (rverse-nqg)
 - Lush and Riser Length changes propagated to offline pipeline in real-time — riser rebuilds on parameter change (rverse-nqg)
 - DSP unit tests: 42 tests across 7 files covering BufferUtils, Reverb, TimeStretch, Stutter, SampleLoader, and Constants (rverse-2uq)
 - `trimTrailingSilence` / `trimTrailingSilenceStereo` in BufferUtils.h — removes near-silent tail samples below a configurable threshold (rverse-0d0)

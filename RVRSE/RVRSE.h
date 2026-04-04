@@ -19,8 +19,8 @@ enum EParams
   kParamLush,
   kParamRiserLength,
   kParamFadeIn,
+  kParamRiserVolume,
   kParamHitVolume,
-  kParamDryWet,
   kNumParams
 };
 

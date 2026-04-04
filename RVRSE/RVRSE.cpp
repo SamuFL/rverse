@@ -26,10 +26,10 @@ RVRSE::RVRSE(const InstanceInfo& info)
     rvrse::kRiserLengthDefault, rvrse::kRiserLengthMin, rvrse::kRiserLengthMax, 0.25, "beats");
   GetParam(kParamFadeIn)->InitDouble("Fade In",
     rvrse::kFadeInDefault, 0., 100.0, 0.1, "%");
+  GetParam(kParamRiserVolume)->InitDouble("Riser Volume",
+    rvrse::kRiserVolumeDefault, rvrse::kVolumeMinDb, rvrse::kVolumeMaxDb, 0.1, "dB");
   GetParam(kParamHitVolume)->InitDouble("Hit Volume",
-    rvrse::kHitVolumeDefault, rvrse::kHitVolumeMinDb, rvrse::kHitVolumeMaxDb, 0.1, "dB");
-  GetParam(kParamDryWet)->InitDouble("Dry/Wet",
-    rvrse::kDryWetDefault, 0., 100.0, 0.1, "%");
+    rvrse::kHitVolumeDefault, rvrse::kVolumeMinDb, rvrse::kVolumeMaxDb, 0.1, "dB");
 
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
@@ -193,9 +193,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const float lush = static_cast<float>(GetParam(kParamLush)->Value() / 100.0);
   const double riserLengthBeats = GetParam(kParamRiserLength)->Value();
   const float fadeInPct = static_cast<float>(GetParam(kParamFadeIn)->Value() / 100.0);
-  const float hitVolumeDb = static_cast<float>(GetParam(kParamHitVolume)->Value());
-  const float hitVolumeGain = std::pow(10.0f, hitVolumeDb / 20.0f);
-  const float dryWet = static_cast<float>(GetParam(kParamDryWet)->Value() / 100.0);
+  const float riserVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamRiserVolume)->Value()) / 20.0f);
+  const float hitVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);
   const double sr = GetSampleRate();
 
   // Read host BPM and propagate to the offline pipeline when it changes.
@@ -327,8 +326,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           }
         }
 
-        riserL *= mVelocityGain;
-        riserR *= mVelocityGain;
+        riserL *= mVelocityGain * riserVolumeGain;
+        riserR *= mVelocityGain * riserVolumeGain;
 
         // Apply stutter gate (per-sample, MIDI CC responsive)
         const float stutterGain = rvrse::stutterProcess(
@@ -394,10 +393,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       }
     }
 
-    // --- Mix and output ---
-    // dryWet: 0.0 = all hit (dry), 1.0 = all riser (wet)
-    const float outL = (riserL * dryWet + hitL * (1.0f - dryWet)) * static_cast<float>(masterVol);
-    const float outR = (riserR * dryWet + hitR * (1.0f - dryWet)) * static_cast<float>(masterVol);
+    // --- Mix and output (additive — both voices have independent volume) ---
+    const float outL = (riserL + hitL) * static_cast<float>(masterVol);
+    const float outR = (riserR + hitR) * static_cast<float>(masterVol);
 
     if (nChans >= 1) outputs[0][s] = outL;
     if (nChans >= 2) outputs[1][s] = outR;
