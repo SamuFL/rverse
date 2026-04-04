@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- DSP unit tests: 42 tests across 7 files covering BufferUtils, Reverb, TimeStretch, Stutter, SampleLoader, and Constants (rverse-2uq)
 - `trimTrailingSilence` / `trimTrailingSilenceStereo` in BufferUtils.h — removes near-silent tail samples below a configurable threshold (rverse-0d0)
 - `kReverbTailSeconds` (5.0s) and `kSilenceThreshold` (-30 dB) constants in Constants.h (rverse-0d0)
 - Catch2 v3.7.1 test framework with CTest integration — `cmake --build build --target rvrse_tests && ctest --test-dir build` (rverse-6fl)

@@ -14,9 +14,6 @@
 
 namespace rvrse {
 
-/// Portable pi constant (M_PI is not standard C++ and missing on MSVC without _USE_MATH_DEFINES)
-constexpr double kPi = 3.14159265358979323846;
-
 /// Apply Overlap-Add time-stretching to a mono buffer.
 ///
 /// @param input          Source buffer
