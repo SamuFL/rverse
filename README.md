@@ -303,6 +303,31 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
+### Running Tests
+
+RVRSE includes a Catch2 unit test suite covering all DSP modules (42 tests).
+Tests compile standalone — no iPlug2 or DAW required.
+
+```bash
+# Build and run tests
+cmake --build build --target rvrse_tests
+ctest --test-dir build
+
+# Or run the test binary directly (verbose output)
+./build/tests/rvrse_tests
+
+# Run a specific test category
+./build/tests/rvrse_tests "[reverb]"
+./build/tests/rvrse_tests "[stutter]"
+./build/tests/rvrse_tests "[sampleloader]"
+```
+
+To disable tests entirely (e.g. CI release builds):
+
+```bash
+cmake -B build -DBUILD_TESTING=OFF
+```
+
 ---
 
 ## Plugin Formats
@@ -358,6 +383,15 @@ rverse/
 ├── iPlug2/                   # iPlug2 framework (git submodule)
 ├── build/                    # CMake build output (not committed)
 ├── CMakeLists.txt            # Top-level CMake configuration
+├── tests/                    # Catch2 unit tests (standalone, no iPlug2)
+│   ├── CMakeLists.txt        # Test target configuration
+│   ├── test_smoke.cpp        # Smoke tests (framework + basic DSP)
+│   ├── test_constants.cpp    # Constants.h relational invariants
+│   ├── test_buffer_utils.cpp # Reverse, resample, fade, trim
+│   ├── test_reverb.cpp       # Schroeder reverb properties
+│   ├── test_time_stretch.cpp # OLA stretcher factors + edge cases
+│   ├── test_stutter.cpp      # Gate symmetry, convergence, phase
+│   └── test_sample_loader.cpp# WAV loading, deinterleave, error handling
 ├── RVRSE_BRIEF.md            # Full product specification
 ├── UAT_PLAYBOOK.md           # Manual test scenarios and pass criteria
 ├── CHANGELOG.md              # Release notes (Keep a Changelog format)
