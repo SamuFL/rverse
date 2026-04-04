@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- GitHub Actions CI: macOS (Apple Silicon, Ninja) + Windows (VS2022) — builds all plugin formats and runs 42 unit tests on every push/PR (rverse-lxg)
+- GitHub Actions CI: macOS (Apple Silicon, Ninja) + Windows (VS2022) — builds all plugin formats and runs 42 unit tests on pushes to develop/main and PRs targeting them (rverse-lxg)
 - DSP unit tests: 42 tests across 7 files covering BufferUtils, Reverb, TimeStretch, Stutter, SampleLoader, and Constants (rverse-2uq)
 - `trimTrailingSilence` / `trimTrailingSilenceStereo` in BufferUtils.h — removes near-silent tail samples below a configurable threshold (rverse-0d0)
 - `kReverbTailSeconds` (5.0s) and `kSilenceThreshold` (-30 dB) constants in Constants.h (rverse-0d0)
