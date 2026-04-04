@@ -5,6 +5,7 @@
 #include "SampleLoader.h"
 
 #include <algorithm>
+#include <cmath>
 #include <thread>
 
 #if IPLUG_EDITOR
@@ -19,6 +20,16 @@ RVRSE::RVRSE(const InstanceInfo& info)
     rvrse::kStutterRateDefaultHz, rvrse::kStutterRateMinHz, rvrse::kStutterRateMaxHz, 0.1, "Hz");
   GetParam(kParamStutterDepth)->InitDouble("Stutter Depth",
     rvrse::kStutterDepthDefault / 100.0, 0., 1.0, 0.01, "");
+  GetParam(kParamLush)->InitDouble("Lush",
+    rvrse::kLushDefault, 0., 100.0, 0.1, "%");
+  GetParam(kParamRiserLength)->InitDouble("Riser Length",
+    rvrse::kRiserLengthDefault, rvrse::kRiserLengthMin, rvrse::kRiserLengthMax, 0.25, "beats");
+  GetParam(kParamFadeIn)->InitDouble("Fade In",
+    rvrse::kFadeInDefault, 0., 100.0, 0.1, "%");
+  GetParam(kParamHitVolume)->InitDouble("Hit Volume",
+    rvrse::kHitVolumeDefault, rvrse::kHitVolumeMinDb, rvrse::kHitVolumeMaxDb, 0.1, "dB");
+  GetParam(kParamDryWet)->InitDouble("Dry/Wet",
+    rvrse::kDryWetDefault, 0., 100.0, 0.1, "%");
 
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
@@ -179,6 +190,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const double masterVol = GetParam(kParamMasterVol)->Value() / 100.0;
   const auto stutterRateHz = static_cast<float>(GetParam(kParamStutterRate)->Value());
   const float stutterDepth = static_cast<float>(GetParam(kParamStutterDepth)->Value());
+  const float lush = static_cast<float>(GetParam(kParamLush)->Value() / 100.0);
+  const double riserLengthBeats = GetParam(kParamRiserLength)->Value();
+  const float fadeInPct = static_cast<float>(GetParam(kParamFadeIn)->Value() / 100.0);
+  const float hitVolumeDb = static_cast<float>(GetParam(kParamHitVolume)->Value());
+  const float hitVolumeGain = std::pow(10.0f, hitVolumeDb / 20.0f);
+  const float dryWet = static_cast<float>(GetParam(kParamDryWet)->Value() / 100.0);
   const double sr = GetSampleRate();
 
   // Read host BPM and propagate to the offline pipeline when it changes.
@@ -188,6 +205,20 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   {
     mLastBPM = hostBPM;
     mProcessor.setBPM(hostBPM);
+  }
+
+  // Propagate Lush to the offline processor (triggers reverb rebuild)
+  if (std::abs(lush - mLastLush) > 1e-4f)
+  {
+    mLastLush = lush;
+    mProcessor.setLush(lush);
+  }
+
+  // Propagate Riser Length to the offline processor (triggers stretch rebuild)
+  if (std::abs(riserLengthBeats - mLastRiserLength) > 1e-6)
+  {
+    mLastRiserLength = riserLengthBeats;
+    mProcessor.setRiserLength(riserLengthBeats);
   }
 
   // Check if a new sample is ready from the loader thread (lock-free flag)
@@ -281,8 +312,23 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     {
       if (mRiserPos < riser->NumFrames())
       {
-        riserL = riser->mLeft[mRiserPos] * mVelocityGain;
-        riserR = riser->mRight[mRiserPos] * mVelocityGain;
+        riserL = riser->mLeft[mRiserPos];
+        riserR = riser->mRight[mRiserPos];
+
+        // Apply fade-in envelope over the first fadeInPct of the riser
+        if (fadeInPct > 0.0f)
+        {
+          const int fadeInLen = static_cast<int>(static_cast<float>(riser->NumFrames()) * fadeInPct);
+          if (fadeInLen > 0 && mRiserPos < fadeInLen)
+          {
+            const float fadeGain = static_cast<float>(mRiserPos) / static_cast<float>(fadeInLen);
+            riserL *= fadeGain;
+            riserR *= fadeGain;
+          }
+        }
+
+        riserL *= mVelocityGain;
+        riserR *= mVelocityGain;
 
         // Apply stutter gate (per-sample, MIDI CC responsive)
         const float stutterGain = rvrse::stutterProcess(
@@ -326,8 +372,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     {
       if (mHitPos < hit->NumFrames())
       {
-        hitL = hit->mLeft[mHitPos] * mVelocityGain;
-        hitR = hit->mRight[mHitPos] * mVelocityGain;
+        hitL = hit->mLeft[mHitPos] * mVelocityGain * hitVolumeGain;
+        hitR = hit->mRight[mHitPos] * mVelocityGain * hitVolumeGain;
 
         if (mHitFadeRemaining > 0)
         {
@@ -349,8 +395,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     }
 
     // --- Mix and output ---
-    const float outL = (riserL + hitL) * static_cast<float>(masterVol);
-    const float outR = (riserR + hitR) * static_cast<float>(masterVol);
+    // dryWet: 0.0 = all hit (dry), 1.0 = all riser (wet)
+    const float outL = (riserL * dryWet + hitL * (1.0f - dryWet)) * static_cast<float>(masterVol);
+    const float outR = (riserR * dryWet + hitR * (1.0f - dryWet)) * static_cast<float>(masterVol);
 
     if (nChans >= 1) outputs[0][s] = outL;
     if (nChans >= 2) outputs[1][s] = outR;
