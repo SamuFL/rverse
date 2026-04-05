@@ -9,18 +9,17 @@ Run these tests manually after every change to the DSP pipeline or plugin behavi
 
 | # | Host             | Format | Notes                            |
 |---|------------------|--------|----------------------------------|
-| 1 | **Cubase**       | VST3   | Primary DAW for testing          |
-| 2 | **Studio One**   | VST3   | Secondary DAW for cross-compat   |
+| 1 | **Studio One**   | VST3   | Primary DAW for testing          |
+| 2 | **Cubase**       | VST3   | Secondary DAW for cross-compat   |
 | 3 | **Standalone**   | APP    | Quick smoke-test, no DAW needed  |
 
 ### Prerequisites
 
 - Build the plugin: `cmake --build build --config Debug`
 - Plugin auto-deploys to `~/Library/Audio/Plug-Ins/` (macOS)
-- Prepare a set of **test samples** (short percussive hits, long tails, tonal, noise).
-  Store them in a stable location so paths don't change between sessions.
-- Cubase project: *(TODO — create a dedicated Cubase test project)*
-- Studio One project: *(TODO — create a dedicated Studio One test project)*
+- Prepare a **reference sample** (short percussive hit, ~100–500 ms, stereo, 44.1 or 48 kHz).
+  Store it in a stable location so the path doesn't change between sessions.
+- Studio One project: set up an instrument track with RVRSE loaded, reference sample pre-loaded.
 
 ### MIDI CC Reference
 
@@ -31,14 +30,16 @@ Run these tests manually after every change to the DSP pipeline or plugin behavi
 
 ### Plugin Parameters (DAW Generic Editor)
 
-| Parameter       | Range   | Default | Unit |
-|-----------------|---------|---------|------|
-| Master Volume   | 0–100   | 100     | %    |
-| Stutter Rate    | 0–30    | 0 (off) | Hz   |
-| Stutter Depth   | 0–100   | 50      | %    |
-
-> **Note:** Riser length is currently hardcoded at 4 beats. Tempo-sync options
-> are not yet exposed in the UI — they will be tested once the GUI is available.
+| # | Parameter       | Range           | Default   | Unit  | Step  |
+|---|-----------------|-----------------|-----------|-------|-------|
+| 1 | Master Volume   | 0–100           | 100       | %     | 0.01  |
+| 2 | Stutter Rate    | 0–30            | 0 (off)   | Hz    | 0.1   |
+| 3 | Stutter Depth   | 0–1             | 0.5       |       | 0.01  |
+| 4 | Lush            | 0–100           | 40        | %     | 0.1   |
+| 5 | Riser Length     | 0.25–16         | 4         | beats | 0.25  |
+| 6 | Fade In         | 0–100           | 60        | %     | 0.1   |
+| 7 | Riser Volume    | -60 to +6       | 0         | dB    | 0.1   |
+| 8 | Hit Volume      | -60 to +6       | 0         | dB    | 0.1   |
 
 ---
 
@@ -49,7 +50,7 @@ audible, artefact-free reverse-reverb riser for each.
 
 ### Steps
 
-1. Open RVRSE in each test host (Cubase VST3, Studio One VST3, Standalone).
+1. Open RVRSE in each test host (Studio One VST3, Cubase VST3, Standalone).
 2. For each test sample:
    a. Load the sample via the file dialog.
    b. Trigger a MIDI note and listen to the riser → hit playback.
@@ -81,7 +82,121 @@ audible, artefact-free reverse-reverb riser for each.
 
 ---
 
-## Test Scenario 2 — Continuous Stutter Modulation
+## Test Scenario 2 — Parameter Tests (All 8 Parameters)
+
+**Goal:** Verify that each DAW-automatable parameter produces the expected audible
+effect. Use the reference sample and DAW generic editor for all tests.
+
+**Setup:** Load the reference sample, set all parameters to defaults, trigger a
+sustained MIDI note for each sub-test. Change **one parameter at a time** unless
+otherwise stated.
+
+### 2.1 Master Volume
+
+| Test | Value | Expected Outcome |
+|------|-------|------------------|
+| 2.1a | 100% (default) | Full-volume playback of both riser and hit |
+| 2.1b | 50% | Both riser and hit are noticeably quieter (−6 dB) |
+| 2.1c | 0% | Complete silence — no audio output at all |
+| 2.1d | Automate 0→100→0 | Smooth fade in and out, no clicks |
+
+### 2.2 Lush (Reverb Amount)
+
+| Test | Value | Expected Outcome |
+|------|-------|------------------|
+| 2.2a | 0% | Riser is very thin/dry — mostly the raw reversed sample with minimal reverb wash |
+| 2.2b | 40% (default) | Moderate reverb wash, balanced between dry transients and wet tail |
+| 2.2c | 100% | Dense, washy reverb — original transients nearly buried in reverb |
+| 2.2d | Change 40→80 | Riser **rebuilds** after a short delay (offline processing) — next note-on plays the new riser |
+
+> **Note:** Lush triggers an offline pipeline rebuild. The change is NOT instantaneous
+> — the riser plays with the old setting until the rebuild completes. This is expected.
+
+### 2.3 Riser Length
+
+| Test | Value | BPM | Expected Riser Duration |
+|------|-------|-----|------------------------|
+| 2.3a | 4 beats (default) | 120 | ~2 seconds |
+| 2.3b | 1 beat | 120 | ~0.5 seconds |
+| 2.3c | 8 beats | 120 | ~4 seconds |
+| 2.3d | 16 beats | 120 | ~8 seconds |
+| 2.3e | 0.25 beats | 120 | ~0.125 seconds (very short burst before hit) |
+| 2.3f | 4 beats | 60 | ~4 seconds (half the BPM = double the duration) |
+| 2.3g | 4 beats | 180 | ~1.33 seconds (faster BPM = shorter duration) |
+
+> **Note:** Like Lush, changing Riser Length triggers an offline rebuild. The hit should
+> fire at the end of the riser regardless of length — verify the riser→hit timing is correct
+> for each setting.
+
+### 2.4 Fade In
+
+| Test | Value | Expected Outcome |
+|------|-------|------------------|
+| 2.4a | 0% | No fade-in — riser starts at full amplitude immediately |
+| 2.4b | 60% (default) | Riser gradually ramps up over the first 60% of its length, then plays at full volume |
+| 2.4c | 100% | Riser ramps up over its entire length — barely reaches full volume before the hit |
+| 2.4d | Compare 0% vs 100% | At 0%, the riser start is abrupt; at 100%, the start is gentle and progressive |
+
+### 2.5 Riser Volume
+
+| Test | Value | Expected Outcome |
+|------|-------|------------------|
+| 2.5a | 0 dB (default) | Riser plays at unity gain — balanced with the hit |
+| 2.5b | +6 dB | Riser is noticeably louder than the hit |
+| 2.5c | -12 dB | Riser is noticeably quieter than the hit |
+| 2.5d | -60 dB | Riser is essentially inaudible — only the hit is heard |
+| 2.5e | Compare +6 vs -60 | Clear difference: riser dominates at +6, disappears at -60 |
+
+### 2.6 Hit Volume
+
+| Test | Value | Expected Outcome |
+|------|-------|------------------|
+| 2.6a | 0 dB (default) | Hit plays at unity gain — balanced with the riser |
+| 2.6b | +6 dB | Hit is noticeably louder than the riser |
+| 2.6c | -12 dB | Hit is noticeably quieter than the riser |
+| 2.6d | -60 dB | Hit is essentially inaudible — only the riser is heard |
+| 2.6e | Compare +6 vs -60 | Clear difference: hit dominates at +6, disappears at -60 |
+
+### 2.7 Riser Volume + Hit Volume Combined
+
+| Test | Riser Vol | Hit Vol | Expected Outcome |
+|------|-----------|---------|------------------|
+| 2.7a | 0 dB | 0 dB | Both voices at equal level (default) |
+| 2.7b | +6 dB | -60 dB | Only the riser is heard — "riser only" mode |
+| 2.7c | -60 dB | +6 dB | Only the hit is heard — "hit only" mode |
+| 2.7d | +6 dB | +6 dB | Both voices boosted — louder overall, check for clipping |
+| 2.7e | -60 dB | -60 dB | Both inaudible — complete silence (apart from noise floor) |
+
+### 2.8 Stutter Rate
+
+| Test | Value | Depth | Expected Outcome |
+|------|-------|-------|------------------|
+| 2.8a | 0 Hz (default) | 0.5 | No stuttering — clean riser playback |
+| 2.8b | 4 Hz | 0.5 | Slow tremolo-like pulsing on the riser (4 pulses/sec) |
+| 2.8c | 15 Hz | 0.5 | Fast stuttering — "machine gun" effect on the riser |
+| 2.8d | 30 Hz | 0.5 | Maximum stutter — very rapid gating, approaching ring-mod territory |
+| 2.8e | Sweep 0→30 Hz | 0.5 | Rate increases continuously, no stepping or jumps |
+
+### 2.9 Stutter Depth
+
+| Test | Value | Rate | Expected Outcome |
+|------|-------|------|------------------|
+| 2.9a | 0 | 15 Hz | No audible stutter — depth of 0 means dry signal passes through |
+| 2.9b | 0.5 (default) | 15 Hz | Moderate stuttering — signal dips but doesn't fully cut |
+| 2.9c | 1.0 | 15 Hz | Full stutter — signal cuts completely during gate-off portions |
+| 2.9d | Sweep 0→1 | 15 Hz | Stutter gradually goes from subtle to full cut |
+
+### Pass Criteria (All Parameter Tests)
+
+- [ ] Each parameter audibly changes the output as described
+- [ ] Lush and Riser Length trigger pipeline rebuilds (visible as short delay before new riser)
+- [ ] Fade In, Riser Volume, Hit Volume, Stutter Rate/Depth take effect instantly (next sample)
+- [ ] No clicks, pops, or glitches when changing any parameter
+- [ ] No CPU spikes or audio dropouts during parameter changes
+
+---
+
+## Test Scenario 3 — Continuous Stutter Modulation (MIDI CC)
 
 **Goal:** Verify that the stutter gate responds smoothly to continuous MIDI CC changes
 without audible clicks or artefacts.
@@ -111,7 +226,7 @@ without audible clicks or artefacts.
 
 ---
 
-## Test Scenario 3 — Discontinuous Stutter Automation (Click-Free)
+## Test Scenario 4 — Discontinuous Stutter Automation (Click-Free)
 
 **Goal:** Verify that sudden, discrete jumps in stutter parameters do **not** produce
 audible clicks, pops, or glitches.
@@ -137,7 +252,7 @@ audible clicks, pops, or glitches.
 
 ---
 
-## Test Scenario 4 — *(Reserved: Sample Persistence)*
+## Test Scenario 5 — *(Reserved: Sample Persistence)*
 
 > **Not yet implemented.** See beads issue for sample persistence feature.
 > Once implemented, test that:
@@ -147,13 +262,13 @@ audible clicks, pops, or glitches.
 
 ---
 
-## Test Scenario 5 — *(Reserved: GUI Interaction)*
+## Test Scenario 6 — *(Reserved: GUI Interaction)*
 
 > **Not yet implemented.** Will be added when the IGraphics GUI is built.
 
 ---
 
-## Test Scenario 6 — *(Reserved: Tempo-Synced Stutter)*
+## Test Scenario 7 — *(Reserved: Tempo-Synced Stutter)*
 
 > **Not yet implemented.** See beads issue rverse-0gq.
 
@@ -161,6 +276,7 @@ audible clicks, pops, or glitches.
 
 ## Revision History
 
-| Date       | Change                                             |
-|------------|----------------------------------------------------|
-| 2026-04-02 | Initial playbook: scenarios 1–3 (load, stutter, clicks) |
+| Date       | Change                                                         |
+|------------|----------------------------------------------------------------|
+| 2026-04-05 | Added Scenario 2: full parameter tests for all 8 params (rverse-nqg) |
+| 2026-04-02 | Initial playbook: scenarios 1–3 (load, stutter, clicks)       |
