@@ -27,11 +27,23 @@ constexpr double kRiserVolumeDefault  = 0.0;    ///< Riser volume in dB (default
 constexpr double kHitVolumeDefault   = 0.0;    ///< Hit volume in dB (default: unity)
 constexpr double kVolumeMinDb        = -60.0;  ///< Voice volume minimum (-60 dB ≈ silence)
 constexpr double kVolumeMaxDb        = 6.0;    ///< Voice volume maximum (+6 dB headroom)
-constexpr double kDryWetDefault      = 100.0;  ///< Dry/Wet mix (0=all dry/hit, 100=all riser)
 constexpr double kStutterDepthDefault = 50.0;  ///< Stutter wet/dry (0–100%)
 constexpr double kStutterRateMinHz   = 0.0;    ///< Stutter rate minimum (0 = off)
 constexpr double kStutterRateMaxHz   = 30.0;   ///< Stutter rate maximum in Hz
 constexpr double kStutterRateDefaultHz = 0.0;  ///< Stutter rate default (off)
+
+// --- Debug Playback Mode ---
+/// Selects which pipeline stage buffer is played back.
+/// Normal = full riser + hit. Other modes play intermediate buffers for diagnostics.
+enum EDebugStage
+{
+  kDebugNormal   = 0, ///< Normal operation: riser + hit
+  kDebugReverbed = 1, ///< Play reverbed sample (before reverse/stretch), no hit
+  kDebugReversed = 2, ///< Play reversed sample (before stretch), no hit
+  kDebugRiserOnly = 3 ///< Play final riser (after stretch), suppress hit
+};
+
+constexpr int kNumDebugStages = 4;
 
 // --- Tuning ---
 constexpr double kTuneMinSemitones   = -24.0;

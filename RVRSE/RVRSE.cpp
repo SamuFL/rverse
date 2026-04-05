@@ -30,6 +30,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
     rvrse::kRiserVolumeDefault, rvrse::kVolumeMinDb, rvrse::kVolumeMaxDb, 0.1, "dB");
   GetParam(kParamHitVolume)->InitDouble("Hit Volume",
     rvrse::kHitVolumeDefault, rvrse::kVolumeMinDb, rvrse::kVolumeMaxDb, 0.1, "dB");
+  GetParam(kParamDebugStage)->InitEnum("Debug Stage", rvrse::kDebugNormal, {
+    "Normal", "Reverbed", "Reversed", "Riser Only"
+  });
 
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
@@ -195,6 +198,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const float fadeInPct = static_cast<float>(GetParam(kParamFadeIn)->Value() / 100.0);
   const float riserVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamRiserVolume)->Value()) / 20.0f);
   const float hitVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);
+  const auto debugStage = static_cast<rvrse::EDebugStage>(
+    static_cast<int>(GetParam(kParamDebugStage)->Value()));
   const double sr = GetSampleRate();
 
   // Read host BPM and propagate to the offline pipeline when it changes.
@@ -262,12 +267,18 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         if (riser && riser->IsReady())
         {
           mRiserPos = 0;
-          mSamplesFromNoteOn = 0;
-          mHitPos = -1; // Hit hasn't fired yet
+          mHitPos = -1;
 
-          // Calculate the hit offset: the riser length IS the riser buffer length
-          // (the OLA stretcher already sized it to riserLengthBeats × samplesPerBeat)
-          mHitOffset = riser->NumFrames();
+          // In debug modes, play the selected buffer; only trigger hit in Normal mode
+          if (debugStage == rvrse::kDebugNormal)
+          {
+            mSamplesFromNoteOn = 0;
+            mHitOffset = riser->NumFrames();
+          }
+          else
+          {
+            mSamplesFromNoteOn = -1; // No hit in debug modes
+          }
         }
         else if (hit && hit->IsLoaded())
         {
@@ -303,37 +314,67 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       mMidiQueue.Remove();
     }
 
-    // --- Generate riser output ---
+    // --- Generate riser/debug output ---
     float riserL = 0.0f;
     float riserR = 0.0f;
 
     if (mRiserPos >= 0 && riser && riser->IsReady())
     {
-      if (mRiserPos < riser->NumFrames())
+      // Select the active buffer based on debug stage
+      const float* bufL = riser->mLeft.data();
+      const float* bufR = riser->mRight.data();
+      int bufLen = riser->NumFrames();
+
+      if (debugStage == rvrse::kDebugReverbed && riser->ReverbedFrames() > 0)
       {
-        riserL = riser->mLeft[mRiserPos];
-        riserR = riser->mRight[mRiserPos];
+        bufL = riser->mReverbedL.data();
+        bufR = riser->mReverbedR.data();
+        bufLen = riser->ReverbedFrames();
+      }
+      else if (debugStage == rvrse::kDebugReversed && riser->ReversedFrames() > 0)
+      {
+        bufL = riser->mReversedL.data();
+        bufR = riser->mReversedR.data();
+        bufLen = riser->ReversedFrames();
+      }
 
-        // Apply fade-in envelope over the first fadeInPct of the riser
-        if (fadeInPct > 0.0f)
+      if (mRiserPos < bufLen)
+      {
+        riserL = bufL[mRiserPos];
+        riserR = bufR[mRiserPos];
+
+        const bool isDebugRaw = (debugStage == rvrse::kDebugReverbed ||
+                                 debugStage == rvrse::kDebugReversed);
+
+        if (!isDebugRaw)
         {
-          const int fadeInLen = static_cast<int>(static_cast<float>(riser->NumFrames()) * fadeInPct);
-          if (fadeInLen > 0 && mRiserPos < fadeInLen)
+          // Apply fade-in envelope over the first fadeInPct of the buffer
+          if (fadeInPct > 0.0f)
           {
-            const float fadeGain = static_cast<float>(mRiserPos) / static_cast<float>(fadeInLen);
-            riserL *= fadeGain;
-            riserR *= fadeGain;
+            const int fadeInLen = static_cast<int>(static_cast<float>(bufLen) * fadeInPct);
+            if (fadeInLen > 0 && mRiserPos < fadeInLen)
+            {
+              const float fadeGain = static_cast<float>(mRiserPos) / static_cast<float>(fadeInLen);
+              riserL *= fadeGain;
+              riserR *= fadeGain;
+            }
           }
+
+          riserL *= mVelocityGain * riserVolumeGain;
+          riserR *= mVelocityGain * riserVolumeGain;
+
+          // Apply stutter gate (per-sample, MIDI CC responsive)
+          const float stutterGain = rvrse::stutterProcess(
+            mStutterState, stutterRateHz, stutterDepth, sr);
+          riserL *= stutterGain;
+          riserR *= stutterGain;
         }
-
-        riserL *= mVelocityGain * riserVolumeGain;
-        riserR *= mVelocityGain * riserVolumeGain;
-
-        // Apply stutter gate (per-sample, MIDI CC responsive)
-        const float stutterGain = rvrse::stutterProcess(
-          mStutterState, stutterRateHz, stutterDepth, sr);
-        riserL *= stutterGain;
-        riserR *= stutterGain;
+        else
+        {
+          // Debug raw modes: only velocity gain (no fade-in, stutter, or riser volume)
+          riserL *= mVelocityGain;
+          riserR *= mVelocityGain;
+        }
 
         if (mRiserFadeRemaining > 0)
         {
@@ -348,7 +389,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       }
       else
       {
-        // Riser finished naturally
+        // Buffer finished naturally
         mRiserPos = -1;
       }
     }

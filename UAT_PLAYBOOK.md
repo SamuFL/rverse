@@ -40,6 +40,7 @@ Run these tests manually after every change to the DSP pipeline or plugin behavi
 | 6 | Fade In         | 0–100           | 60        | %     | 0.1   |
 | 7 | Riser Volume    | -60 to +6       | 0         | dB    | 0.1   |
 | 8 | Hit Volume      | -60 to +6       | 0         | dB    | 0.1   |
+| 9 | Debug Stage     | Normal / Reverbed / Reversed / Riser Only | Normal | — | enum |
 
 ---
 
@@ -252,7 +253,75 @@ audible clicks, pops, or glitches.
 
 ---
 
-## Test Scenario 5 — *(Reserved: Sample Persistence)*
+## Test Scenario 5 — Debug Stage Diagnostic Playback
+
+**Goal:** Verify that the Debug Stage parameter correctly exposes intermediate
+pipeline buffers, allowing isolation of each processing stage for diagnostics.
+
+> **Usage hint:** Use Debug Stage to identify which pipeline step introduces
+> unwanted artefacts (pitch shift, phasing, etc.). Compare each stage's output
+> against the original sample.
+
+### Pre-condition
+
+- Sample loaded and riser generated (Scenario 1 passing)
+- All params at defaults except Debug Stage
+
+### Tests
+
+#### 5.1 — Normal mode (default)
+- Set **Debug Stage = Normal** (default).
+- Trigger note → riser plays, hit fires at beat boundary.
+- Identical to behaviour without debug mode.
+
+#### 5.2 — Reverbed
+- Set **Debug Stage = Reverbed**.
+- Trigger note → plays the **reverbed sample** (forward, not reversed, not stretched).
+- **No hit fires** after the buffer ends.
+- Duration should be original sample length + reverb tail (up to ~5 s extra).
+- No fade-in, no stutter applied — raw reverb output.
+- Useful for checking if the **Schroeder reverb introduces pitch colouring**.
+
+#### 5.3 — Reversed
+- Set **Debug Stage = Reversed**.
+- Trigger note → plays the **reversed reverbed sample** (not stretched).
+- **No hit fires**.
+- Duration same as Reverbed (pre-stretch length).
+- No fade-in, no stutter — raw reversed output.
+- Useful for checking that **reversal is clean** (no clicks, no glitches).
+
+#### 5.4 — Riser Only
+- Set **Debug Stage = Riser Only**.
+- Trigger note → plays the **final stretched riser** with all normal processing
+  (fade-in, stutter, riser volume gain).
+- **No hit fires** — riser plays in isolation.
+- Duration matches Riser Length × tempo (same as Normal mode riser).
+- Useful for hearing the **time-stretcher quality** without the hit masking artefacts.
+
+#### 5.5 — A/B comparison workflow
+1. Set Debug Stage to **Reverbed** → trigger note → listen for pitch artefacts.
+2. Switch to **Reversed** → trigger → compare tonal quality with Reverbed.
+3. Switch to **Riser Only** → trigger → listen for stretching artefacts.
+4. Switch to **Normal** → trigger → verify full pipeline is unchanged.
+5. At each step, the pipeline does NOT rebuild — switching is instant.
+
+#### 5.6 — Lush interaction
+- Set **Debug Stage = Reverbed**, Lush = 0% → trigger → should hear nearly dry sample.
+- Set Lush = 100% → trigger → should hear heavy reverb (pipeline rebuilds).
+- Confirm pitch colouring increases with higher Lush values.
+
+### Pass Criteria
+
+- [ ] Each debug stage plays the correct intermediate buffer
+- [ ] No hit fires in Reverbed, Reversed, or Riser Only modes
+- [ ] Switching debug stages does not trigger a pipeline rebuild
+- [ ] Reverbed and Reversed modes play without fade-in or stutter processing
+- [ ] Riser Only mode plays with full processing chain (fade-in, stutter, volume)
+- [ ] No clicks or crashes when switching debug stages during playback
+
+---
+
+## Test Scenario 6 — *(Reserved: Sample Persistence)*
 
 > **Not yet implemented.** See beads issue for sample persistence feature.
 > Once implemented, test that:
@@ -262,13 +331,13 @@ audible clicks, pops, or glitches.
 
 ---
 
-## Test Scenario 6 — *(Reserved: GUI Interaction)*
+## Test Scenario 7 — *(Reserved: GUI Interaction)*
 
 > **Not yet implemented.** Will be added when the IGraphics GUI is built.
 
 ---
 
-## Test Scenario 7 — *(Reserved: Tempo-Synced Stutter)*
+## Test Scenario 8 — *(Reserved: Tempo-Synced Stutter)*
 
 > **Not yet implemented.** See beads issue rverse-0gq.
 
@@ -278,5 +347,6 @@ audible clicks, pops, or glitches.
 
 | Date       | Change                                                         |
 |------------|----------------------------------------------------------------|
+| 2026-04-05 | Added Scenario 5: debug stage diagnostic playback (rverse-l9x) |
 | 2026-04-05 | Added Scenario 2: full parameter tests for all 8 params (rverse-nqg) |
 | 2026-04-02 | Initial playbook: scenarios 1–3 (load, stutter, clicks)       |
