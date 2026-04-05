@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `BufferUtils.h` — in-place stereo buffer reversal, linear resampling, tail fade-out utilities (rverse-cmf)
 
 ### Fixed
+- Installer license.rtf replaced with actual MIT license — was iPlug2 placeholder with no legal basis (rverse-jwf)
 - **Critical:** Reverb tail was truncated — output buffer was same size as input, producing no reverb tail. Now pads source with 5 seconds of silence so the Schroeder reverb rings out naturally, then trims trailing silence. This is the core of the reverse-reverb effect. (rverse-0d0)
 - Hit sample now resampled to DAW output rate on load — fixes pitched-down playback with 96kHz+ files (rverse-djb)
 - Offline pipeline resamples source to output rate before processing — riser length now correct regardless of file sample rate (rverse-djb)
