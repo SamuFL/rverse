@@ -41,6 +41,9 @@ class RVRSE final : public Plugin
 public:
   RVRSE(const InstanceInfo& info);
 
+  bool SerializeState(IByteChunk& chunk) const override;
+  int UnserializeState(const IByteChunk& chunk, int startPos) override;
+
 #if IPLUG_EDITOR
   bool OnHostRequestingSupportedViewConfiguration(int width, int height) override { return true; }
 #endif
@@ -54,6 +57,9 @@ public:
 private:
   /// Load a sample file from disk (called from UI thread, does work on background thread)
   void LoadSampleFromFile(const char* filePath);
+
+  /// Persisted sample file path (saved/restored with DAW project)
+  std::string mSampleFilePath;
 
   // --- Sample data (offline → real-time handoff) ---
 

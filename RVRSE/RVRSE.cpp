@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <thread>
 
 #if IPLUG_EDITOR
@@ -93,15 +94,46 @@ RVRSE::RVRSE(const InstanceInfo& info)
         });
     }, "LOAD SAMPLE", buttonStyle), kCtrlTagLoadButton);
 
-    // Sample name display
+    // Sample name display — default text, updated below if a sample is already loaded
     pGraphics->AttachControl(new ITextControl(sampleNameBounds, "No sample loaded",
       IText(14, IColor(200, 180, 180, 180))), kCtrlTagSampleName);
+
+    // Restore sample name display if a sample is already loaded (e.g. editor was closed/reopened)
+    if (!mSampleFilePath.empty())
+    {
+      if (auto* pCtrl = pGraphics->GetControlWithTag(kCtrlTagSampleName))
+      {
+        const auto state = mLoadState.load();
+        if (state == rvrse::ESampleLoadState::Ready && mPlaySample && mPlaySample->IsLoaded())
+        {
+          WDL_String displayStr;
+          displayStr.SetFormatted(256, "%s (%d Hz, %s, %.1fs)",
+            mPlaySample->mFileName.c_str(),
+            static_cast<int>(mPlaySample->mSampleRate),
+            mPlaySample->mNumChannels == 1 ? "mono" : "stereo",
+            static_cast<double>(mPlaySample->NumFrames()) / mPlaySample->mSampleRate);
+          pCtrl->As<ITextControl>()->SetStr(displayStr.Get());
+        }
+        else if (state == rvrse::ESampleLoadState::Loading)
+        {
+          pCtrl->As<ITextControl>()->SetStr("Loading...");
+        }
+        else if (state == rvrse::ESampleLoadState::Error)
+        {
+          WDL_String errStr;
+          errStr.SetFormatted(256, "Missing: %s",
+            rvrse::ExtractFileName(mSampleFilePath).c_str());
+          pCtrl->As<ITextControl>()->SetStr(errStr.Get());
+        }
+      }
+    }
   };
 #endif
 }
 
 void RVRSE::LoadSampleFromFile(const char* filePath)
 {
+  mSampleFilePath = filePath;
   mLoadState.store(rvrse::ESampleLoadState::Loading);
 
   // Update UI to show loading state
@@ -184,6 +216,73 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
       }
     }
   }).detach();
+}
+
+// --- State persistence (save/restore with DAW project) ---
+
+static constexpr int kStateChunkVersion = 1;
+
+bool RVRSE::SerializeState(IByteChunk& chunk) const
+{
+  chunk.Put(&kStateChunkVersion);
+  chunk.PutStr(mSampleFilePath.c_str());
+  return SerializeParams(chunk);
+}
+
+int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
+{
+  int version = 0;
+  startPos = chunk.Get(&version, startPos);
+  if (startPos < 0) return startPos;
+
+  if (version >= 1)
+  {
+    WDL_String pathStr;
+    startPos = chunk.GetStr(pathStr, startPos);
+    if (startPos < 0) return startPos;
+
+    const std::string restoredPath(pathStr.Get());
+
+    if (!restoredPath.empty())
+    {
+      if (std::filesystem::is_regular_file(restoredPath))
+      {
+        LoadSampleFromFile(restoredPath.c_str());
+      }
+      else
+      {
+        mSampleFilePath = restoredPath;
+        mLoadState.store(rvrse::ESampleLoadState::Error);
+
+        // Clear stale audio data so playback matches the "Missing" state
+        {
+          std::lock_guard<std::mutex> lock(mSampleMutex);
+          mHitSample.reset();
+        }
+        mNewSampleReady.store(false, std::memory_order_release);
+
+        if (GetUI())
+        {
+          if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
+          {
+            WDL_String errStr;
+            errStr.SetFormatted(256, "Missing: %s",
+              rvrse::ExtractFileName(restoredPath).c_str());
+            pCtrl->As<ITextControl>()->SetStr(errStr.Get());
+            pCtrl->SetDirty(false);
+          }
+        }
+      }
+    }
+    else
+    {
+      // Empty path — host reset state/preset, clear everything
+      mSampleFilePath.clear();
+      mLoadState.store(rvrse::ESampleLoadState::Empty);
+    }
+  }
+
+  return UnserializeParams(chunk, startPos);
 }
 
 #if IPLUG_DSP

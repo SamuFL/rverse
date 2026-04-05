@@ -311,13 +311,49 @@ pipeline buffers, allowing isolation of each processing stage for diagnostics.
 
 ---
 
-## Test Scenario 6 — *(Reserved: Sample Persistence)*
+## Test Scenario 6 — Sample Persistence (rverse-7dr)
 
-> **Not yet implemented.** See beads issue for sample persistence feature.
-> Once implemented, test that:
-> - Closing and reopening a project restores the previously loaded sample.
-> - If the sample file was moved/deleted, a user-visible warning is displayed.
-> - The plugin degrades gracefully (no crash) when the file is missing.
+**Goal:** Verify that the loaded sample path is saved with the DAW project and
+automatically restored when the project is reopened.
+
+### Pre-condition
+
+- Sample loaded and riser generated (Scenario 1 passing)
+- DAW project saved at least once
+
+### Tests
+
+#### 6.1 — Save and restore sample
+- Load a reference sample. Verify riser plays correctly.
+- Save the DAW project. Close the project (or quit DAW).
+- Reopen the project.
+- **Expected:** Sample is automatically reloaded — sample name appears in the UI,
+  riser plays on note-on without manually re-loading the sample.
+
+#### 6.2 — Parameters persist alongside sample
+- Set non-default values for Lush, Riser Length, Fade In, Riser Volume, Hit Volume.
+- Save project, close, reopen.
+- **Expected:** All parameter values are restored to their saved settings.
+  Riser sounds identical to before save.
+
+#### 6.3 — Missing file graceful degradation
+- Load a sample. Save the project.
+- Move or delete the sample file from disk.
+- Reopen the project.
+- **Expected:** Plugin shows "Missing: filename.wav" in the sample name area.
+  No crash. No riser plays. Loading a new sample works normally.
+
+#### 6.4 — Empty state (no sample loaded)
+- Create a new instance of RVRSE (no sample loaded).
+- Save project, close, reopen.
+- **Expected:** Plugin loads in empty state. "No sample loaded" displayed.
+  No errors.
+
+### Checklist
+- [ ] 6.1 — Sample restored on project reopen
+- [ ] 6.2 — Parameters restored alongside sample
+- [ ] 6.3 — Missing file shows warning, no crash
+- [ ] 6.4 — Empty state round-trips correctly
 
 ---
 
@@ -337,6 +373,7 @@ pipeline buffers, allowing isolation of each processing stage for diagnostics.
 
 | Date       | Change                                                         |
 |------------|----------------------------------------------------------------|
+| 2026-04-05 | Added Scenario 6: sample persistence tests (rverse-7dr)        |
 | 2026-04-05 | Added Scenario 5: debug stage diagnostic playback (rverse-l9x) |
 | 2026-04-05 | Added Scenario 2: full parameter tests for all 8 params (rverse-nqg) |
 | 2026-04-02 | Initial playbook: scenarios 1–3 (load, stutter, clicks)       |

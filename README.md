@@ -444,12 +444,12 @@ the full dependency tree.
 
 | Issue | Priority | Description | Status |
 |-------|----------|-------------|--------|
-| `rverse-nqg` | P1 | Expose DSP params (Lush, Riser Length, Fade In, Riser Volume, Hit Volume) | In Progress (PR #5) |
+| `rverse-nqg` | P1 | Expose DSP params (Lush, Riser Length, Fade In, Riser Volume, Hit Volume) | ✅ Done (PR #5) |
 | `rverse-l9x` | P1 | Debug playback mode — expose intermediate pipeline buffers | ✅ Done (in PR #5) |
 | `rverse-g4j` | P1 | Upgrade OLA time-stretcher to phase vocoder or WSOLA | Open |
 | `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | Blocked by `rverse-nqg` |
 | `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | Open |
-| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | Open |
+| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | ✅ Done (PR #6) |
 
 ### Phase 3 — Documentation & Polish
 
