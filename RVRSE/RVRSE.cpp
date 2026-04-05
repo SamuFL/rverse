@@ -239,8 +239,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mSamplesFromNoteOn = -1;
   }
 
-  // Check if a new riser buffer is ready from the offline pipeline (lock-free)
-  if (mProcessor.isNewRiserReady())
+  // Check if a new riser buffer is ready from the offline pipeline (lock-free).
+  // Latch: only swap when no riser is actively playing to avoid mid-note discontinuities.
+  if (mProcessor.isNewRiserReady() && mRiserPos < 0)
   {
     mRiserBuffer = mProcessor.consumeRiser();
   }
@@ -338,6 +339,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         bufLen = riser->ReversedFrames();
       }
 
+      // Precompute fade-in length (constant for this buffer)
+      const int fadeInLen = static_cast<int>(static_cast<float>(bufLen) * fadeInPct);
+
       if (mRiserPos < bufLen)
       {
         riserL = bufL[mRiserPos];
@@ -349,15 +353,11 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         if (!isDebugRaw)
         {
           // Apply fade-in envelope over the first fadeInPct of the buffer
-          if (fadeInPct > 0.0f)
+          if (fadeInPct > 0.0f && fadeInLen > 1 && mRiserPos < fadeInLen)
           {
-            const int fadeInLen = static_cast<int>(static_cast<float>(bufLen) * fadeInPct);
-            if (fadeInLen > 0 && mRiserPos < fadeInLen)
-            {
-              const float fadeGain = static_cast<float>(mRiserPos) / static_cast<float>(fadeInLen);
-              riserL *= fadeGain;
-              riserR *= fadeGain;
-            }
+            const float fadeGain = static_cast<float>(mRiserPos) / static_cast<float>(fadeInLen - 1);
+            riserL *= fadeGain;
+            riserR *= fadeGain;
           }
 
           riserL *= mVelocityGain * riserVolumeGain;
