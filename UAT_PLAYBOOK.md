@@ -158,34 +158,24 @@ otherwise stated.
 | 2.6d | -60 dB | Hit is essentially inaudible — only the riser is heard |
 | 2.6e | Compare +6 vs -60 | Clear difference: hit dominates at +6, disappears at -60 |
 
-### 2.7 Riser Volume + Hit Volume Combined
-
-| Test | Riser Vol | Hit Vol | Expected Outcome |
-|------|-----------|---------|------------------|
-| 2.7a | 0 dB | 0 dB | Both voices at equal level (default) |
-| 2.7b | +6 dB | -60 dB | Only the riser is heard — "riser only" mode |
-| 2.7c | -60 dB | +6 dB | Only the hit is heard — "hit only" mode |
-| 2.7d | +6 dB | +6 dB | Both voices boosted — louder overall, check for clipping |
-| 2.7e | -60 dB | -60 dB | Both inaudible — complete silence (apart from noise floor) |
-
-### 2.8 Stutter Rate
+### 2.7 Stutter Rate
 
 | Test | Value | Depth | Expected Outcome |
 |------|-------|-------|------------------|
-| 2.8a | 0 Hz (default) | 0.5 | No stuttering — clean riser playback |
-| 2.8b | 4 Hz | 0.5 | Slow tremolo-like pulsing on the riser (4 pulses/sec) |
-| 2.8c | 15 Hz | 0.5 | Fast stuttering — "machine gun" effect on the riser |
-| 2.8d | 30 Hz | 0.5 | Maximum stutter — very rapid gating, approaching ring-mod territory |
-| 2.8e | Sweep 0→30 Hz | 0.5 | Rate increases continuously, no stepping or jumps |
+| 2.7a | 0 Hz (default) | 0.5 | No stuttering — clean riser playback |
+| 2.7b | 4 Hz | 0.5 | Slow tremolo-like pulsing on the riser (4 pulses/sec) |
+| 2.7c | 15 Hz | 0.5 | Fast stuttering — "machine gun" effect on the riser |
+| 2.7d | 30 Hz | 0.5 | Maximum stutter — very rapid gating, approaching ring-mod territory |
+| 2.7e | Sweep 0→30 Hz | 0.5 | Rate increases continuously, no stepping or jumps |
 
-### 2.9 Stutter Depth
+### 2.8 Stutter Depth
 
 | Test | Value | Rate | Expected Outcome |
 |------|-------|------|------------------|
-| 2.9a | 0 | 15 Hz | No audible stutter — depth of 0 means dry signal passes through |
-| 2.9b | 0.5 (default) | 15 Hz | Moderate stuttering — signal dips but doesn't fully cut |
-| 2.9c | 1.0 | 15 Hz | Full stutter — signal cuts completely during gate-off portions |
-| 2.9d | Sweep 0→1 | 15 Hz | Stutter gradually goes from subtle to full cut |
+| 2.8a | 0 | 15 Hz | No audible stutter — depth of 0 means dry signal passes through |
+| 2.8b | 0.5 (default) | 15 Hz | Moderate stuttering — signal dips but doesn't fully cut |
+| 2.8c | 1.0 | 15 Hz | Full stutter — signal cuts completely during gate-off portions |
+| 2.8d | Sweep 0→1 | 15 Hz | Stutter gradually goes from subtle to full cut |
 
 ### Pass Criteria (All Parameter Tests)
 
