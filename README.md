@@ -449,7 +449,7 @@ the full dependency tree.
 | `rverse-g4j` | P1 | Upgrade OLA time-stretcher to phase vocoder or WSOLA | Open |
 | `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | Blocked by `rverse-nqg` |
 | `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | Open |
-| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | In Progress |
+| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | ✅ Done (PR #6) |
 
 ### Phase 3 — Documentation & Polish
 

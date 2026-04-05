@@ -6,8 +6,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <thread>
-#include <fstream>
 
 #if IPLUG_EDITOR
 #include "IControls.h"
@@ -245,8 +245,7 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
 
     if (!restoredPath.empty())
     {
-      std::ifstream probe(restoredPath);
-      if (probe.good())
+      if (std::filesystem::is_regular_file(restoredPath))
       {
         LoadSampleFromFile(restoredPath.c_str());
       }
@@ -254,6 +253,13 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
       {
         mSampleFilePath = restoredPath;
         mLoadState.store(rvrse::ESampleLoadState::Error);
+
+        // Clear stale audio data so playback matches the "Missing" state
+        {
+          std::lock_guard<std::mutex> lock(mSampleMutex);
+          mHitSample.reset();
+        }
+        mNewSampleReady.store(false, std::memory_order_release);
 
         if (GetUI())
         {
@@ -267,6 +273,12 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
           }
         }
       }
+    }
+    else
+    {
+      // Empty path — host reset state/preset, clear everything
+      mSampleFilePath.clear();
+      mLoadState.store(rvrse::ESampleLoadState::Empty);
     }
   }
 
