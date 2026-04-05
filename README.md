@@ -437,7 +437,7 @@ the full dependency tree.
 | Issue | Priority | Description | Status |
 |-------|----------|-------------|--------|
 | `rverse-g67` | P2 | Replace all AcmeInc placeholder branding with SamuFL identity | Open |
-| `rverse-jwf` | P1 | Replace installer license.rtf placeholder with actual MIT license | Open |
+| `rverse-jwf` | P1 | Replace installer license.rtf placeholder with actual MIT license | ✅ Done (PR #7) |
 | `rverse-lxg` | P0 | Set up GitHub Actions CI (Windows + macOS) | ✅ Done |
 
 ### Phase 2 — Feature Completion
