@@ -190,10 +190,12 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
 
 // --- State persistence (save/restore with DAW project) ---
 
+static constexpr int kStateChunkMagic = 0x52565253; // "RVRS"
 static constexpr int kStateChunkVersion = 1;
 
 bool RVRSE::SerializeState(IByteChunk& chunk) const
 {
+  chunk.Put(&kStateChunkMagic);
   chunk.Put(&kStateChunkVersion);
   chunk.PutStr(mSampleFilePath.c_str());
   return SerializeParams(chunk);
@@ -201,21 +203,29 @@ bool RVRSE::SerializeState(IByteChunk& chunk) const
 
 int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
 {
+  // Detect chunk format: new (magic + version + path + params) vs old (params only).
+  // Old-format chunks exist if the host cached state before PLUG_DOES_STATE_CHUNKS was enabled.
+  int magic = 0;
+  const int afterMagic = chunk.Get(&magic, startPos);
+
+  if (afterMagic < 0 || magic != kStateChunkMagic)
+    return UnserializeParams(chunk, startPos);
+
+  startPos = afterMagic;
   int version = 0;
   startPos = chunk.Get(&version, startPos);
-  if (startPos < 0) return startPos;
+  if (startPos < 0) return UnserializeParams(chunk, 0);
 
   if (version >= 1)
   {
     WDL_String pathStr;
     startPos = chunk.GetStr(pathStr, startPos);
-    if (startPos < 0) return startPos;
+    if (startPos < 0) return UnserializeParams(chunk, 0);
 
     const std::string restoredPath(pathStr.Get());
 
     if (!restoredPath.empty())
     {
-      // Check if the file still exists before attempting to load
       std::ifstream probe(restoredPath);
       if (probe.good())
       {
@@ -223,7 +233,7 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
       }
       else
       {
-        mSampleFilePath = restoredPath; // Preserve path even if file is missing
+        mSampleFilePath = restoredPath;
         mLoadState.store(rvrse::ESampleLoadState::Error);
 
         if (GetUI())
