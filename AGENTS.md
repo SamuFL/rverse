@@ -173,8 +173,23 @@ Keeping documentation current is **not optional**. It is part of completing any 
 | `README.md` | Any user-facing behaviour changes, new build steps, new dependencies |
 | `BRIEF.md` | Architecture decisions change or new constraints are discovered |
 | `CHANGELOG.md` | Any commit that changes user-facing behaviour (add an entry under `[Unreleased]`) |
+| `UAT_PLAYBOOK.md` | Any parameter added/changed/removed, any new test scenario needed |
 | `Constants.h` comments | Any constant value or MIDI CC mapping changes |
 | Inline `///` doc comments | Any public function signature changes |
+
+### PR Documentation Checklist
+
+Before opening or updating a pull request, **review every file in the table above** and
+verify it reflects the changes in the PR. This is a blocking requirement — a PR with
+stale documentation is not ready for review.
+
+Specifically:
+1. **Before opening a PR:** Re-read `README.md`, `CHANGELOG.md`, and `UAT_PLAYBOOK.md`.
+   Confirm all new/changed behaviour is documented and all parameter tables are current.
+2. **While working on a PR:** After each commit that changes user-facing behaviour,
+   update `CHANGELOG.md` in the same commit (not as an afterthought).
+3. **Before requesting review:** Do a final pass over all documentation files.
+   Check that parameter names, ranges, defaults, and descriptions match the code.
 
 ### CHANGELOG format
 

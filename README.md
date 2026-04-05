@@ -6,8 +6,9 @@ RVRSE generates a reverse-reverb riser automatically from any loaded hit sample,
 original hit at a tempo-synced beat boundary. One sample in → complete transition out. No manual
 editing, no extra samples needed.
 
-> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline and stutter gate working.
-> GUI, parameter exposure, CI, and release packaging still in progress.
+> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline, stutter gate, and all DAW
+> parameters working. CI running on macOS + Windows. Debug playback mode available.
+> GUI and release packaging still in progress.
 > See [CHANGELOG.md](./CHANGELOG.md) and the Release Preparation Epic (`rverse-0v6`) for details.
 
 ---
@@ -242,14 +243,17 @@ Per-sample loop (s = 0 to nFrames):
     │     Note-off: Begin 5ms fade-out, kill hit trigger
     │
     ├── Riser voice
-    │     Read riser[mRiserPos], apply velocity + fade
+    │     Read riser[mRiserPos], apply fade-in envelope
+    │     Apply velocity × riser volume gain
+    │     Apply stutter gate (per-sample, MIDI CC responsive)
     │     Advance position
     │
     ├── Hit trigger check
     │     If mSamplesFromNoteOn >= mHitOffset → fire hit (mHitPos = 0)
     │
     ├── Hit voice
-    │     Read hit[mHitPos], apply velocity + fade
+    │     Read hit[mHitPos], apply velocity × hit volume gain
+    │     Apply note-off fade if active
     │     Advance position
     │
     └── Output: (riserL + hitL) × masterVol
@@ -358,12 +362,29 @@ Build artefacts are in `build/RVRSE/`.
    at the beat boundary (default: 4 beats at host BPM).
 4. **Release the note** to fade out both voices (5ms anti-click envelope).
 
+### DAW Parameters
+
+All parameters are exposed in the DAW's generic editor and can be automated:
+
+| Parameter | Range | Default | Notes |
+|---|---|---|---|
+| Master Volume | 0–100% | 100% | Overall output level |
+| Lush | 0–100% | 40% | Reverb amount — triggers offline rebuild |
+| Riser Length | 0.25–16 beats | 4 | Time-stretch target — triggers offline rebuild |
+| Fade In | 0–100% | 60% | Linear ramp over portion of riser length |
+| Riser Volume | -60 to +6 dB | 0 dB | Independent riser voice gain |
+| Hit Volume | -60 to +6 dB | 0 dB | Independent hit voice gain |
+| Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1) |
+| Stutter Depth | 0–1 | 0.5 | Gate depth (also via MIDI CC11) |
+| Debug Stage | Normal / Reverbed / Reversed / Riser Only | Normal | Diagnostic: audition intermediate pipeline buffers |
+
 ### Current Limitations
 
-- No GUI knobs yet — parameters like Lush, Riser Length, and Stutter are not yet exposed in the UI (use DAW generic editor or MIDI CC).
+- No custom GUI yet — use the DAW's generic parameter editor or MIDI CC for all controls.
 - No preset system.
 - No pitch shift (planned).
 - Single-voice only — overlapping notes cut the previous voice.
+- OLA time-stretcher may introduce pitch artefacts at large stretch ratios (known issue, improvement tracked).
 
 ---
 
@@ -413,31 +434,33 @@ the full dependency tree.
 
 ### Phase 1 — Critical Fixes
 
-| Issue | Priority | Description |
-|-------|----------|-------------|
-| `rverse-g67` | P2 | Replace all AcmeInc placeholder branding with SamuFL identity |
-| `rverse-jwf` | P1 | Replace installer license.rtf placeholder with actual MIT license |
-| `rverse-lxg` | P0 | Set up GitHub Actions CI (Windows + macOS) |
+| Issue | Priority | Description | Status |
+|-------|----------|-------------|--------|
+| `rverse-g67` | P2 | Replace all AcmeInc placeholder branding with SamuFL identity | Open |
+| `rverse-jwf` | P1 | Replace installer license.rtf placeholder with actual MIT license | Open |
+| `rverse-lxg` | P0 | Set up GitHub Actions CI (Windows + macOS) | ✅ Done |
 
 ### Phase 2 — Feature Completion
 
-| Issue | Priority | Description | Blocked by |
-|-------|----------|-------------|------------|
-| `rverse-nqg` | P1 | Expose remaining DSP params (Lush, Riser Length, Fade In, Hit Vol, Dry/Wet) | — |
-| `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | `rverse-nqg` |
-| `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | — |
-| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | — |
+| Issue | Priority | Description | Status |
+|-------|----------|-------------|--------|
+| `rverse-nqg` | P1 | Expose DSP params (Lush, Riser Length, Fade In, Riser Volume, Hit Volume) | In Progress (PR #5) |
+| `rverse-l9x` | P1 | Debug playback mode — expose intermediate pipeline buffers | ✅ Done (in PR #5) |
+| `rverse-g4j` | P1 | Upgrade OLA time-stretcher to phase vocoder or WSOLA | Open |
+| `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | Blocked by `rverse-nqg` |
+| `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | Open |
+| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | Open |
 
 ### Phase 3 — Documentation & Polish
 
-| Issue | Priority | Description | Blocked by |
-|-------|----------|-------------|------------|
-| `rverse-6fl` | P0 | Add Catch2 test framework and tests/ directory | — |
-| `rverse-2uq` | P0 | Unit tests for existing DSP modules | `rverse-6fl` |
-| `rverse-zvc` | P2 | Write user manual (LaTeX → PDF) | `rverse-ebv` |
-| `rverse-jaj` | P2 | Automate version number sync (plists, installer, config.h) | — |
-| `rverse-nwe` | P2 | Add Pluginval to CI pipeline | `rverse-lxg` |
-| `rverse-k4o` | P3 | Add CONTRIBUTING.md and CODE_OF_CONDUCT.md | — |
+| Issue | Priority | Description | Status |
+|-------|----------|-------------|--------|
+| `rverse-6fl` | P0 | Add Catch2 test framework and tests/ directory | ✅ Done |
+| `rverse-2uq` | P0 | Unit tests for existing DSP modules | ✅ Done (42 tests) |
+| `rverse-zvc` | P2 | Write user manual (LaTeX → PDF) | Blocked by `rverse-ebv` |
+| `rverse-jaj` | P2 | Automate version number sync (plists, installer, config.h) | Open |
+| `rverse-nwe` | P2 | Add Pluginval to CI pipeline | Open |
+| `rverse-k4o` | P3 | Add CONTRIBUTING.md and CODE_OF_CONDUCT.md | Open |
 
 ### Phase 4 — QA & Release
 
