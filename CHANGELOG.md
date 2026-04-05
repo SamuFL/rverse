@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Persist loaded sample path across DAW sessions — save/restore via `SerializeState`/`UnserializeState` with versioned chunk format. Shows "Missing: filename" if file is gone on reload. (rverse-7dr)
 - GitHub Actions CI: macOS (Apple Silicon, Ninja) + Windows (VS2022) — builds all plugin formats and runs 42 unit tests on pushes to develop/main and PRs targeting them (rverse-lxg)
 - Expose 5 new DAW-automatable parameters via generic editor: Lush (0–100%), Riser Length (0.25–16 beats), Fade In (0–100%), Riser Volume (-60 to +6 dB), Hit Volume (-60 to +6 dB) (rverse-nqg)
 - Debug Stage parameter (Normal / Reverbed / Reversed / Riser Only) — exposes intermediate pipeline buffers for diagnostic playback without hit (rverse-l9x)

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <thread>
+#include <fstream>
 
 #if IPLUG_EDITOR
 #include "IControls.h"
@@ -102,6 +103,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
 
 void RVRSE::LoadSampleFromFile(const char* filePath)
 {
+  mSampleFilePath = filePath;
   mLoadState.store(rvrse::ESampleLoadState::Loading);
 
   // Update UI to show loading state
@@ -184,6 +186,62 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
       }
     }
   }).detach();
+}
+
+// --- State persistence (save/restore with DAW project) ---
+
+static constexpr int kStateChunkVersion = 1;
+
+bool RVRSE::SerializeState(IByteChunk& chunk) const
+{
+  chunk.Put(&kStateChunkVersion);
+  chunk.PutStr(mSampleFilePath.c_str());
+  return SerializeParams(chunk);
+}
+
+int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
+{
+  int version = 0;
+  startPos = chunk.Get(&version, startPos);
+  if (startPos < 0) return startPos;
+
+  if (version >= 1)
+  {
+    WDL_String pathStr;
+    startPos = chunk.GetStr(pathStr, startPos);
+    if (startPos < 0) return startPos;
+
+    const std::string restoredPath(pathStr.Get());
+
+    if (!restoredPath.empty())
+    {
+      // Check if the file still exists before attempting to load
+      std::ifstream probe(restoredPath);
+      if (probe.good())
+      {
+        LoadSampleFromFile(restoredPath.c_str());
+      }
+      else
+      {
+        mSampleFilePath = restoredPath; // Preserve path even if file is missing
+        mLoadState.store(rvrse::ESampleLoadState::Error);
+
+        if (GetUI())
+        {
+          if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
+          {
+            WDL_String errStr;
+            errStr.SetFormatted(256, "Missing: %s",
+              rvrse::ExtractFileName(restoredPath).c_str());
+            pCtrl->As<ITextControl>()->SetStr(errStr.Get());
+            pCtrl->SetDirty(false);
+          }
+        }
+      }
+    }
+  }
+
+  return UnserializeParams(chunk, startPos);
 }
 
 #if IPLUG_DSP
