@@ -74,7 +74,6 @@ Every parameter listed here MUST have a corresponding control in the GUI. The "C
 |---|---|---|---|---|
 | Riser Tune | Riser | Knob | -24 – +24 st | Pitch-shifts the riser. Beads issue `rverse-bzs`. |
 | Hit Tune | Hit | Knob | -24 – +24 st | Pitch-shifts the hit. Beads issue `rverse-bzs`. |
-| Dry/Wet | Global | Knob | 0 – 100% | Blends RVRSE output with dry input. |
 
 ### 3.7 Non-Parameter UI Elements
 
@@ -113,7 +112,7 @@ Three zones, top to bottom:
 │  Stutter Rate [knob] ◉  │                            │
 │  Stutter Depth[knob] ◉  │                            │
 ├─────────────────────────┴────────────────────────────┤
-│  Master [knob]  (Dry/Wet [reserved])   RVRSE v0.1.0  │  ← Bottom bar
+│  Master [knob]                         RVRSE v0.1.0  │  ← Bottom bar
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -123,7 +122,7 @@ Three zones, top to bottom:
 - The **HIT panel** is simpler — just volume + a small waveform preview of the original sample.
 - The **waveform display** spans the full width above the panels. It shows the complete playback sequence: reversed riser transitioning into the hit transient. A playhead indicator scrubs through during playback.
 - **Stutter knobs** should visually stand apart (perhaps a subtle separator or grouping label "REAL-TIME") since they are MIDI CC controlled, unlike the offline knobs above them.
-- **Reserved spaces** (shown in parentheses) are for future parameters (Riser Tune, Hit Tune, Dry/Wet). Design should accommodate them gracefully — either as visible disabled placeholders or as empty space that won't look awkward.
+- **Reserved spaces** (shown in parentheses) are for future parameters (Riser Tune, Hit Tune). Design should accommodate them gracefully — either as visible disabled placeholders or as empty space that won't look awkward.
 - Bottom bar is minimal — master volume on the left, version string on the right.
 - The Debug Stage dropdown should be **invisible** in the default view.
 

@@ -89,7 +89,6 @@ RVRSE reads the host BPM via iPlug2's `ITimeInfo`. When a MIDI note-on arrives:
 | Parameter | Range | Default | Description |
 |---|---|---|---|
 | Master Volume | -inf – +6 dB | 0 dB | Overall output level. |
-| Dry/Wet | 0 – 100% | 100% | Blends the RVRSE output with the dry input (useful in FX chain mode). |
 
 ---
 
@@ -219,7 +218,7 @@ Dark-themed, minimal, performance-focused. Three clear zones:
 │  Stutter Depth[knob] ◉  │                            │
 │  (◉ = MIDI CC active)   │                            │
 ├─────────────────────────┴────────────────────────────┤
-│  Master Vol [knob]   Dry/Wet [knob]   RVRSE v0.1.0   │
+│  Master Vol [knob]                     RVRSE v0.1.0   │
 └──────────────────────────────────────────────────────┘
 ```
 
