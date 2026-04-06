@@ -117,6 +117,18 @@ RVRSE::RVRSE(const InstanceInfo& info)
         offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(70.f, 90.f));
       const IRECT stretchBounds = offlineArea.GetReducedFromTop(116.f).GetFromLeft(100.f).GetCentredInside(90.f, 30.f);
       pGraphics->GetControlWithTag(kCtrlTagStretchQuality)->SetTargetAndDrawRECTs(stretchBounds);
+      // Hit panel
+      const IRECT hitLabelBounds = hitRect.GetPadded(-8.f).GetFromTop(20.f);
+      pGraphics->GetControlWithTag(kCtrlTagHitSectionLabel)->SetTargetAndDrawRECTs(hitLabelBounds);
+      const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
+      pGraphics->GetControlWithTag(kCtrlTagHitVolume)->SetTargetAndDrawRECTs(
+        hitVolArea.GetCentredInside(75.f, 90.f));
+      const IRECT logoArea = hitRect.GetPadded(-8.f).GetReducedFromTop(124.f).GetFromTop(50.f);
+      pGraphics->GetControlWithTag(kCtrlTagLogo)->SetTargetAndDrawRECTs(
+        logoArea.GetCentredInside(80.f, 40.f));
+      const IRECT supportArea = hitRect.GetPadded(-8.f).GetFromBottom(36.f);
+      pGraphics->GetControlWithTag(kCtrlTagSupportButton)->SetTargetAndDrawRECTs(
+        supportArea.GetCentredInside(130.f, 26.f));
       return;
     }
 
@@ -305,6 +317,48 @@ RVRSE::RVRSE(const InstanceInfo& info)
     const IRECT stretchBounds = offlineArea.GetReducedFromTop(116.f).GetFromLeft(100.f).GetCentredInside(90.f, 30.f);
     pGraphics->AttachControl(new IVToggleControl(stretchBounds, kParamStretchQuality,
       "STRETCH", toggleStyle, "LOW", "HIGH"), kCtrlTagStretchQuality);
+
+    // ── Hit panel contents ──────────────────────────────────────────────
+    // Section label
+    const IRECT hitLabelBounds = hitRect.GetPadded(-8.f).GetFromTop(20.f);
+    pGraphics->AttachControl(new ITextControl(hitLabelBounds, "HIT",
+      IText(12, kColorBlue, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagHitSectionLabel);
+
+    // Hit Volume knob (blue accent)
+    const IVStyle hitKnobStyle = knobStyle
+      .WithColor(kX1, kColorBlue);
+
+    const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
+    const IRECT hitVolBounds = hitVolArea.GetCentredInside(75.f, 90.f);
+    pGraphics->AttachControl(new IVKnobControl(hitVolBounds, kParamHitVolume,
+      "VOLUME", hitKnobStyle, true), kCtrlTagHitVolume);
+
+    // Logo (SVG)
+    const ISVG logo = pGraphics->LoadSVG(LOGO_FN);
+    const IRECT logoArea = hitRect.GetPadded(-8.f).GetReducedFromTop(124.f).GetFromTop(50.f);
+    const IRECT logoBounds = logoArea.GetCentredInside(80.f, 40.f);
+    pGraphics->AttachControl(new ISVGControl(logoBounds, logo), kCtrlTagLogo);
+
+    // Support button
+    const IVStyle supportStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kPR, kColorDarkGrey)
+      .WithColor(kFR, kColorBlue)
+      .WithColor(kHL, kColorBlue.WithOpacity(0.1f))
+      .WithDrawFrame(true)
+      .WithFrameThickness(1.f)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithRoundness(0.3f)
+      .WithShowValue(false)
+      .WithLabelText(IText(10, kColorBlue, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
+
+    const IRECT supportArea = hitRect.GetPadded(-8.f).GetFromBottom(36.f);
+    const IRECT supportBounds = supportArea.GetCentredInside(130.f, 26.f);
+    pGraphics->AttachControl(new IVButtonControl(supportBounds, [](IControl* pCaller) {
+      pCaller->GetUI()->OpenURL("https://samufl.com/#/portal/support");
+    }, "SUPPORT", supportStyle), kCtrlTagSupportButton);
 
     // Restore sample name if already loaded
     if (!mSampleFilePath.empty())

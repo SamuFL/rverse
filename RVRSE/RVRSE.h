@@ -55,6 +55,11 @@ enum ECtrlTags
   kCtrlTagRiserVolume,
   kCtrlTagStretchQuality,
   kCtrlTagOfflineSectionLabel,
+  // Hit panel
+  kCtrlTagHitSectionLabel,
+  kCtrlTagHitVolume,
+  kCtrlTagSupportButton,
+  kCtrlTagLogo,
   kNumCtrlTags
 };
 
