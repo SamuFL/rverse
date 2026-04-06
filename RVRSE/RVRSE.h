@@ -28,10 +28,19 @@ enum EParams
 
 enum ECtrlTags
 {
-  kCtrlTagVersionNumber = 0,
-  kCtrlTagTitle,
+  // Header
+  kCtrlTagTitle = 0,
   kCtrlTagLoadButton,
-  kCtrlTagSampleName
+  kCtrlTagSampleName,
+  // Zone panels (backgrounds)
+  kCtrlTagHeaderPanel,
+  kCtrlTagWaveformPanel,
+  kCtrlTagRiserPanel,
+  kCtrlTagHitPanel,
+  kCtrlTagFooterPanel,
+  // Footer
+  kCtrlTagVersionNumber,
+  kNumCtrlTags
 };
 
 using namespace iplug;

@@ -11,6 +11,7 @@
 
 #if IPLUG_EDITOR
 #include "IControls.h"
+#include "GUIColors.h"
 #endif
 
 RVRSE::RVRSE(const InstanceInfo& info)
@@ -45,64 +46,109 @@ RVRSE::RVRSE(const InstanceInfo& info)
   };
   
   mLayoutFunc = [&](IGraphics* pGraphics) {
-    const IRECT bounds = pGraphics->GetBounds();
-    const IRECT innerBounds = bounds.GetPadded(-10.f);
-    const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
-    const IRECT titleBounds = innerBounds.GetCentredInside(300, 60).GetVShifted(-80.f);
-    const IRECT loadBtnBounds = innerBounds.GetCentredInside(200, 40);
-    const IRECT sampleNameBounds = innerBounds.GetCentredInside(600, 24).GetVShifted(40.f);
+    using namespace rvrse::gui;
+    const IRECT b = pGraphics->GetBounds();
+    const float w = b.W();
+    const float h = b.H();
 
+    // ── Scale layout proportions relative to default 1024×768 ──────────
+    const float scaleY = h / 768.f;
+    const float headerH  = kHeaderHeight  * scaleY;
+    const float footerH  = kFooterHeight  * scaleY;
+    const float waveH    = kWaveformHeight * scaleY;
+    const float gap      = kZoneGap;
+
+    // ── Zone rects ─────────────────────────────────────────────────────
+    const IRECT headerRect   = b.GetFromTop(headerH);
+    const IRECT footerRect   = b.GetFromBottom(footerH);
+    const IRECT waveformRect = IRECT(b.L + gap, headerRect.B + gap,
+                                     b.R - gap, headerRect.B + gap + waveH);
+    const float panelTop    = waveformRect.B + gap;
+    const float panelBottom = footerRect.T - gap;
+    const float panelMid    = b.L + gap + (w - 2.f * gap) * kRiserPanelPct;
+    const IRECT riserRect   = IRECT(b.L + gap, panelTop, panelMid - gap * 0.5f, panelBottom);
+    const IRECT hitRect     = IRECT(panelMid + gap * 0.5f, panelTop, b.R - gap, panelBottom);
+
+    // ── Resize path — reposition existing controls ─────────────────────
     if (pGraphics->NControls()) {
-      pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
+      pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(b);
+      pGraphics->GetControlWithTag(kCtrlTagHeaderPanel)->SetTargetAndDrawRECTs(headerRect);
+      pGraphics->GetControlWithTag(kCtrlTagWaveformPanel)->SetTargetAndDrawRECTs(waveformRect);
+      pGraphics->GetControlWithTag(kCtrlTagRiserPanel)->SetTargetAndDrawRECTs(riserRect);
+      pGraphics->GetControlWithTag(kCtrlTagHitPanel)->SetTargetAndDrawRECTs(hitRect);
+      pGraphics->GetControlWithTag(kCtrlTagFooterPanel)->SetTargetAndDrawRECTs(footerRect);
+
+      // Reposition header contents
+      const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f);
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
-      pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
+      const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 34.f);
       pGraphics->GetControlWithTag(kCtrlTagLoadButton)->SetTargetAndDrawRECTs(loadBtnBounds);
-      pGraphics->GetControlWithTag(kCtrlTagSampleName)->SetTargetAndDrawRECTs(sampleNameBounds);
+      const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f);
+      pGraphics->GetControlWithTag(kCtrlTagSampleName)->SetTargetAndDrawRECTs(sampleBounds);
+      const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
+      pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
       return;
     }
 
+    // ── First-time setup ───────────────────────────────────────────────
     pGraphics->SetLayoutOnResize(true);
     pGraphics->AttachCornerResizer(EUIResizerMode::Size, true);
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
-    pGraphics->AttachPanelBackground(COLOR_DARK_GRAY);
 
-    // Title
+    // Main background
+    pGraphics->AttachPanelBackground(kColorDark);
+
+    // Zone panels
+    const IVStyle panelStyle = DEFAULT_STYLE
+      .WithDrawFrame(false).WithDrawShadows(false);
+
+    pGraphics->AttachControl(new IVPanelControl(headerRect,
+      "", panelStyle.WithColor(kBG, kColorHeaderBg)), kCtrlTagHeaderPanel);
+    pGraphics->AttachControl(new IVPanelControl(waveformRect,
+      "", panelStyle.WithColor(kBG, kColorWaveformBg).WithRoundness(0.2f)), kCtrlTagWaveformPanel);
+    pGraphics->AttachControl(new IVPanelControl(riserRect,
+      "", panelStyle.WithColor(kBG, kColorDarkGrey).WithRoundness(0.2f)), kCtrlTagRiserPanel);
+    pGraphics->AttachControl(new IVPanelControl(hitRect,
+      "", panelStyle.WithColor(kBG, kColorDarkGrey).WithRoundness(0.2f)), kCtrlTagHitPanel);
+    pGraphics->AttachControl(new IVPanelControl(footerRect,
+      "", panelStyle.WithColor(kBG, kColorHeaderBg)), kCtrlTagFooterPanel);
+
+    // ── Header contents (placeholder positions — refined in Step 2) ────
+    const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f);
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
-      IText(40, COLOR_WHITE)), kCtrlTagTitle);
+      IText(36, kColorGold, "Roboto-Regular", EAlign::Near)), kCtrlTagTitle);
 
-    // Version info
-    WDL_String buildInfoStr;
-    GetBuildInfoStr(buildInfoStr, __DATE__, __TIME__);
-    pGraphics->AttachControl(new ITextControl(versionBounds, buildInfoStr.Get(),
-      IText(12, COLOR_LIGHT_GRAY).WithAlign(EAlign::Far)), kCtrlTagVersionNumber);
-
-    // Load Sample button
-    const IVStyle buttonStyle = DEFAULT_STYLE
-      .WithColor(kFG, IColor(255, 100, 180, 255))
-      .WithColor(kBG, IColor(255, 40, 40, 40))
-      .WithRoundness(0.3f);
+    const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 34.f);
+    const IVStyle loadBtnStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorGold)
+      .WithColor(kBG, kColorDarkGrey)
+      .WithColor(kFR, kColorGold)
+      .WithDrawFrame(true)
+      .WithRoundness(0.3f)
+      .WithLabelText(IText(12, kColorGold));
 
     pGraphics->AttachControl(new IVButtonControl(loadBtnBounds, [this](IControl* pCaller) {
-      // Spawn file dialog from the UI thread
       WDL_String fileName;
       WDL_String path;
       pCaller->GetUI()->PromptForFile(fileName, path, EFileAction::Open,
         rvrse::kSupportedAudioExts,
         [this, pCaller](const WDL_String& fileName, const WDL_String& path) {
-          // Note: on macOS, iPlug2 sets fileName to the FULL path,
-          // and path to the directory with trailing slash.
           if (fileName.GetLength() > 0)
-          {
             LoadSampleFromFile(fileName.Get());
-          }
         });
-    }, "LOAD SAMPLE", buttonStyle), kCtrlTagLoadButton);
+    }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
 
-    // Sample name display — default text, updated below if a sample is already loaded
-    pGraphics->AttachControl(new ITextControl(sampleNameBounds, "No sample loaded",
-      IText(14, IColor(200, 180, 180, 180))), kCtrlTagSampleName);
+    // Sample name display
+    const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f);
+    pGraphics->AttachControl(new ITextControl(sampleBounds, "No sample loaded",
+      IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Far)), kCtrlTagSampleName);
 
-    // Restore sample name display if a sample is already loaded (e.g. editor was closed/reopened)
+    // Version string (footer)
+    const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
+    pGraphics->AttachControl(new ITextControl(versionBounds, "RVRSE v" PLUG_VERSION_STR,
+      IText(11, kColorTextMuted, "Roboto-Regular", EAlign::Far)), kCtrlTagVersionNumber);
+
+    // Restore sample name if already loaded
     if (!mSampleFilePath.empty())
     {
       if (auto* pCtrl = pGraphics->GetControlWithTag(kCtrlTagSampleName))

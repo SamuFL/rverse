@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary-fixed-dim": "#bdc7d8",
+            "on-primary-fixed": "#251a00",
+            "surface-container-lowest": "#0a100a",
+            "on-primary": "#3f2e00",
+            "on-background": "#dee4da",
+            "on-secondary-container": "#f1f4ff",
+            "on-tertiary-container": "#525c6a",
+            "surface-dim": "#0f150f",
+            "outline-variant": "#4e4635",
+            "inverse-surface": "#dee4da",
+            "on-error-container": "#ffdad6",
+            "surface-bright": "#343b33",
+            "tertiary-fixed": "#d9e3f5",
+            "inverse-primary": "#785a00",
+            "surface-variant": "#30362f",
+            "inverse-on-surface": "#2c322b",
+            "on-primary-fixed-variant": "#5b4300",
+            "error-container": "#93000a",
+            "on-primary-container": "#745600",
+            "surface-container-high": "#252c25",
+            "surface-tint": "#f1c048",
+            "on-tertiary-fixed": "#121c29",
+            "surface": "#0f150f",
+            "primary-fixed-dim": "#f1c048",
+            "tertiary-container": "#cad4e5",
+            "on-surface-variant": "#d2c5af",
+            "error": "#ffb4ab",
+            "on-secondary": "#002f64",
+            "secondary-fixed": "#d6e3ff",
+            "surface-container-low": "#171d17",
+            "primary": "#ffedce",
+            "on-tertiary-fixed-variant": "#3e4755",
+            "secondary-fixed-dim": "#aac7ff",
+            "tertiary": "#e8f0ff",
+            "outline": "#9b8f7b",
+            "on-error": "#690005",
+            "secondary": "#aac7ff",
+            "primary-fixed": "#ffdf9c",
+            "primary-container": "#ffcc53",
+            "background": "#0f150f",
+            "surface-container-highest": "#30362f",
+            "on-tertiary": "#27313e",
+            "on-secondary-fixed": "#001b3e",
+            "on-surface": "#dee4da",
+            "secondary-container": "#036ed8",
+            "surface-container": "#1b211b",
+            "on-secondary-fixed-variant": "#00458d"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "fontFamily": {
+            "headline": ["Roboto", "sans-serif"],
+            "body": ["Roboto", "sans-serif"],
+            "label": ["Roboto", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body { font-family: 'Roboto', sans-serif; background-color: #0A100A; overflow: hidden; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    .waveform-riser-gradient {
+      background: linear-gradient(90deg, transparent 0%, #FFCC53 100%);
+      clip-path: polygon(0% 50%, 10% 45%, 20% 55%, 30% 40%, 40% 60%, 50% 30%, 60% 70%, 70% 20%, 80% 80%, 90% 10%, 100% 90%, 100% 10%, 90% 80%, 80% 20%, 70% 70%, 60% 30%, 50% 60%, 40% 40%, 30% 55%, 20% 45%, 10% 50%, 0% 50%);
+    }
+    .waveform-hit-spike {
+      background: #4490FC;
+      clip-path: polygon(0% 50%, 5% 48%, 10% 52%, 15% 10%, 20% 90%, 25% 45%, 30% 55%, 100% 50%, 100% 51%, 0% 51%);
+    }
+    .gauge-track { stroke: #1A2235; fill: none; stroke-width: 4; }
+    .gauge-indicator-gold { stroke: #FFCC53; fill: none; stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+    .gauge-indicator-steel { stroke: #A0AEC0; fill: none; stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+    .gauge-indicator-white { stroke: #FFFFFF; fill: none; stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+    .gauge-indicator-blue { stroke: #4490FC; fill: none; stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+    .stepped-gauge-segment { stroke: #FFFFFF; fill: none; stroke-width: 4; stroke-linecap: butt; }
+    .stepped-gauge-track { stroke: #1A2235; fill: none; stroke-width: 4; stroke-linecap: butt; }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center h-screen">
+<!-- Main Application Window -->
+<div class="w-[1024px] h-[768px] bg-[#0A100A] flex flex-col relative shadow-2xl overflow-hidden border border-[#1A2235]">
+<!-- Zone 1: Header -->
+<header class="h-[60px] bg-[#0E150E] flex items-center justify-between px-6 shrink-0 z-10 border-b border-[#1A2235]">
+<div class="flex items-baseline gap-3">
+<h1 class="text-4xl font-black text-[#FFCC53] tracking-tighter">RVRSE</h1>
+<span class="text-[10px] font-medium text-[#8B95A5] uppercase tracking-widest">Rise &amp; Hit Designer</span>
+</div>
+<button class="bg-[#222D42] border border-[#FFCC53] px-6 py-2 rounded-lg text-[#FFCC53] font-bold text-xs hover:bg-[#343B33] transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">upload_file</span>
+        LOAD SAMPLE
+      </button>
+<div class="flex items-center gap-6">
+<div class="flex flex-col items-end">
+<span class="text-[#8B95A5] text-[10px] font-medium leading-none">crash_01.wav</span>
+<span class="text-[#4A5568] text-[9px] leading-none">48kHz, stereo, 1.2s</span>
+</div>
+<div class="h-8 w-px bg-[#1A2235]"></div>
+<div class="flex items-baseline gap-1">
+<span class="text-[10px] text-[#4A5568]">BPM:</span>
+<span class="text-[10px] font-bold text-white">120.0</span>
+</div>
+</div>
+</header>
+<!-- Zone 2: Waveform Visualizer -->
+<div class="m-2 h-[170px] bg-[#060A06] rounded-lg relative overflow-hidden flex items-center border border-[#1A2235]/30">
+<!-- Riser Section -->
+<div class="w-[70%] h-full relative flex items-center px-4">
+<div class="absolute top-3 left-4 flex items-center gap-2">
+<span class="text-[10px] font-black text-[#FFCC53] tracking-widest">RISER</span>
+<div class="w-1.5 h-1.5 rounded-full bg-[#FFCC53]"></div>
+</div>
+<div class="w-full h-[120px] waveform-riser-gradient opacity-80"></div>
+<!-- Playhead -->
+<div class="absolute left-[60%] top-0 bottom-0 w-px bg-[#D8FDFB] shadow-[0_0_8px_#D8FDFB] z-10"></div>
+</div>
+<!-- Vertical Separator -->
+<div class="h-full w-px border-l border-dashed border-[#4A5568]"></div>
+<!-- Hit Section -->
+<div class="w-[30%] h-full relative flex items-center px-4">
+<div class="absolute top-3 left-4 flex items-center gap-2">
+<span class="text-[10px] font-black text-[#4490FC] tracking-widest">HIT</span>
+<div class="w-1.5 h-1.5 rounded-full bg-[#4490FC]"></div>
+</div>
+<div class="w-full h-[120px] waveform-hit-spike opacity-90"></div>
+</div>
+</div>
+<!-- Zone 3: Control Panels -->
+<div class="flex flex-1 gap-2 p-2 min-h-0">
+<!-- Left Panel: RISER -->
+<div class="w-[60%] bg-[#222D42] rounded-lg p-4 flex flex-col gap-2">
+<div class="flex items-center justify-between mb-1">
+<h2 class="text-[11px] font-black text-[#FFCC53]/60 tracking-[0.2em] uppercase">RISER PARAMETERS</h2>
+<span class="text-[9px] text-[#4A5568] uppercase font-bold">Engine v2.4</span>
+</div>
+<!-- Real-time Mod Section -->
+<div class="relative py-4">
+<div class="absolute -top-2 left-1/2 -translate-x-1/2 px-3 bg-[#222D42] z-10">
+<span class="text-[10px] font-black text-[#FFCC53] tracking-widest uppercase">Real-Time</span>
+</div>
+<div class="flex justify-around items-center pt-2">
+<!-- Stutter Rate -->
+<div class="flex flex-col items-center gap-2">
+<div class="relative w-[70px] h-[70px]">
+<svg class="w-full h-full" viewbox="0 0 40 40">
+<circle class="gauge-track" cx="20" cy="20" r="16"></circle>
+<circle class="gauge-indicator-gold" cx="20" cy="20" r="16" stroke-dasharray="100.5 100.5" stroke-dashoffset="100.5"></circle>
+</svg>
+<span class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-white">0 Hz</span>
+</div>
+<span class="text-[9px] text-[#8B95A5] uppercase tracking-tighter">Stutter Rate</span>
+</div>
+<!-- Stutter Depth -->
+<div class="flex flex-col items-center gap-2">
+<div class="relative w-[70px] h-[70px]">
+<svg class="w-full h-full" viewbox="0 0 40 40">
+<circle class="gauge-track" cx="20" cy="20" r="16"></circle>
+<circle class="gauge-indicator-gold" cx="20" cy="20" r="16" stroke-dasharray="100.5 100.5" stroke-dashoffset="50"></circle>
+</svg>
+<span class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-white">50%</span>
+</div>
+<span class="text-[9px] text-[#8B95A5] uppercase tracking-tighter">Stutter Depth</span>
+</div>
+</div>
+</div>
+<!-- Offline Section -->
+<div class="relative py-4 mt-2">
+<div class="absolute -top-2 left-1/2 -translate-x-1/2 px-3 bg-[#222D42] z-10">
+<span class="text-[10px] font-black text-[#8B95A5] tracking-widest uppercase">Offline</span>
+</div>
+<div class="w-full h-px border-t border-dashed border-[#1A2235] absolute top-0 left-0"></div>
+<div class="grid grid-cols-12 gap-y-6 gap-x-4 pt-4">
+<!-- Length (Slider) - Far Left (Col 1-5) -->
+<div class="col-span-5 flex flex-col gap-4 justify-center px-2">
+<div class="flex items-center justify-between">
+<span class="text-[10px] text-[#8B95A5] uppercase tracking-tighter">Length</span>
+<span class="text-sm font-black text-[#A0AEC0]">4</span>
+</div>
+<div class="relative w-full">
+<div class="relative h-1 bg-[#1A2235] rounded-full">
+<div class="absolute top-0 left-0 h-full w-[60%] bg-[#A0AEC0] rounded-full"></div>
+<div class="absolute top-1/2 -translate-y-1/2 left-[60%] w-3 h-3 bg-[#A0AEC0] border-2 border-[#222D42] rounded-full shadow-lg"></div>
+</div>
+<!-- Ticks -->
+<div class="flex justify-between mt-2 px-0.5">
+<div class="flex flex-col items-center gap-1">
+<div class="w-px h-1.5 bg-[#4A5568]"></div>
+<span class="text-[7px] text-[#4A5568]">1/4</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-px h-1.5 bg-[#4A5568]"></div>
+<span class="text-[7px] text-[#4A5568]">1/2</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-px h-1.5 bg-[#4A5568]"></div>
+<span class="text-[7px] text-[#4A5568]">1</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-px h-1.5 bg-[#4A5568]"></div>
+<span class="text-[7px] text-[#4A5568]">2</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-px h-1.5 bg-[#A0AEC0]"></div>
+<span class="text-[7px] text-[#A0AEC0]">4</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-px h-1.5 bg-[#4A5568]"></div>
+<span class="text-[7px] text-[#4A5568]">8</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Lush - Right of Length -->
+<div class="col-span-3 flex flex-col items-center gap-2">
+<div class="relative w-[60px] h-[60px]">
+<svg class="w-full h-full" viewbox="0 0 40 40">
+<circle class="gauge-track" cx="20" cy="20" r="16"></circle>
+<circle class="gauge-indicator-steel" cx="20" cy="20" r="16" stroke-dasharray="100.5 100.5" stroke-dashoffset="60"></circle>
+</svg>
+<span class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-[#A0AEC0]">40%</span>
+</div>
+<span class="text-[9px] text-[#8B95A5] uppercase tracking-tighter">Lush</span>
+</div>
+<!-- Fade In - Far Right -->
+<div class="col-span-4 flex flex-col items-center gap-2">
+<div class="relative w-[60px] h-[60px]">
+<svg class="w-full h-full" viewbox="0 0 40 40">
+<circle class="gauge-track" cx="20" cy="20" r="16"></circle>
+<circle class="gauge-indicator-steel" cx="20" cy="20" r="16" stroke-dasharray="100.5 100.5" stroke-dashoffset="40"></circle>
+</svg>
+<span class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-[#A0AEC0]">60%</span>
+</div>
+<span class="text-[9px] text-[#8B95A5] uppercase tracking-tighter">Fade In</span>
+</div>
+<!-- Volume -->
+<div class="col-span-5 flex flex-col items-center gap-3 justify-center">
+<div class="w-full flex flex-col gap-1.5 px-2">
+<div class="flex items-center justify-between">
+<span class="text-[9px] text-[#8B95A5] uppercase tracking-tighter">Volume</span>
+<span class="text-[10px] font-bold text-[#A0AEC0]">0.0</span>
+</div>
+<div class="relative w-full h-1 bg-[#1A2235] rounded-full">
+<div class="absolute top-0 left-0 h-full w-[100%] bg-[#A0AEC0] rounded-full"></div>
+<div class="absolute top-1/2 -translate-y-1/2 left-[100%] -translate-x-1/2 w-2.5 h-2.5 bg-[#A0AEC0] border-2 border-[#222D42] rounded-full shadow-lg"></div>
+</div>
+</div>
+</div>
+<!-- Tune -->
+<div class="col-span-3 flex flex-col items-center gap-2 opacity-20">
+<div class="relative w-[60px] h-[60px]">
+<svg class="w-full h-full" viewbox="0 0 40 40">
+<circle class="gauge-track" cx="20" cy="20" r="16"></circle>
+</svg>
+<span class="absolute inset-0 flex items-center justify-center text-[7px] font-bold text-[#A0AEC0] leading-none text-center">SOON</span>
+</div>
+<span class="text-[9px] text-[#4A5568] uppercase tracking-tighter">Tune</span>
+</div>
+<!-- Stretch -->
+<div class="col-span-4 flex flex-col items-center justify-center gap-2">
+<div class="w-[60px] h-[24px] bg-[#1A2235] rounded-full p-0.5 flex">
+<div class="flex-1 bg-[#A0AEC0] rounded-full flex items-center justify-center">
+<span class="text-[8px] font-bold text-[#0A100A]">HI</span>
+</div>
+<div class="flex-1 flex items-center justify-center">
+<span class="text-[8px] font-bold text-[#4A5568]">LO</span>
+</div>
+</div>
+<span class="text-[9px] text-[#8B95A5] uppercase tracking-tighter">Stretch</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Panel: HIT -->
+<div class="w-[40%] bg-[#222D42] rounded-lg p-4 flex flex-col">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-[11px] font-black tracking-[0.2em] uppercase text-[#4490FC]">HIT PARAMETERS</h2>
+<span class="material-symbols-outlined text-[#4A5568] text-sm">settings_input_component</span>
+</div>
+<div class="flex flex-col gap-6 flex-1">
+<div class="flex flex-col gap-3 px-4">
+<div class="flex items-center justify-between">
+<span class="text-[10px] text-[#8B95A5] uppercase tracking-tighter">Output Gain</span>
+<span class="text-sm font-bold text-white">0.0 dB</span>
+</div>
+<div class="relative w-full h-1.5 bg-[#1A2235] rounded-full">
+<div class="absolute top-0 left-0 h-full w-[100%] bg-[#4490FC] rounded-full"></div>
+<div class="absolute top-1/2 -translate-y-1/2 left-[100%] -translate-x-1/2 w-3 h-3 bg-[#4490FC] border-2 border-[#222D42] rounded-full shadow-lg"></div>
+</div>
+</div>
+<div class="flex items-center justify-between px-4 opacity-30">
+<div class="flex flex-col gap-1">
+<span class="text-[10px] text-[#4A5568] uppercase tracking-tighter">Pitch Shift</span>
+<span class="text-xs font-bold text-[#8B95A5]">Coming Soon</span>
+</div>
+<div class="w-12 h-12">
+<svg class="w-full h-full" viewbox="0 0 40 40">
+<circle class="gauge-track" cx="20" cy="20" r="16"></circle>
+</svg>
+</div>
+</div>
+</div>
+<!-- Tail Preview -->
+<div class="h-[80px] bg-[#060A06] rounded border border-[#1A2235] p-2 flex flex-col justify-between mb-8">
+<span class="text-[8px] text-[#4490FC] font-black uppercase">Tail Preview</span>
+<div class="w-full h-[40px] opacity-60">
+<svg height="100%" preserveaspectratio="none" viewbox="0 0 200 60" width="100%">
+<path d="M0 30 L10 10 L20 50 L30 25 L40 35 L50 30 L200 30" fill="none" stroke="#4490FC" stroke-width="1"></path>
+</svg>
+</div>
+</div>
+<!-- Bottom Layout Section -->
+<div class="mt-auto pt-2 flex items-center justify-between">
+<button class="bg-[#1A2235] border border-[#FFCC53] px-3 py-1.5 rounded text-[#FFCC53] font-black text-[9px] hover:bg-[#252C25] transition-colors tracking-widest">
+            SUPPORT THE PROJECT
+          </button>
+<div class="w-8 h-8 bg-[#FFCC53] rounded flex items-center justify-center shadow-lg">
+<span class="text-[12px] font-black text-[#0A100A]">RV</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Zone 4: Footer -->
+<footer class="h-[55px] bg-[#0E150E] flex items-center justify-between px-6 shrink-0 border-t border-[#1A2235]">
+<div class="flex items-center gap-6">
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between min-w-[200px]">
+<span class="text-[10px] font-bold text-white uppercase tracking-wider">Volume</span>
+<span class="text-[10px] font-bold text-[#FFCC53]">0 dB</span>
+</div>
+<div class="relative w-[200px] h-1.5 bg-[#1A2235] rounded-full">
+<div class="absolute top-0 left-0 h-full w-[85%] bg-[#FFCC53] rounded-full shadow-[0_0_8px_#FFCC53/30]"></div>
+<div class="absolute top-1/2 -translate-y-1/2 left-[85%] w-3 h-3 bg-[#FFCC53] border-2 border-[#0E150E] rounded-full shadow-lg"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex gap-2">
+<div class="w-2 h-2 rounded-full bg-[#4490FC] animate-pulse shadow-[0_0_5px_#4490FC]"></div>
+<span class="text-[10px] text-[#8B95A5] font-medium">MIDI IN</span>
+</div>
+<div class="h-6 w-px bg-[#1A2235]"></div>
+<span class="text-[11px] font-medium text-[#4A5568] tracking-widest">RVRSE v0.1.0</span>
+</div>
+</footer>
+<!-- Side Decoration Tonal Shift -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#FFCC53] opacity-20"></div>
+</div>
+</body></html>
