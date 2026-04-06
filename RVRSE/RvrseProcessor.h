@@ -22,26 +22,30 @@
 namespace rvrse {
 
 /// Result of the offline pipeline — the ready-to-play riser buffer plus
-/// intermediate debug buffers for diagnostic playback.
+/// intermediate debug buffers for diagnostic playback (debug builds only).
 struct RiserData
 {
   std::vector<float> mLeft;    ///< Left channel of final_riser[] (stretched + faded)
   std::vector<float> mRight;   ///< Right channel of final_riser[]
   double mSampleRate = 0.0;    ///< Sample rate of the riser data
 
+#ifndef NDEBUG
   // Debug: intermediate pipeline buffers (populated alongside the main output)
   std::vector<float> mReverbedL;  ///< After reverb, before reverse/stretch
   std::vector<float> mReverbedR;
   std::vector<float> mReversedL;  ///< After reverse, before stretch
   std::vector<float> mReversedR;
+#endif
 
   int NumFrames() const { return static_cast<int>(mLeft.size()); }
   bool IsReady() const { return !mLeft.empty() && mSampleRate > 0.0; }
 
+#ifndef NDEBUG
   /// @return Number of frames in the reverbed debug buffer
   int ReverbedFrames() const { return static_cast<int>(mReverbedL.size()); }
   /// @return Number of frames in the reversed debug buffer
   int ReversedFrames() const { return static_cast<int>(mReversedL.size()); }
+#endif
 };
 
 /// The offline pipeline orchestrator.
@@ -70,8 +74,10 @@ public:
       // Clear cached intermediate buffers since the source changed
       mCachedReversedL.clear();
       mCachedReversedR.clear();
+#ifndef NDEBUG
       mCachedReverbedL.clear();
       mCachedReverbedR.clear();
+#endif
     }
     rebuildAsync(EPipelineStage::Reverb);
   }
@@ -86,8 +92,10 @@ public:
       // Clear cached reversed buffer since reverb output changed
       mCachedReversedL.clear();
       mCachedReversedR.clear();
+#ifndef NDEBUG
       mCachedReverbedL.clear();
       mCachedReverbedR.clear();
+#endif
     }
     rebuildAsync(EPipelineStage::Reverb);
   }
@@ -132,8 +140,10 @@ public:
       mOutputSampleRate = sr;
       mCachedReversedL.clear();
       mCachedReversedR.clear();
+#ifndef NDEBUG
       mCachedReverbedL.clear();
       mCachedReverbedR.clear();
+#endif
     }
     rebuildAsync(EPipelineStage::Reverb);
   }
@@ -205,7 +215,9 @@ private:
     double riserLengthBeats, bpm, sampleRate;
     EStretchQuality quality;
     std::vector<float> cachedRevL, cachedRevR;
+#ifndef NDEBUG
     std::vector<float> cachedRvbL, cachedRvbR;
+#endif
 
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
@@ -216,8 +228,10 @@ private:
       quality = mStretchQuality;
       cachedRevL = mCachedReversedL;
       cachedRevR = mCachedReversedR;
+#ifndef NDEBUG
       cachedRvbL = mCachedReverbedL;
       cachedRvbR = mCachedReverbedR;
+#endif
     }
 
     // No cached buffers yet — fall back to async (first load still in progress)
@@ -237,10 +251,12 @@ private:
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
 
+#ifndef NDEBUG
     riser->mReverbedL = std::move(cachedRvbL);
     riser->mReverbedR = std::move(cachedRvbR);
     riser->mReversedL = std::move(cachedRevL);
     riser->mReversedR = std::move(cachedRevR);
+#endif
 
     // Tail fade-out
     if (kRiserTailFadeBeats > 0.0)
@@ -268,7 +284,9 @@ private:
     double riserLengthBeats, bpm, sampleRate;
     EStretchQuality quality;
     std::vector<float> cachedRevL, cachedRevR;
+#ifndef NDEBUG
     std::vector<float> cachedRvbL, cachedRvbR;
+#endif
 
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
@@ -283,8 +301,10 @@ private:
       {
         cachedRevL = mCachedReversedL;
         cachedRevR = mCachedReversedR;
+#ifndef NDEBUG
         cachedRvbL = mCachedReverbedL;
         cachedRvbR = mCachedReverbedR;
+#endif
       }
     }
 
@@ -303,7 +323,9 @@ private:
     }
 
     std::vector<float> reversedL, reversedR;
+#ifndef NDEBUG
     std::vector<float> reverbedL, reverbedR;
+#endif
 
     if (fromStage == EPipelineStage::Reverb || cachedRevL.empty())
     {
@@ -362,9 +384,11 @@ private:
       }
 
       // --- Stage 2: Reverse ---
+#ifndef NDEBUG
       // Save pre-reverse (reverbed) buffers for debug playback
       reverbedL = lushedL;
       reverbedR = lushedR;
+#endif
 
       reverseBufferStereo(lushedL, lushedR);
       reversedL = std::move(lushedL);
@@ -375,8 +399,10 @@ private:
         std::lock_guard<std::mutex> lock(mParamMutex);
         mCachedReversedL = reversedL;
         mCachedReversedR = reversedR;
+#ifndef NDEBUG
         mCachedReverbedL = reverbedL;
         mCachedReverbedR = reverbedR;
+#endif
       }
     }
     else
@@ -384,8 +410,10 @@ private:
       // Use cached buffers (stretch-only rebuild)
       reversedL = std::move(cachedRevL);
       reversedR = std::move(cachedRevR);
+#ifndef NDEBUG
       reverbedL = std::move(cachedRvbL);
       reverbedR = std::move(cachedRvbR);
+#endif
     }
 
     // Abort check
@@ -405,11 +433,13 @@ private:
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
 
+#ifndef NDEBUG
     // Store intermediate buffers for debug playback
     riser->mReverbedL = std::move(reverbedL);
     riser->mReverbedR = std::move(reverbedR);
     riser->mReversedL = std::move(reversedL);
     riser->mReversedR = std::move(reversedR);
+#endif
 
     // --- Stage 4: Tail fade-out ---
     // Short fade at the end of the riser so the reversed transient doesn't
@@ -447,8 +477,10 @@ private:
   // --- Cached intermediate buffers (protected by mParamMutex) ---
   std::vector<float> mCachedReversedL;
   std::vector<float> mCachedReversedR;
+#ifndef NDEBUG
   std::vector<float> mCachedReverbedL;
   std::vector<float> mCachedReverbedR;
+#endif
 
   // --- Output (lock-free handoff to audio thread) ---
   std::shared_ptr<RiserData> mRiserOutput;

@@ -21,7 +21,7 @@ enum EParams
   kParamFadeIn,
   kParamRiserVolume,
   kParamHitVolume,
-  kParamDebugStage,
+  kParamDebugStage, // Reserved in all builds to keep parameter indices stable.
   kParamStretchQuality,
   kNumParams
 };

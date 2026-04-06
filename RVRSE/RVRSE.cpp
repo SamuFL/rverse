@@ -731,8 +731,10 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const float fadeInPct = static_cast<float>(GetParam(kParamFadeIn)->Value() / 100.0);
   const float riserVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamRiserVolume)->Value()) / 20.0f);
   const float hitVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);
+#ifndef NDEBUG
   const auto debugStage = static_cast<rvrse::EDebugStage>(
     static_cast<int>(GetParam(kParamDebugStage)->Value()));
+#endif
   const auto stretchQuality = static_cast<rvrse::EStretchQuality>(
     static_cast<int>(GetParam(kParamStretchQuality)->Value()));
   const double sr = GetSampleRate();
@@ -820,6 +822,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           hitPos = -1;
 
           // In debug modes, play the selected buffer; only trigger hit in Normal mode
+#ifndef NDEBUG
           if (debugStage == rvrse::kDebugNormal)
           {
             mSamplesFromNoteOn = 0;
@@ -829,6 +832,10 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           {
             mSamplesFromNoteOn = -1; // No hit in debug modes
           }
+#else
+          mSamplesFromNoteOn = 0;
+          mHitOffset = riser->NumFrames();
+#endif
         }
         else if (hit && hit->IsLoaded())
         {
@@ -870,11 +877,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
     if (riserPos >= 0 && riser && riser->IsReady())
     {
-      // Select the active buffer based on debug stage
       const float* bufL = riser->mLeft.data();
       const float* bufR = riser->mRight.data();
       int bufLen = riser->NumFrames();
 
+#ifndef NDEBUG
+      // Select the active buffer based on debug stage
       if (debugStage == rvrse::kDebugReverbed && riser->ReverbedFrames() > 0)
       {
         bufL = riser->mReverbedL.data();
@@ -887,6 +895,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         bufR = riser->mReversedR.data();
         bufLen = riser->ReversedFrames();
       }
+#endif
 
       // Precompute fade-in length (constant for this buffer)
       const int fadeInLen = static_cast<int>(static_cast<float>(bufLen) * fadeInPct);
@@ -896,8 +905,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         riserL = bufL[riserPos];
         riserR = bufR[riserPos];
 
+#ifndef NDEBUG
         const bool isDebugRaw = (debugStage == rvrse::kDebugReverbed ||
                                  debugStage == rvrse::kDebugReversed);
+#else
+        constexpr bool isDebugRaw = false;
+#endif
 
         if (!isDebugRaw)
         {
