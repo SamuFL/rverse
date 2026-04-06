@@ -102,6 +102,21 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagStutterRate)->SetTargetAndDrawRECTs(stutterRateBounds);
       const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 2).GetCentredInside(75.f, 90.f);
       pGraphics->GetControlWithTag(kCtrlTagStutterDepth)->SetTargetAndDrawRECTs(stutterDepthBounds);
+      // Offline section
+      const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(124.f);
+      const IRECT offlineLabelBounds = offlineArea.GetFromTop(18.f);
+      pGraphics->GetControlWithTag(kCtrlTagOfflineSectionLabel)->SetTargetAndDrawRECTs(offlineLabelBounds);
+      const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(90.f);
+      pGraphics->GetControlWithTag(kCtrlTagLush)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(70.f, 90.f));
+      pGraphics->GetControlWithTag(kCtrlTagRiserLength)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(70.f, 90.f));
+      pGraphics->GetControlWithTag(kCtrlTagFadeIn)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(70.f, 90.f));
+      pGraphics->GetControlWithTag(kCtrlTagRiserVolume)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(70.f, 90.f));
+      const IRECT stretchBounds = offlineArea.GetReducedFromTop(116.f).GetFromLeft(100.f).GetCentredInside(90.f, 30.f);
+      pGraphics->GetControlWithTag(kCtrlTagStretchQuality)->SetTargetAndDrawRECTs(stretchBounds);
       return;
     }
 
@@ -243,6 +258,53 @@ RVRSE::RVRSE(const InstanceInfo& info)
       "RATE", knobStyle, true), kCtrlTagStutterRate);
     pGraphics->AttachControl(new IVKnobControl(stutterDepthBounds, kParamStutterDepth,
       "DEPTH", knobStyle, true), kCtrlTagStutterDepth);
+
+    // ── Riser panel: offline section ────────────────────────────────────
+    const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(124.f);
+
+    // Offline section label
+    const IRECT offlineLabelBounds = offlineArea.GetFromTop(18.f);
+    pGraphics->AttachControl(new ITextControl(offlineLabelBounds, "OFFLINE",
+      IText(11, kColorSteel, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagOfflineSectionLabel);
+
+    // Steel knob style for offline params
+    const IVStyle offlineKnobStyle = knobStyle
+      .WithColor(kX1, kColorSteel);
+
+    // Row of offline knobs: Lush | Length | Fade In | Volume
+    const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(90.f);
+    const IRECT lushBounds    = offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(70.f, 90.f);
+    const IRECT lengthBounds  = offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(70.f, 90.f);
+    const IRECT fadeInBounds  = offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(70.f, 90.f);
+    const IRECT riserVolBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(70.f, 90.f);
+
+    pGraphics->AttachControl(new IVKnobControl(lushBounds, kParamLush,
+      "LUSH", offlineKnobStyle, true), kCtrlTagLush);
+    pGraphics->AttachControl(new IVKnobControl(lengthBounds, kParamRiserLength,
+      "LENGTH", offlineKnobStyle, true), kCtrlTagRiserLength);
+    pGraphics->AttachControl(new IVKnobControl(fadeInBounds, kParamFadeIn,
+      "FADE IN", offlineKnobStyle, true), kCtrlTagFadeIn);
+    pGraphics->AttachControl(new IVKnobControl(riserVolBounds, kParamRiserVolume,
+      "VOLUME", offlineKnobStyle, true), kCtrlTagRiserVolume);
+
+    // Stretch Quality toggle (small, below offline knobs)
+    const IVStyle toggleStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kFR, kColorSteel)
+      .WithColor(kHL, kColorSteel.WithOpacity(0.1f))
+      .WithDrawFrame(true)
+      .WithFrameThickness(1.f)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithRoundness(0.3f)
+      .WithShowLabel(true)
+      .WithLabelText(IText(10, kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
+      .WithValueText(IText(10, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
+
+    const IRECT stretchBounds = offlineArea.GetReducedFromTop(116.f).GetFromLeft(100.f).GetCentredInside(90.f, 30.f);
+    pGraphics->AttachControl(new IVToggleControl(stretchBounds, kParamStretchQuality,
+      "STRETCH", toggleStyle, "LOW", "HIGH"), kCtrlTagStretchQuality);
 
     // Restore sample name if already loaded
     if (!mSampleFilePath.empty())

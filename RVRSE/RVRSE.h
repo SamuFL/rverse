@@ -48,6 +48,13 @@ enum ECtrlTags
   kCtrlTagStutterRate,
   kCtrlTagStutterDepth,
   kCtrlTagRiserSectionLabel,
+  // Riser offline knobs
+  kCtrlTagLush,
+  kCtrlTagRiserLength,
+  kCtrlTagFadeIn,
+  kCtrlTagRiserVolume,
+  kCtrlTagStretchQuality,
+  kCtrlTagOfflineSectionLabel,
   kNumCtrlTags
 };
 
