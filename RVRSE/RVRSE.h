@@ -21,7 +21,9 @@ enum EParams
   kParamFadeIn,
   kParamRiserVolume,
   kParamHitVolume,
+#ifndef NDEBUG
   kParamDebugStage,
+#endif
   kParamStretchQuality,
   kNumParams
 };

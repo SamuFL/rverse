@@ -57,6 +57,8 @@ constexpr double kStutterRateDefaultHz = 0.0;  ///< Stutter rate default (off)
 // --- Debug Playback Mode ---
 /// Selects which pipeline stage buffer is played back.
 /// Normal = full riser + hit. Other modes play intermediate buffers for diagnostics.
+/// Only available in debug builds (stripped from release via NDEBUG).
+#ifndef NDEBUG
 enum EDebugStage
 {
   kDebugNormal   = 0, ///< Normal operation: riser + hit
@@ -66,6 +68,7 @@ enum EDebugStage
 };
 
 constexpr int kNumDebugStages = 4;
+#endif
 
 // --- Tuning ---
 constexpr double kTuneMinSemitones   = -24.0;
