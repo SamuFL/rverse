@@ -44,6 +44,10 @@ enum ECtrlTags
   kCtrlTagMidiIndicator,
   // BPM display
   kCtrlTagBPMDisplay,
+  // Riser panel knobs
+  kCtrlTagStutterRate,
+  kCtrlTagStutterDepth,
+  kCtrlTagRiserSectionLabel,
   kNumCtrlTags
 };
 

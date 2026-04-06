@@ -94,6 +94,14 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagMasterVolSlider)->SetTargetAndDrawRECTs(masterSliderBounds);
       const IRECT midiBounds = footerRect.GetPadded(-8.f).GetMidHPadded(30.f);
       pGraphics->GetControlWithTag(kCtrlTagMidiIndicator)->SetTargetAndDrawRECTs(midiBounds);
+      // Riser panel contents
+      const IRECT riserLabelBounds = riserRect.GetPadded(-8.f).GetFromTop(20.f);
+      pGraphics->GetControlWithTag(kCtrlTagRiserSectionLabel)->SetTargetAndDrawRECTs(riserLabelBounds);
+      const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
+      const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 2).GetCentredInside(75.f, 90.f);
+      pGraphics->GetControlWithTag(kCtrlTagStutterRate)->SetTargetAndDrawRECTs(stutterRateBounds);
+      const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 2).GetCentredInside(75.f, 90.f);
+      pGraphics->GetControlWithTag(kCtrlTagStutterDepth)->SetTargetAndDrawRECTs(stutterDepthBounds);
       return;
     }
 
@@ -202,6 +210,39 @@ RVRSE::RVRSE(const InstanceInfo& info)
         IRECT textR = r.GetFromBottom(12.f);
         g.DrawText(label, "MIDI", textR);
       }, DEFAULT_ANIMATION_DURATION, false, false), kCtrlTagMidiIndicator);
+
+    // ── Riser panel contents ────────────────────────────────────────────
+    // Section label at top of riser panel
+    const IRECT riserLabelBounds = riserRect.GetPadded(-8.f).GetFromTop(20.f);
+    pGraphics->AttachControl(new ITextControl(riserLabelBounds, "RISER — REAL-TIME",
+      IText(12, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagRiserSectionLabel);
+
+    // Knob style: gold arc on dark track
+    const IVStyle knobStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kFR, kColorKnobTrack)
+      .WithColor(kX1, kColorGold)          // arc fill
+      .WithColor(kHL, kColorGold.WithOpacity(0.1f))
+      .WithDrawFrame(false)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithShowLabel(true)
+      .WithShowValue(true)
+      .WithRoundness(1.f)
+      .WithWidgetFrac(0.75f)
+      .WithLabelText(IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
+      .WithValueText(IText(10, kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Top));
+
+    // Stutter Rate + Depth — side by side in top portion of riser panel
+    const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
+    const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 2).GetCentredInside(75.f, 90.f);
+    const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 2).GetCentredInside(75.f, 90.f);
+
+    pGraphics->AttachControl(new IVKnobControl(stutterRateBounds, kParamStutterRate,
+      "RATE", knobStyle, true), kCtrlTagStutterRate);
+    pGraphics->AttachControl(new IVKnobControl(stutterDepthBounds, kParamStutterDepth,
+      "DEPTH", knobStyle, true), kCtrlTagStutterDepth);
 
     // Restore sample name if already loaded
     if (!mSampleFilePath.empty())
