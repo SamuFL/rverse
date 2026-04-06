@@ -34,11 +34,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
     rvrse::kRiserVolumeDefault, rvrse::kVolumeMinDb, rvrse::kVolumeMaxDb, 0.1, "dB");
   GetParam(kParamHitVolume)->InitDouble("Hit Volume",
     rvrse::kHitVolumeDefault, rvrse::kVolumeMinDb, rvrse::kVolumeMaxDb, 0.1, "dB");
-#ifndef NDEBUG
   GetParam(kParamDebugStage)->InitEnum("Debug Stage", rvrse::kDebugNormal, {
     "Normal", "Reverbed", "Reversed", "Riser Only"
   });
-#endif
   GetParam(kParamStretchQuality)->InitEnum("Stretch Quality", rvrse::kStretchQualityDefault, {
     "High", "Low"
   });
