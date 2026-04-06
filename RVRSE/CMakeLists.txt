@@ -25,14 +25,11 @@ iplug_add_plugin(${PROJECT_NAME}
 
 # Spectral stretcher FFT is orders of magnitude slower at -O0.
 # Force -O2 for TimeStretch.cpp even in Debug builds.
-# On MSVC, /O2 conflicts with /RTC1 (runtime checks), so we disable RTC for this file.
+# MSVC Debug: skipped — /O2 conflicts with /RTC1 (runtime checks) and there's no
+# clean per-file way to remove it. Release builds already use /O2 on all compilers.
 if(NOT MSVC)
   set_source_files_properties(TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
     "$<$<CONFIG:Debug>:-O2>"
-  )
-else()
-  set_source_files_properties(TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
-    "$<$<CONFIG:Debug>:/O2;/RTC->"
   )
 endif()
 
