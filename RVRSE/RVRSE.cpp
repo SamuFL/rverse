@@ -118,11 +118,11 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
       IText(40, kColorGold, "Roboto-Bold", EAlign::Near)), kCtrlTagTitle);
 
-    const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f);
+    const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f).GetVShifted(1.f);
     const IVStyle loadBtnStyle = DEFAULT_STYLE
       .WithColor(kFG, kColorDarkGrey)
       .WithColor(kBG, IColor(0, 0, 0, 0))
-      .WithColor(kPR, kColorGold.WithOpacity(0.2f))
+      .WithColor(kPR, kColorDarkGrey)
       .WithColor(kFR, kColorGold)
       .WithColor(kHL, kColorGold.WithOpacity(0.1f))
       .WithDrawFrame(true)
