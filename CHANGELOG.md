@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Replaced all AcmeInc placeholder branding with SamuFL identity across plists, installer files, and config (rverse-g67)
 - Updated user-facing URL to https://samufl.com and contact email to info@samufl.com (rverse-g67)
-- Synced plist version strings to 0.1.0 to match config.h (rverse-g67)
+- Updated config.h and related metadata toward the 0.1.0 release version (rverse-g67)
 - Header zone: plugin title, Load Sample button with native file dialog, sample info display, BPM display (rverse-ebv)
 - Footer zone: master volume slider with label/value, MIDI activity indicator (blue dot), version string (rverse-ebv)
 - Resize support: corner resizer with smart layout scaling — waveform absorbs squeeze, panels maintain minimum heights (rverse-ebv)
