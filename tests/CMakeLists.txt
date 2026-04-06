@@ -38,13 +38,14 @@ target_link_libraries(rvrse_tests PRIVATE Catch2::Catch2WithMain signalsmith-str
 
 # Spectral stretcher FFT is orders of magnitude slower at -O0.
 # Force -O2 for TimeStretch.cpp even in Debug test builds.
+# On MSVC, /O2 conflicts with /RTC1 (runtime checks), so we disable RTC for this file.
 if(NOT MSVC)
   set_source_files_properties(${CMAKE_SOURCE_DIR}/RVRSE/TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
     "$<$<CONFIG:Debug>:-O2>"
   )
 else()
   set_source_files_properties(${CMAKE_SOURCE_DIR}/RVRSE/TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
-    "$<$<CONFIG:Debug>:/O2>"
+    "$<$<CONFIG:Debug>:/O2;/RTC->"
   )
 endif()
 
