@@ -14,6 +14,7 @@ iplug_add_plugin(${PROJECT_NAME}
     SampleData.h
     SampleLoader.h
     SampleLoader.cpp
+    TimeStretch.cpp
     dr_libs_impl.cpp
     resources/resource.h
   RESOURCES
@@ -21,6 +22,18 @@ iplug_add_plugin(${PROJECT_NAME}
   FORMATS
     MINIMAL_PLUGINS APP
 )
+
+# Spectral stretcher FFT is orders of magnitude slower at -O0.
+# Force -O2 for TimeStretch.cpp even in Debug builds.
+if(NOT MSVC)
+  set_source_files_properties(TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
+    "$<$<CONFIG:Debug>:-O2>"
+  )
+else()
+  set_source_files_properties(TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
+    "$<$<CONFIG:Debug>:/O2>"
+  )
+endif()
 
 # dr_libs headers live in RVRSE/libs/dr_libs
 target_include_directories(_${PROJECT_NAME}-base INTERFACE
