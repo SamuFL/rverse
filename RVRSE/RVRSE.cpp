@@ -304,10 +304,11 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // Read host BPM and propagate to the offline pipeline when it changes.
   // GetTempo() reads from the host-provided ITimeInfo (populated each block).
   const double hostBPM = GetTempo();
+  const bool offline = GetRenderingOffline();
   if (hostBPM > 0.0 && std::abs(hostBPM - mLastBPM) > 0.01)
   {
     mLastBPM = hostBPM;
-    mProcessor.setBPM(hostBPM);
+    mProcessor.setBPM(hostBPM, offline);
   }
 
   // Propagate Lush to the offline processor (triggers reverb rebuild)
@@ -317,11 +318,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mProcessor.setLush(lush);
   }
 
-  // Propagate Riser Length to the offline processor (triggers stretch rebuild)
+  // Propagate Riser Length to the offline processor (triggers stretch rebuild).
+  // Pass offline flag so the processor uses synchronous stretch during bounce.
   if (std::abs(riserLengthBeats - mLastRiserLength) > 1e-6)
   {
     mLastRiserLength = riserLengthBeats;
-    mProcessor.setRiserLength(riserLengthBeats);
+    mProcessor.setRiserLength(riserLengthBeats, offline);
   }
 
   // Check if a new sample is ready from the loader thread (lock-free flag)

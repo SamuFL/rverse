@@ -93,28 +93,34 @@ public:
   }
 
   /// Set the riser length in beats. Only re-stretches (skips reverb + reverse).
-  /// Uses synchronous rebuild when cached reversed buffers exist so that
-  /// offline/bounce rendering picks up the change immediately.
-  void setRiserLength(double beats)
+  /// When offline, performs a synchronous rebuild so bounce/export picks up the
+  /// change immediately. In real-time mode, uses async to avoid blocking audio.
+  void setRiserLength(double beats, bool offline = false)
   {
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       if (std::abs(mRiserLengthBeats - beats) < 1e-9) return;
       mRiserLengthBeats = beats;
     }
-    rebuildStretch();
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   /// Set the host BPM. Only re-stretches.
-  /// Uses synchronous rebuild (same rationale as setRiserLength).
-  void setBPM(double bpm)
+  /// Same offline/real-time branching as setRiserLength.
+  void setBPM(double bpm, bool offline = false)
   {
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       if (std::abs(mBPM - bpm) < 1e-9) return;
       mBPM = bpm;
     }
-    rebuildStretch();
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   /// Set the output sample rate. Triggers full rebuild if changed.
@@ -173,13 +179,9 @@ private:
   /// Falls back to async if cached reversed buffers aren't available yet
   /// (i.e. the initial reverb+reverse pass hasn't completed).
   ///
-  /// This is safe to call from ProcessBlock because:
-  ///   - The stretch with -O2 + presetCheaper completes in ~10-50ms
-  ///   - It only runs when cached buffers exist (no first-time overhead)
-  ///   - During offline/bounce rendering, real-time deadlines don't apply
-  ///   - During live playback, a brief stall on parameter change is
-  ///     preferable to using a stale riser length
-  void rebuildStretch()
+  /// Only called during offline/bounce rendering where real-time deadlines
+  /// don't apply. Never call this during real-time playback.
+  void rebuildStretchSync()
   {
     // Invalidate in-flight builds
     mGeneration.fetch_add(1, std::memory_order_release);
