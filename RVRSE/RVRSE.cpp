@@ -89,6 +89,11 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagBPMDisplay)->SetTargetAndDrawRECTs(bpmBounds);
       const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
       pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
+      // Footer: master vol slider + MIDI indicator
+      const IRECT masterSliderBounds = footerRect.GetPadded(-8.f).GetFromLeft(220.f).GetCentredInside(200.f, 30.f);
+      pGraphics->GetControlWithTag(kCtrlTagMasterVolSlider)->SetTargetAndDrawRECTs(masterSliderBounds);
+      const IRECT midiBounds = footerRect.GetPadded(-8.f).GetMidHPadded(30.f);
+      pGraphics->GetControlWithTag(kCtrlTagMidiIndicator)->SetTargetAndDrawRECTs(midiBounds);
       return;
     }
 
@@ -158,10 +163,45 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(new ITextControl(bpmBounds, "BPM: —",
       IText(11, kColorTextMuted, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagBPMDisplay);
 
-    // Version string (footer)
+    // Version string (footer — right)
     const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
     pGraphics->AttachControl(new ITextControl(versionBounds, "RVRSE v" PLUG_VERSION_STR,
       IText(11, kColorTextMuted, "Roboto-Regular", EAlign::Far)), kCtrlTagVersionNumber);
+
+    // ── Footer contents ─────────────────────────────────────────────────
+    // Master Volume horizontal slider (left side of footer)
+    const IVStyle sliderStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorGold)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kFR, kColorKnobTrack)
+      .WithColor(kX1, kColorGold)          // filled track color
+      .WithColor(kHL, kColorGold.WithOpacity(0.15f))
+      .WithDrawFrame(false)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithShowLabel(true)
+      .WithShowValue(true)
+      .WithRoundness(1.f)
+      .WithLabelText(IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Near, EVAlign::Middle))
+      .WithValueText(IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Far, EVAlign::Middle));
+
+    const IRECT masterSliderBounds = footerRect.GetPadded(-8.f).GetFromLeft(220.f).GetCentredInside(200.f, 30.f);
+    pGraphics->AttachControl(new IVSliderControl(masterSliderBounds, kParamMasterVol,
+      "VOLUME", sliderStyle, true, EDirection::Horizontal, DEFAULT_GEARING, 8.f, 2.f), kCtrlTagMasterVolSlider);
+
+    // MIDI indicator (center of footer) — blue dot, lights up on MIDI input
+    const IRECT midiBounds = footerRect.GetPadded(-8.f).GetMidHPadded(30.f);
+    pGraphics->AttachControl(new ILambdaControl(midiBounds,
+      [](ILambdaControl* pCaller, IGraphics& g, IRECT& r) {
+        const float dotR = 4.f;
+        const float cx = r.MW();
+        const float cy = r.MH();
+        // Dim blue dot (will brighten when MIDI active — wired later)
+        g.FillCircle(rvrse::gui::kColorBlue.WithOpacity(0.3f), cx, cy, dotR);
+        const IText label(9, rvrse::gui::kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Top);
+        IRECT textR = r.GetFromBottom(12.f);
+        g.DrawText(label, "MIDI", textR);
+      }, DEFAULT_ANIMATION_DURATION, false, false), kCtrlTagMidiIndicator);
 
     // Restore sample name if already loaded
     if (!mSampleFilePath.empty())

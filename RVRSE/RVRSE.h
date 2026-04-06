@@ -40,6 +40,8 @@ enum ECtrlTags
   kCtrlTagFooterPanel,
   // Footer
   kCtrlTagVersionNumber,
+  kCtrlTagMasterVolSlider,
+  kCtrlTagMidiIndicator,
   // BPM display
   kCtrlTagBPMDisplay,
   kNumCtrlTags
