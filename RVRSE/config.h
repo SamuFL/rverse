@@ -4,8 +4,8 @@
 #define PLUG_VERSION_STR "0.1.0"
 #define PLUG_UNIQUE_ID '5SpI'
 #define PLUG_MFR_ID 'SmFL'
-#define PLUG_URL_STR "https://github.com/SamuFL/rverse"
-#define PLUG_EMAIL_STR "samuel.ferraz-leite@protonmail.com"
+#define PLUG_URL_STR "https://samufl.com"
+#define PLUG_EMAIL_STR "info@samufl.com"
 #define PLUG_COPYRIGHT_STR "Copyright 2026 SamuFL"
 #define PLUG_CLASS_NAME RVRSE
 

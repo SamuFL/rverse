@@ -208,7 +208,7 @@ BEGIN
             VALUE "InternalName", "RVRSE"
             VALUE "ProductName", "RVRSE"
             VALUE "CompanyName", "SamuFL"
-            VALUE "LegalCopyright", "Copyright 2020 Acme Inc"
+            VALUE "LegalCopyright", "Copyright 2026 Samuel Ferraz-Leite"
             VALUE "LegalTrademarks", "VST is a trademark of Steinberg Media Technologies GmbH, Audio Unit is a trademark of Apple, Inc."
         END
     END

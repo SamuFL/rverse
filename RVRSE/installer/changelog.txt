@@ -1,4 +1,4 @@
 RVRSE changelog
-www.acmeinc.com
+https://samufl.com
 
-00/00/0000 - v0.0.0 initial release
+See CHANGELOG.md for full history.
