@@ -154,6 +154,10 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
     pGraphics->LoadFont("Roboto-Bold", ROBOTO_BOLD_FN);
 
+    // Reset waveform tracking so OnIdle re-feeds data to the new controls
+    mWaveformLastRiser.reset();
+    mWaveformLastHit.reset();
+
     // Main background
     pGraphics->AttachPanelBackground(kColorDark);
 
