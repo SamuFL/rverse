@@ -12,7 +12,7 @@ RVRSE is a free, open-source audio plugin (VST3 / AU / CLAP) that generates a **
 
 - **Framework:** iPlug2 IGraphics (C++ native). NO web UI, NO HTML/CSS/React.
 - **Rendering:** NanoVG (vector) on macOS (Metal backend) and Windows (OpenGL2).
-- **Resolution:** Default 1024×768 px, resizable with corner resizer.
+- **Resolution:** Default/minimum 1024×620 px, resizable with corner resizer.
 - **Theme:** Dark. This is a production audio tool — dark backgrounds reduce eye fatigue in studio environments.
 - **Controls must map to iPlug2 native widgets** (see Section 5 below).
 
@@ -387,11 +387,11 @@ Three companion files provide the **authoritative visual reference** for the GUI
 **Implementation notes vs. stitch mockup:**
 1. The Length slider in the mockup shows 6 ticks (1/4 → 8) — **add the missing "16" tick** (7 discrete values total).
 2. "Engine v2.4" label in the mockup is a design artifact — **drop it**.
-3. "RV" placeholder in the Hit panel bottom → **replace with actual `logo.svg`** from `RVRSE/resources/img/logo.svg`.
+3. "RV" placeholder in the Hit panel bottom → **replace with the bundled logo image** from `RVRSE/resources/img/` (currently `logo.png` bitmap).
 4. "SUPPORT THE PROJECT" button → **links to `https://samufl.com/#/portal/support`** (€5 donation page).
-5. Fonts: Use the **iPlug2 default font** (Roboto-Regular bundled by iPlug2) — no custom font embedding.
-6. "Tail Preview" in Hit panel = hit sample waveform preview (custom `ILambdaControl`).
+5. Fonts: Use **Roboto-Regular** (bundled by iPlug2) and **Roboto-Bold** (bundled as custom resource) for headings/emphasis.
+6. "Tail Preview" in Hit panel = hit sample waveform preview (custom `HitPreviewControl`).
 7. Web-specific CSS effects (backdrop-blur, animate-pulse, CSS clip-path waveforms) → use NanoVG equivalents where practical; prioritize functionality over pixel-perfect CSS replication.
 
 ### Logo
-A **SamuFL brand logo** SVG is available in `RVRSE/resources/img/logo.svg`. It should be displayed in the Hit panel (bottom-right area, replacing the "RV" placeholder). SVG is ideal — resolution-independent, scales perfectly at any DPI. Use `pGraphics->LoadSVG(LOGO_FN)` to load it and `ISVGControl` to display it. Define `#define LOGO_FN "logo.svg"` in `config.h`.
+A **SamuFL brand logo** image is available in `RVRSE/resources/img/`. It is displayed in the Hit panel (bottom-right area) as a bitmap loaded via `IBitmapControl`. The implementation uses `logo.png` defined as `LOGO_FN` in the resource configuration.

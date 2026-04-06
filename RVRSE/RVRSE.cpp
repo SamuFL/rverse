@@ -259,8 +259,8 @@ RVRSE::RVRSE(const InstanceInfo& info)
         const float dotR = 4.f;
         const float cx = r.MW();
         const float cy = r.MH();
-        // Dim blue dot (will brighten when MIDI active — wired later)
-        g.FillCircle(rvrse::gui::kColorBlue.WithOpacity(0.3f), cx, cy, dotR);
+        const float opacity = 0.15f + 0.85f * static_cast<float>(pCaller->GetValue());
+        g.FillCircle(rvrse::gui::kColorBlue.WithOpacity(opacity), cx, cy, dotR);
         const IText label(11, rvrse::gui::kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Top);
         IRECT textR = r.GetFromBottom(12.f);
         g.DrawText(label, "MIDI", textR);
@@ -446,14 +446,15 @@ RVRSE::RVRSE(const InstanceInfo& info)
 void RVRSE::OnIdle()
 {
   // Update BPM display when host tempo changes
-  if (GetUI() && std::abs(mLastBPM - mLastDisplayedBPM) > 0.01)
+  const double currentBPM = mLastBPM.load(std::memory_order_relaxed);
+  if (GetUI() && std::abs(currentBPM - mLastDisplayedBPM) > 0.01)
   {
-    mLastDisplayedBPM = mLastBPM;
+    mLastDisplayedBPM = currentBPM;
     if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagBPMDisplay))
     {
       WDL_String bpmStr;
-      if (mLastBPM > 0.0)
-        bpmStr.SetFormatted(32, "BPM: %.1f", mLastBPM);
+      if (currentBPM > 0.0)
+        bpmStr.SetFormatted(32, "BPM: %.1f", currentBPM);
       else
         bpmStr.Set("BPM: —");
       pCtrl->As<ITextControl>()->SetStr(bpmStr.Get());
@@ -475,6 +476,27 @@ void RVRSE::OnIdle()
         pCtrl->SetDirty(false);
       }
     }
+  }
+
+  // Update MIDI activity indicator
+  if (GetUI())
+  {
+    const int counter = mMidiActivityCounter.load(std::memory_order_relaxed);
+    if (counter != mMidiLastSeenCounter)
+    {
+      mMidiLastSeenCounter = counter;
+      mMidiCooldownFrames = 8; // ~130ms at 60fps
+    }
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagMidiIndicator))
+    {
+      const double val = (mMidiCooldownFrames > 0) ? 1.0 : 0.0;
+      if (pCtrl->GetValue() != val)
+      {
+        pCtrl->SetValue(val);
+        pCtrl->SetDirty(false);
+      }
+    }
+    if (mMidiCooldownFrames > 0) mMidiCooldownFrames--;
   }
 
   // Update waveform display
@@ -527,8 +549,8 @@ void RVRSE::OnIdle()
         if (totalFrames > 0)
         {
           float pos = -1.f;
-          const int riserPos = mRiserPos;
-          const int hitPos = mHitPos;
+          const int riserPos = mRiserPos.load(std::memory_order_relaxed);
+          const int hitPos = mHitPos.load(std::memory_order_relaxed);
           if (riserPos >= 0)
             pos = static_cast<float>(riserPos) / static_cast<float>(totalFrames);
           else if (hitPos >= 0)
@@ -772,6 +794,11 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const auto& hit = mPlaySample;
   const auto& riser = mRiserBuffer;
 
+  // Local copies of atomic positions for the per-sample loop (avoids atomic
+  // loads on every access; written back after the loop for UI thread visibility)
+  int riserPos = mRiserPos.load(std::memory_order_relaxed);
+  int hitPos   = mHitPos.load(std::memory_order_relaxed);
+
   for (int s = 0; s < nFrames; s++)
   {
     // Process MIDI events at this sample offset
@@ -789,8 +816,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
         if (riser && riser->IsReady())
         {
-          mRiserPos = 0;
-          mHitPos = -1;
+          riserPos = 0;
+          hitPos = -1;
 
           // In debug modes, play the selected buffer; only trigger hit in Normal mode
           if (debugStage == rvrse::kDebugNormal)
@@ -806,18 +833,18 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         else if (hit && hit->IsLoaded())
         {
           // No riser available yet — fall back to direct hit playback
-          mRiserPos = -1;
+          riserPos = -1;
           mSamplesFromNoteOn = -1;
-          mHitPos = 0;
+          hitPos = 0;
         }
       }
       else if (msg.StatusMsg() == IMidiMsg::kNoteOff ||
                (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() == 0))
       {
         // Note-off: begin fade-out on both voices and kill the hit trigger
-        if (mRiserPos >= 0)
+        if (riserPos >= 0)
           mRiserFadeRemaining = mFadeOutLength;
-        if (mHitPos >= 0)
+        if (hitPos >= 0)
           mHitFadeRemaining = mFadeOutLength;
 
         // Stop the hit trigger counter so the hit can't re-trigger after fade-out
@@ -841,7 +868,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     float riserL = 0.0f;
     float riserR = 0.0f;
 
-    if (mRiserPos >= 0 && riser && riser->IsReady())
+    if (riserPos >= 0 && riser && riser->IsReady())
     {
       // Select the active buffer based on debug stage
       const float* bufL = riser->mLeft.data();
@@ -864,10 +891,10 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       // Precompute fade-in length (constant for this buffer)
       const int fadeInLen = static_cast<int>(static_cast<float>(bufLen) * fadeInPct);
 
-      if (mRiserPos < bufLen)
+      if (riserPos < bufLen)
       {
-        riserL = bufL[mRiserPos];
-        riserR = bufR[mRiserPos];
+        riserL = bufL[riserPos];
+        riserR = bufR[riserPos];
 
         const bool isDebugRaw = (debugStage == rvrse::kDebugReverbed ||
                                  debugStage == rvrse::kDebugReversed);
@@ -875,9 +902,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         if (!isDebugRaw)
         {
           // Apply fade-in envelope over the first fadeInPct of the buffer
-          if (fadeInPct > 0.0f && fadeInLen > 1 && mRiserPos < fadeInLen)
+          if (fadeInPct > 0.0f && fadeInLen > 1 && riserPos < fadeInLen)
           {
-            const float fadeGain = static_cast<float>(mRiserPos) / static_cast<float>(fadeInLen - 1);
+            const float fadeGain = static_cast<float>(riserPos) / static_cast<float>(fadeInLen - 1);
             riserL *= fadeGain;
             riserR *= fadeGain;
           }
@@ -904,24 +931,24 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           riserL *= fadeGain;
           riserR *= fadeGain;
           mRiserFadeRemaining--;
-          if (mRiserFadeRemaining == 0) mRiserPos = -1;
+          if (mRiserFadeRemaining == 0) riserPos = -1;
         }
 
-        if (mRiserPos >= 0) mRiserPos++;
+        if (riserPos >= 0) riserPos++;
       }
       else
       {
         // Buffer finished naturally
-        mRiserPos = -1;
+        riserPos = -1;
       }
     }
 
     // --- Check if it's time to fire the hit ---
-    if (mSamplesFromNoteOn >= 0 && mHitPos < 0)
+    if (mSamplesFromNoteOn >= 0 && hitPos < 0)
     {
       if (mSamplesFromNoteOn >= mHitOffset && hit && hit->IsLoaded())
       {
-        mHitPos = 0; // Fire the hit!
+        hitPos = 0; // Fire the hit!
       }
       mSamplesFromNoteOn++;
     }
@@ -930,12 +957,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     float hitL = 0.0f;
     float hitR = 0.0f;
 
-    if (mHitPos >= 0 && hit && hit->IsLoaded())
+    if (hitPos >= 0 && hit && hit->IsLoaded())
     {
-      if (mHitPos < hit->NumFrames())
+      if (hitPos < hit->NumFrames())
       {
-        hitL = hit->mLeft[mHitPos] * mVelocityGain * hitVolumeGain;
-        hitR = hit->mRight[mHitPos] * mVelocityGain * hitVolumeGain;
+        hitL = hit->mLeft[hitPos] * mVelocityGain * hitVolumeGain;
+        hitR = hit->mRight[hitPos] * mVelocityGain * hitVolumeGain;
 
         if (mHitFadeRemaining > 0)
         {
@@ -943,15 +970,15 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           hitL *= fadeGain;
           hitR *= fadeGain;
           mHitFadeRemaining--;
-          if (mHitFadeRemaining == 0) mHitPos = -1;
+          if (mHitFadeRemaining == 0) hitPos = -1;
         }
 
-        if (mHitPos >= 0) mHitPos++;
+        if (hitPos >= 0) hitPos++;
       }
       else
       {
         // Hit finished naturally
-        mHitPos = -1;
+        hitPos = -1;
         mSamplesFromNoteOn = -1;
       }
     }
@@ -964,11 +991,16 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     if (nChans >= 2) outputs[1][s] = outR;
   }
 
+  // Write back local position copies so UI thread can read them
+  mRiserPos.store(riserPos, std::memory_order_relaxed);
+  mHitPos.store(hitPos, std::memory_order_relaxed);
+
   mMidiQueue.Flush(nFrames);
 }
 
 void RVRSE::ProcessMidiMsg(const IMidiMsg& msg)
 {
+  ++mMidiActivityCounter;
   mMidiQueue.Add(msg);
 }
 

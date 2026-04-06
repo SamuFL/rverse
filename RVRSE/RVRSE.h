@@ -116,11 +116,7 @@ private:
   IMidiQueue mMidiQueue;       ///< Sample-accurate MIDI message queue
   float mVelocityGain = 1.0f;  ///< Velocity-scaled gain for current note (0.0–1.0)
 
-  // --- Riser voice ---
-  int mRiserPos = -1;          ///< Current playback position in riser buffer (-1 = not playing)
-
   // --- Hit voice ---
-  int mHitPos = -1;            ///< Current playback position in hit sample (-1 = not playing)
   int mHitOffset = -1;         ///< Sample offset at which hit fires (riser length in samples)
   int mSamplesFromNoteOn = -1; ///< Counter from note-on to trigger hit at mHitOffset
 
@@ -131,14 +127,22 @@ private:
 
   // --- Offline pipeline ---
   rvrse::RvrseProcessor mProcessor;   ///< Offline pipeline orchestrator (reverb → reverse → stretch)
-  double mLastBPM = 0.0;              ///< Last BPM sent to the processor (avoids redundant calls)
+  std::atomic<double> mLastBPM { 0.0 };  ///< Last BPM from host (written by audio thread, read by UI)
   double mLastDisplayedBPM = -1.0;    ///< Last BPM shown in GUI (avoids redundant UI updates)
   float mLastLush = -1.0f;            ///< Last Lush value sent to processor
   double mLastRiserLength = -1.0;     ///< Last Riser Length sent to processor
   int mLastStretchQuality = -1;       ///< Last Stretch Quality sent to processor
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
+  /// NOTE: shared_ptr read/write across threads is technically a data race in C++17.
+  /// In practice, swaps happen once per ProcessBlock and reads once per UI frame,
+  /// making collision vanishingly unlikely on aligned pointer stores (x86/ARM64).
+  /// A fully correct fix requires C++20 std::atomic<shared_ptr> or a mutex snapshot.
   std::shared_ptr<rvrse::RiserData> mRiserBuffer;
+
+  // --- Playback positions (audio thread writes, UI thread reads for playhead) ---
+  std::atomic<int> mRiserPos { -1 };  ///< Current playback position in riser buffer (-1 = not playing)
+  std::atomic<int> mHitPos { -1 };    ///< Current playback position in hit sample (-1 = not playing)
 
   // --- Waveform display state (UI thread only) ---
   std::shared_ptr<rvrse::RiserData> mWaveformLastRiser; ///< Last riser pointer fed to waveform

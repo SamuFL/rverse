@@ -8,10 +8,10 @@
 #include <algorithm>
 #include <cmath>
 
+namespace rvrse {
+
 using namespace iplug;
 using namespace igraphics;
-
-namespace rvrse {
 
 /// Downsampled peak data for efficient waveform drawing.
 struct WaveformPeaks
@@ -200,7 +200,7 @@ private:
     for (int bin = 0; bin < numBins; ++bin)
     {
       const int startFrame = static_cast<int>(bin * framesPerBin);
-      const int endFrame = std::min(static_cast<int>((bin + 1) * framesPerBin), numFrames);
+      const int endFrame = std::min(std::max(startFrame + 1, static_cast<int>((bin + 1) * framesPerBin)), numFrames);
 
       float lo = 0.f, hi = 0.f;
       for (int f = startFrame; f < endFrame; ++f)
@@ -333,7 +333,7 @@ public:
     for (int bin = 0; bin < numBins; ++bin)
     {
       const int s = static_cast<int>(bin * framesPerBin);
-      const int e = std::min(static_cast<int>((bin + 1) * framesPerBin), numFrames);
+      const int e = std::min(std::max(s + 1, static_cast<int>((bin + 1) * framesPerBin)), numFrames);
       float lo = 0.f, hi = 0.f;
       for (int f = s; f < e; ++f)
       {
