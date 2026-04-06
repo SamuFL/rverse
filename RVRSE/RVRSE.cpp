@@ -51,8 +51,8 @@ RVRSE::RVRSE(const InstanceInfo& info)
     const float w = b.W();
     const float h = b.H();
 
-    // ── Scale layout proportions relative to default 1024×768 ──────────
-    const float scaleY = h / 768.f;
+    // ── Scale layout proportions relative to default 1024×620 ──────────
+    const float scaleY = h / 620.f;
     const float headerH  = kHeaderHeight  * scaleY;
     const float footerH  = kFooterHeight  * scaleY;
     const float waveH    = kWaveformHeight * scaleY;
@@ -98,34 +98,29 @@ RVRSE::RVRSE(const InstanceInfo& info)
     // Main background
     pGraphics->AttachPanelBackground(kColorDark);
 
-    // Zone panels
-    const IVStyle panelStyle = DEFAULT_STYLE
-      .WithDrawFrame(false).WithDrawShadows(false);
-
-    pGraphics->AttachControl(new IVPanelControl(headerRect,
-      "", panelStyle.WithColor(kBG, kColorHeaderBg)), kCtrlTagHeaderPanel);
-    pGraphics->AttachControl(new IVPanelControl(waveformRect,
-      "", panelStyle.WithColor(kBG, kColorWaveformBg).WithRoundness(0.2f)), kCtrlTagWaveformPanel);
-    pGraphics->AttachControl(new IVPanelControl(riserRect,
-      "", panelStyle.WithColor(kBG, kColorDarkGrey).WithRoundness(0.2f)), kCtrlTagRiserPanel);
-    pGraphics->AttachControl(new IVPanelControl(hitRect,
-      "", panelStyle.WithColor(kBG, kColorDarkGrey).WithRoundness(0.2f)), kCtrlTagHitPanel);
-    pGraphics->AttachControl(new IVPanelControl(footerRect,
-      "", panelStyle.WithColor(kBG, kColorHeaderBg)), kCtrlTagFooterPanel);
+    // Zone panels — plain IPanelControl (simple filled rects, no emboss/frame)
+    pGraphics->AttachControl(new IPanelControl(headerRect, kColorHeaderBg), kCtrlTagHeaderPanel);
+    pGraphics->AttachControl(new IPanelControl(waveformRect, kColorWaveformBg), kCtrlTagWaveformPanel);
+    pGraphics->AttachControl(new IPanelControl(riserRect, kColorDarkGrey), kCtrlTagRiserPanel);
+    pGraphics->AttachControl(new IPanelControl(hitRect, kColorDarkGrey), kCtrlTagHitPanel);
+    pGraphics->AttachControl(new IPanelControl(footerRect, kColorHeaderBg), kCtrlTagFooterPanel);
 
     // ── Header contents (placeholder positions — refined in Step 2) ────
     const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f);
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
       IText(36, kColorGold, "Roboto-Regular", EAlign::Near)), kCtrlTagTitle);
 
-    const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 34.f);
+    const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f);
     const IVStyle loadBtnStyle = DEFAULT_STYLE
       .WithColor(kFG, kColorGold)
       .WithColor(kBG, kColorDarkGrey)
+      .WithColor(kPR, kColorGold.WithOpacity(0.3f))
       .WithColor(kFR, kColorGold)
       .WithDrawFrame(true)
+      .WithDrawShadows(false)
       .WithRoundness(0.3f)
-      .WithLabelText(IText(12, kColorGold));
+      .WithShowValue(false)
+      .WithLabelText(IText(12, kColorGold, "Roboto-Regular"));
 
     pGraphics->AttachControl(new IVButtonControl(loadBtnBounds, [this](IControl* pCaller) {
       WDL_String fileName;
