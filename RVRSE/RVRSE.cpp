@@ -94,33 +94,44 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->SetLayoutOnResize(true);
     pGraphics->AttachCornerResizer(EUIResizerMode::Size, true);
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
+    pGraphics->LoadFont("Roboto-Bold", ROBOTO_BOLD_FN);
 
     // Main background
     pGraphics->AttachPanelBackground(kColorDark);
 
-    // Zone panels — plain IPanelControl (simple filled rects, no emboss/frame)
+    // Helper: draw a filled rounded rect panel
+    auto MakeRoundedPanel = [](const IRECT& bounds, const IColor& color, float radius) {
+      return new ILambdaControl(bounds, [color, radius](ILambdaControl* pCaller, IGraphics& g, IRECT& r) {
+        g.FillRoundRect(color, r, radius);
+      }, DEFAULT_ANIMATION_DURATION, false, false);
+    };
+
+    // Zone panels — rounded rects for waveform, riser, hit panels
     pGraphics->AttachControl(new IPanelControl(headerRect, kColorHeaderBg), kCtrlTagHeaderPanel);
-    pGraphics->AttachControl(new IPanelControl(waveformRect, kColorWaveformBg), kCtrlTagWaveformPanel);
-    pGraphics->AttachControl(new IPanelControl(riserRect, kColorDarkGrey), kCtrlTagRiserPanel);
-    pGraphics->AttachControl(new IPanelControl(hitRect, kColorDarkGrey), kCtrlTagHitPanel);
+    pGraphics->AttachControl(MakeRoundedPanel(waveformRect, kColorWaveformBg, 6.f), kCtrlTagWaveformPanel);
+    pGraphics->AttachControl(MakeRoundedPanel(riserRect, kColorDarkGrey, 6.f), kCtrlTagRiserPanel);
+    pGraphics->AttachControl(MakeRoundedPanel(hitRect, kColorDarkGrey, 6.f), kCtrlTagHitPanel);
     pGraphics->AttachControl(new IPanelControl(footerRect, kColorHeaderBg), kCtrlTagFooterPanel);
 
-    // ── Header contents (placeholder positions — refined in Step 2) ────
+    // ── Header contents ────────────────────────────────────────────────
     const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f);
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
-      IText(36, kColorGold, "Roboto-Regular", EAlign::Near)), kCtrlTagTitle);
+      IText(40, kColorGold, "Roboto-Bold", EAlign::Near)), kCtrlTagTitle);
 
     const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f);
     const IVStyle loadBtnStyle = DEFAULT_STYLE
-      .WithColor(kFG, kColorGold)
-      .WithColor(kBG, kColorDarkGrey)
-      .WithColor(kPR, kColorGold.WithOpacity(0.3f))
+      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kPR, kColorGold.WithOpacity(0.2f))
       .WithColor(kFR, kColorGold)
+      .WithColor(kHL, kColorGold.WithOpacity(0.1f))
       .WithDrawFrame(true)
+      .WithFrameThickness(1.5f)
       .WithDrawShadows(false)
+      .WithEmboss(false)
       .WithRoundness(0.3f)
       .WithShowValue(false)
-      .WithLabelText(IText(12, kColorGold, "Roboto-Regular"));
+      .WithLabelText(IText(13, kColorGold, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
 
     pGraphics->AttachControl(new IVButtonControl(loadBtnBounds, [this](IControl* pCaller) {
       WDL_String fileName;

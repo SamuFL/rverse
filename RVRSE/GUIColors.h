@@ -34,8 +34,8 @@ const IColor kColorSteel         {255, 0xA0, 0xAE, 0xC0}; // #A0AEC0 — offline
 constexpr float kHeaderHeight  = 60.f;
 constexpr float kFooterHeight  = 55.f;
 constexpr float kWaveformHeight = 170.f;
-constexpr float kZoneGap       = 2.f;
-constexpr float kPanelPad      = 2.f;
+constexpr float kZoneGap       = 4.f;
+constexpr float kPanelPad      = 4.f;
 constexpr float kRiserPanelPct = 0.6f; // riser panel = 60% of width
 
 } // namespace gui
