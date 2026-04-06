@@ -289,9 +289,13 @@ git submodule update --init --recursive
 ### Build (macOS)
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DIPLUG_DEPLOY_METHOD=SYMLINK
 cmake --build build
 ```
+
+> **Note:** Use `-DIPLUG_DEPLOY_METHOD=SYMLINK` on macOS with non-Xcode generators
+> (Make, Ninja) to avoid a resource deployment race condition. Symlink mode lets
+> the DAW read directly from the build output where resources are bundled correctly.
 
 ### Build (Windows)
 

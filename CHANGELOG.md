@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Replaced OLA time-stretcher with signalsmith-stretch (MIT, spectral, polyphonic-aware) for significantly better audio quality at all stretch ratios — transient smearing at riser end eliminated (rverse-g4j)
 
+### Fixed
+- Plugin GUI crash (SIGABRT in NanoVG font rendering) caused by missing font resource in deployed VST3/AU bundles — switched macOS non-Xcode deployment from COPY to SYMLINK to avoid iPlug2 resource bundling race condition (pre-existing bug)
+
 ### Added
 - Persist loaded sample path across DAW sessions — save/restore via `SerializeState`/`UnserializeState` with versioned chunk format. Shows "Missing: filename" if file is gone on reload. (rverse-7dr)
 - GitHub Actions CI: macOS (Apple Silicon, Ninja) + Windows (VS2022) — builds all plugin formats and runs 42 unit tests on pushes to develop/main and PRs targeting them (rverse-lxg)

@@ -212,21 +212,24 @@ Follow [Keep a Changelog](https://keepachangelog.com/) conventions:
 ## 7. Build & Test
 
 ```bash
-# Configure (first time)
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+# Configure (first time) — use SYMLINK on macOS with Make/Ninja generators
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DIPLUG_DEPLOY_METHOD=SYMLINK
 
 # Build
 cmake --build build --config Debug
 
 # The plugin outputs appear in:
-# build/RVRSE_artefacts/Debug/VST3/
-# build/RVRSE_artefacts/Debug/AU/       (macOS only)
-# build/RVRSE_artefacts/Debug/CLAP/
+# build/out/RVRSE.vst3/
+# build/out/RVRSE.component/   (macOS only)
+# build/out/RVRSE.clap/
+# build/out/RVRSE.app/
+
+# Run unit tests
+cmake --build build --target rvrse_tests && ctest --test-dir build
 ```
 
-There is currently no automated test suite (warmup project scope). Manually validate in a
-DAW after any change to the DSP pipeline. Recommended DAWs: **Cubase**, **Studio One**,
-**Logic** (macOS only).
+Manually validate in a DAW after any change to the DSP pipeline. Recommended DAWs:
+**Cubase**, **Studio One**, **Logic** (macOS only).
 
 ---
 
