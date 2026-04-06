@@ -50,6 +50,38 @@ public:
     SetDirty(false);
   }
 
+  /// Set riser volume in dB for visual scaling.
+  void SetRiserVolumeDb(float dB)
+  {
+    const float gain = std::pow(10.f, dB / 20.f);
+    if (std::abs(gain - mRiserGain) > 0.001f)
+    {
+      mRiserGain = gain;
+      SetDirty(false);
+    }
+  }
+
+  /// Set hit volume in dB for visual scaling.
+  void SetHitVolumeDb(float dB)
+  {
+    const float gain = std::pow(10.f, dB / 20.f);
+    if (std::abs(gain - mHitGain) > 0.001f)
+    {
+      mHitGain = gain;
+      SetDirty(false);
+    }
+  }
+
+  /// Set fade-in fraction (0..1 of riser length) for visual envelope.
+  void SetFadeInFrac(float frac)
+  {
+    if (std::abs(frac - mFadeInFrac) > 0.001f)
+    {
+      mFadeInFrac = std::clamp(frac, 0.f, 1.f);
+      SetDirty(false);
+    }
+  }
+
   /// Set playhead position as fraction [0..1] of total (riser+hit). Negative = hidden.
   void SetPlayheadPos(float pos)
   {
@@ -80,18 +112,33 @@ public:
     const float riserFrac = static_cast<float>(mRiserFrames) / static_cast<float>(totalFrames);
     const float splitX = r.L + w * riserFrac;
 
-    // Draw riser waveform (gold)
+    // Shared peak across both waveforms for correct relative amplitude
+    float sharedPeak = 0.001f;
+    for (int i = 0; i < mRiserPeaks.mNumBins; ++i)
+    {
+      sharedPeak = std::max(sharedPeak, std::abs(mRiserPeaks.mMin[i]));
+      sharedPeak = std::max(sharedPeak, std::abs(mRiserPeaks.mMax[i]));
+    }
+    for (int i = 0; i < mHitPeaks.mNumBins; ++i)
+    {
+      sharedPeak = std::max(sharedPeak, std::abs(mHitPeaks.mMin[i]));
+      sharedPeak = std::max(sharedPeak, std::abs(mHitPeaks.mMax[i]));
+    }
+
+    // Draw riser waveform (gold) — with volume and fade-in envelope
     if (!mRiserPeaks.IsEmpty())
     {
       DrawWaveform(g, mRiserPeaks, IRECT(r.L, r.T, splitX, r.B),
-                   gui::kColorGold.WithOpacity(0.7f), gui::kColorGold.WithOpacity(0.3f));
+                   gui::kColorGold, gui::kColorGold.WithOpacity(0.06f),
+                   sharedPeak, mRiserGain, mFadeInFrac);
     }
 
-    // Draw hit waveform (blue)
+    // Draw hit waveform (blue) — with volume scaling
     if (!mHitPeaks.IsEmpty())
     {
       DrawWaveform(g, mHitPeaks, IRECT(splitX, r.T, r.R, r.B),
-                   gui::kColorBlue.WithOpacity(0.7f), gui::kColorBlue.WithOpacity(0.3f));
+                   gui::kColorBlue, gui::kColorBlue.WithOpacity(0.06f),
+                   sharedPeak, mHitGain, 0.f);
     }
 
     // Separator line at split point
@@ -113,17 +160,17 @@ public:
       g.DrawLine(gui::kColorHighlight.WithOpacity(0.3f), px + 1.f, r.T, px + 1.f, r.B, nullptr, 1.f);
     }
 
-    // Section labels
+    // Section labels — bottom corners
     if (mRiserFrames > 0)
     {
-      const IText riserLabel(11, gui::kColorGold.WithOpacity(0.5f), "Roboto-Regular", EAlign::Near, EVAlign::Top);
-      IRECT labelR(r.L + 6.f, r.T + 4.f, splitX - 4.f, r.T + 18.f);
+      const IText riserLabel(11, gui::kColorGold.WithOpacity(0.4f), "Roboto-Regular", EAlign::Near, EVAlign::Middle);
+      IRECT labelR(r.L + 8.f, r.B - 18.f, splitX - 4.f, r.B - 4.f);
       g.DrawText(riserLabel, "RISER", labelR);
     }
     if (mHitFrames > 0)
     {
-      const IText hitLabel(11, gui::kColorBlue.WithOpacity(0.5f), "Roboto-Regular", EAlign::Near, EVAlign::Top);
-      IRECT labelR(splitX + 6.f, r.T + 4.f, r.R - 4.f, r.T + 18.f);
+      const IText hitLabel(11, gui::kColorBlue.WithOpacity(0.4f), "Roboto-Regular", EAlign::Far, EVAlign::Middle);
+      IRECT labelR(splitX + 4.f, r.B - 18.f, r.R - 8.f, r.B - 4.f);
       g.DrawText(hitLabel, "HIT", labelR);
     }
   }
@@ -167,39 +214,83 @@ private:
   }
 
   /// Draw a waveform from peak data within the given rect.
+  /// @param normPeak   Shared peak for normalization (correct relative amplitude)
+  /// @param gain       Volume multiplier (1.0 = unity)
+  /// @param fadeInFrac Fade-in as fraction of total width (0 = none)
   void DrawWaveform(IGraphics& g, const WaveformPeaks& peaks, const IRECT& area,
-                    const IColor& fillColor, const IColor& bgColor) const
+                    const IColor& fillColor, const IColor& bgColor,
+                    float normPeak, float gain = 1.f, float fadeInFrac = 0.f) const
   {
     const float w = area.W();
     const float h = area.H();
     const float midY = area.MH();
-    const float halfH = h * 0.45f; // leave a little headroom
+    const float halfH = h * 0.38f;
+    const int numPx = static_cast<int>(w);
+    if (numPx <= 0 || peaks.mNumBins <= 0) return;
 
-    // Find global peak for normalization
-    float globalPeak = 0.001f; // avoid division by zero
-    for (int i = 0; i < peaks.mNumBins; ++i)
+    const float binsPerPixel = static_cast<float>(peaks.mNumBins) / static_cast<float>(numPx);
+    const float fadeInPx = fadeInFrac * w;
+
+    // Pass 1: per-pixel min/max scanning ALL bins that map to each pixel
+    thread_local std::vector<float> pxMin, pxMax;
+    pxMin.resize(numPx);
+    pxMax.resize(numPx);
+
+    for (int px = 0; px < numPx; ++px)
     {
-      globalPeak = std::max(globalPeak, std::abs(peaks.mMin[i]));
-      globalPeak = std::max(globalPeak, std::abs(peaks.mMax[i]));
+      const int binStart = static_cast<int>(px * binsPerPixel);
+      int binEnd = static_cast<int>((px + 1) * binsPerPixel);
+      if (binEnd <= binStart) binEnd = binStart + 1;
+      if (binEnd > peaks.mNumBins) binEnd = peaks.mNumBins;
+
+      float lo = 0.f, hi = 0.f;
+      for (int b = binStart; b < binEnd; ++b)
+      {
+        lo = std::min(lo, peaks.mMin[b]);
+        hi = std::max(hi, peaks.mMax[b]);
+      }
+      pxMin[px] = lo;
+      pxMax[px] = hi;
     }
 
-    const float binsPerPixel = static_cast<float>(peaks.mNumBins) / w;
+    // Pass 2: draw with gain and fade-in.
+    // Only apply 3-pixel smoothing when the section is wide enough that
+    // individual bins are ~1 pixel each. When narrow (high binsPerPixel),
+    // smoothing destroys sharp transients.
+    const bool smooth = binsPerPixel < 1.5f;
 
-    for (int px = 0; px < static_cast<int>(w); ++px)
+    for (int px = 0; px < numPx; ++px)
     {
-      const int bin = static_cast<int>(px * binsPerPixel);
-      if (bin >= peaks.mNumBins) break;
+      float lo = pxMin[px];
+      float hi = pxMax[px];
 
-      const float minVal = peaks.mMin[bin] / globalPeak;
-      const float maxVal = peaks.mMax[bin] / globalPeak;
+      if (smooth)
+      {
+        int count = 1;
+        if (px > 0) { lo += pxMin[px - 1]; hi += pxMax[px - 1]; ++count; }
+        if (px < numPx - 1) { lo += pxMin[px + 1]; hi += pxMax[px + 1]; ++count; }
+        lo /= static_cast<float>(count);
+        hi /= static_cast<float>(count);
+      }
+
+      float minVal = (lo / normPeak) * gain;
+      float maxVal = (hi / normPeak) * gain;
+
+      if (fadeInPx > 0.f && px < static_cast<int>(fadeInPx))
+      {
+        const float env = static_cast<float>(px) / fadeInPx;
+        minVal *= env;
+        maxVal *= env;
+      }
+
+      minVal = std::clamp(minVal, -1.f, 1.f);
+      maxVal = std::clamp(maxVal, -1.f, 1.f);
 
       const float x = area.L + static_cast<float>(px);
       const float y1 = midY - maxVal * halfH;
       const float y2 = midY - minVal * halfH;
 
-      // Background fill (subtle)
       g.DrawLine(bgColor, x, midY - halfH, x, midY + halfH, nullptr, 1.f);
-      // Waveform fill
       g.DrawLine(fillColor, x, y1, x, y2, nullptr, 1.f);
     }
   }
@@ -209,6 +300,9 @@ private:
   int mRiserFrames = 0;
   int mHitFrames = 0;
   float mPlayheadPos = -1.f; ///< 0..1 fraction, negative = hidden
+  float mRiserGain = 1.f;    ///< Visual volume scaling for riser
+  float mHitGain = 1.f;      ///< Visual volume scaling for hit
+  float mFadeInFrac = 0.f;   ///< Fade-in as fraction of riser length
 };
 
 } // namespace rvrse

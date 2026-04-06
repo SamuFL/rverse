@@ -487,6 +487,11 @@ void RVRSE::OnIdle()
         mWaveformLastHit = mPlaySample;
       }
 
+      // Update visual volume and fade-in envelope
+      pWaveform->SetRiserVolumeDb(static_cast<float>(GetParam(kParamRiserVolume)->Value()));
+      pWaveform->SetHitVolumeDb(static_cast<float>(GetParam(kParamHitVolume)->Value()));
+      pWaveform->SetFadeInFrac(static_cast<float>(GetParam(kParamFadeIn)->Value()) / 100.f);
+
       // Update playhead position
       if (mRiserBuffer && mPlaySample)
       {
