@@ -90,45 +90,48 @@ RVRSE::RVRSE(const InstanceInfo& info)
       const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
       pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
       // Footer: master vol slider + MIDI indicator
-      const IRECT masterSliderBounds = footerRect.GetPadded(-8.f).GetFromLeft(220.f).GetCentredInside(200.f, 30.f);
+      const IRECT masterArea = footerRect.GetPadded(-8.f).GetFromLeft(220.f);
+      const IRECT masterLabelRow = masterArea.GetFromTop(22.f);
+      const IRECT masterSliderBounds = masterArea.GetReducedFromTop(20.f).GetCentredInside(200.f, 24.f);
+      pGraphics->GetControlWithTag(kCtrlTagMasterVolLabel)->SetTargetAndDrawRECTs(masterLabelRow.GetFromLeft(110.f));
+      pGraphics->GetControlWithTag(kCtrlTagMasterVolValue)->SetTargetAndDrawRECTs(masterLabelRow.GetFromRight(110.f));
       pGraphics->GetControlWithTag(kCtrlTagMasterVolSlider)->SetTargetAndDrawRECTs(masterSliderBounds);
       const IRECT midiBounds = footerRect.GetPadded(-8.f).GetMidHPadded(30.f);
       pGraphics->GetControlWithTag(kCtrlTagMidiIndicator)->SetTargetAndDrawRECTs(midiBounds);
       // Riser panel contents
       const IRECT riserLabelBounds = riserRect.GetPadded(-8.f).GetFromTop(20.f);
       pGraphics->GetControlWithTag(kCtrlTagRiserSectionLabel)->SetTargetAndDrawRECTs(riserLabelBounds);
-      const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
-      const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 2).GetCentredInside(75.f, 90.f);
+      const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
+      const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 3).GetCentredInside(95.f, 110.f);
       pGraphics->GetControlWithTag(kCtrlTagStutterRate)->SetTargetAndDrawRECTs(stutterRateBounds);
-      const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 2).GetCentredInside(75.f, 90.f);
+      const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 3).GetCentredInside(95.f, 110.f);
       pGraphics->GetControlWithTag(kCtrlTagStutterDepth)->SetTargetAndDrawRECTs(stutterDepthBounds);
+      const IRECT riserVolBounds = knobArea.GetGridCell(2, 1, 3).GetCentredInside(95.f, 110.f);
+      pGraphics->GetControlWithTag(kCtrlTagRiserVolume)->SetTargetAndDrawRECTs(riserVolBounds);
       // Offline section
-      const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(124.f);
+      const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(144.f);
       const IRECT offlineLabelBounds = offlineArea.GetFromTop(18.f);
       pGraphics->GetControlWithTag(kCtrlTagOfflineSectionLabel)->SetTargetAndDrawRECTs(offlineLabelBounds);
-      const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(90.f);
+      const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(80.f);
       pGraphics->GetControlWithTag(kCtrlTagLush)->SetTargetAndDrawRECTs(
-        offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(70.f, 90.f));
+        offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(60.f, 80.f));
       pGraphics->GetControlWithTag(kCtrlTagRiserLength)->SetTargetAndDrawRECTs(
-        offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(70.f, 90.f));
+        offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(60.f, 80.f));
       pGraphics->GetControlWithTag(kCtrlTagFadeIn)->SetTargetAndDrawRECTs(
-        offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(70.f, 90.f));
-      pGraphics->GetControlWithTag(kCtrlTagRiserVolume)->SetTargetAndDrawRECTs(
-        offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(70.f, 90.f));
-      const IRECT stretchBounds = offlineArea.GetReducedFromTop(116.f).GetFromLeft(100.f).GetCentredInside(90.f, 30.f);
+        offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(60.f, 80.f));
+      const IRECT stretchBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(90.f, 50.f);
       pGraphics->GetControlWithTag(kCtrlTagStretchQuality)->SetTargetAndDrawRECTs(stretchBounds);
       // Hit panel
       const IRECT hitLabelBounds = hitRect.GetPadded(-8.f).GetFromTop(20.f);
       pGraphics->GetControlWithTag(kCtrlTagHitSectionLabel)->SetTargetAndDrawRECTs(hitLabelBounds);
-      const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
+      const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
       pGraphics->GetControlWithTag(kCtrlTagHitVolume)->SetTargetAndDrawRECTs(
-        hitVolArea.GetCentredInside(75.f, 90.f));
-      const IRECT logoArea = hitRect.GetPadded(-8.f).GetReducedFromTop(124.f).GetFromTop(50.f);
-      pGraphics->GetControlWithTag(kCtrlTagLogo)->SetTargetAndDrawRECTs(
-        logoArea.GetCentredInside(80.f, 40.f));
-      const IRECT supportArea = hitRect.GetPadded(-8.f).GetFromBottom(36.f);
+        hitVolArea.GetCentredInside(95.f, 110.f));
+      const IRECT bottomArea = hitRect.GetPadded(-10.f).GetFromBottom(80.f);
+      const IRECT logoArea = bottomArea.GetFromRight(120.f);
+      pGraphics->GetControlWithTag(kCtrlTagLogo)->SetTargetAndDrawRECTs(logoArea);
       pGraphics->GetControlWithTag(kCtrlTagSupportButton)->SetTargetAndDrawRECTs(
-        supportArea.GetCentredInside(130.f, 26.f));
+        bottomArea.GetReducedFromLeft(8.f).GetFromLeft(140.f).GetCentredInside(130.f, 26.f));
       return;
     }
 
@@ -159,7 +162,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
     // Title: top-left, bold gold
     const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f).GetFromTop(headerH * 0.65f);
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
-      IText(40, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagTitle);
+      IText(44, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagTitle);
 
     // Load Sample button: centered
     const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f).GetVShifted(1.f);
@@ -175,7 +178,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
       .WithEmboss(false)
       .WithRoundness(0.3f)
       .WithShowValue(false)
-      .WithLabelText(IText(13, kColorGold, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
+      .WithLabelText(IText(15, kColorGold, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
 
     pGraphics->AttachControl(new IVButtonControl(loadBtnBounds, [this](IControl* pCaller) {
       WDL_String fileName;
@@ -191,38 +194,45 @@ RVRSE::RVRSE(const InstanceInfo& info)
     // Sample name: top-right area
     const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
     pGraphics->AttachControl(new ITextControl(sampleBounds, "No sample loaded",
-      IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagSampleName);
+      IText(15, kColorTextPrimary, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagSampleName);
 
     // BPM display: bottom-right area — updated from ProcessBlock when host tempo changes
     const IRECT bpmBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromBottom(headerH * 0.4f);
     pGraphics->AttachControl(new ITextControl(bpmBounds, "BPM: —",
-      IText(11, kColorTextMuted, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagBPMDisplay);
+      IText(14, kColorTextSecondary, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagBPMDisplay);
 
     // Version string (footer — right)
     const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
     pGraphics->AttachControl(new ITextControl(versionBounds, "RVRSE v" PLUG_VERSION_STR,
-      IText(11, kColorTextMuted, "Roboto-Regular", EAlign::Far)), kCtrlTagVersionNumber);
+      IText(13, kColorTextPrimary, "Roboto-Regular", EAlign::Far)), kCtrlTagVersionNumber);
 
     // ── Footer contents ─────────────────────────────────────────────────
     // Master Volume horizontal slider (left side of footer)
+    // Master volume: label + value above, slider below
+    const IRECT masterArea = footerRect.GetPadded(-8.f).GetFromLeft(220.f);
+    const IRECT masterLabelRow = masterArea.GetFromTop(22.f);
+    const IRECT masterSliderBounds = masterArea.GetReducedFromTop(20.f).GetCentredInside(200.f, 24.f);
+
+    pGraphics->AttachControl(new ITextControl(masterLabelRow.GetFromLeft(110.f), "VOLUME",
+      IText(14, kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagMasterVolLabel);
+    pGraphics->AttachControl(new ITextControl(masterLabelRow.GetFromRight(110.f), "100%",
+      IText(14, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagMasterVolValue);
+
     const IVStyle sliderStyle = DEFAULT_STYLE
       .WithColor(kFG, kColorGold)
       .WithColor(kBG, IColor(0, 0, 0, 0))
       .WithColor(kFR, kColorKnobTrack)
-      .WithColor(kX1, kColorGold)          // filled track color
+      .WithColor(kX1, kColorGold)
       .WithColor(kHL, kColorGold.WithOpacity(0.15f))
       .WithDrawFrame(false)
       .WithDrawShadows(false)
       .WithEmboss(false)
-      .WithShowLabel(true)
-      .WithShowValue(true)
-      .WithRoundness(1.f)
-      .WithLabelText(IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Near, EVAlign::Middle))
-      .WithValueText(IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Far, EVAlign::Middle));
+      .WithShowLabel(false)
+      .WithShowValue(false)
+      .WithRoundness(1.f);
 
-    const IRECT masterSliderBounds = footerRect.GetPadded(-8.f).GetFromLeft(220.f).GetCentredInside(200.f, 30.f);
     pGraphics->AttachControl(new IVSliderControl(masterSliderBounds, kParamMasterVol,
-      "VOLUME", sliderStyle, true, EDirection::Horizontal, DEFAULT_GEARING, 8.f, 2.f), kCtrlTagMasterVolSlider);
+      "", sliderStyle, true, EDirection::Horizontal, DEFAULT_GEARING, 8.f, 2.f), kCtrlTagMasterVolSlider);
 
     // MIDI indicator (center of footer) — blue dot, lights up on MIDI input
     const IRECT midiBounds = footerRect.GetPadded(-8.f).GetMidHPadded(30.f);
@@ -233,7 +243,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
         const float cy = r.MH();
         // Dim blue dot (will brighten when MIDI active — wired later)
         g.FillCircle(rvrse::gui::kColorBlue.WithOpacity(0.3f), cx, cy, dotR);
-        const IText label(9, rvrse::gui::kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Top);
+        const IText label(11, rvrse::gui::kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Top);
         IRECT textR = r.GetFromBottom(12.f);
         g.DrawText(label, "MIDI", textR);
       }, DEFAULT_ANIMATION_DURATION, false, false), kCtrlTagMidiIndicator);
@@ -242,53 +252,64 @@ RVRSE::RVRSE(const InstanceInfo& info)
     // Section label at top of riser panel
     const IRECT riserLabelBounds = riserRect.GetPadded(-8.f).GetFromTop(20.f);
     pGraphics->AttachControl(new ITextControl(riserLabelBounds, "RISER — REAL-TIME",
-      IText(12, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagRiserSectionLabel);
+      IText(17, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagRiserSectionLabel);
 
-    // Knob style: gold arc on dark track
+    // Knob style: solid gold body for real-time knobs
+    const IColor kKnobBodyGold {255, 0x7A, 0x68, 0x28}; // rich warm gold
     const IVStyle knobStyle = DEFAULT_STYLE
-      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kFG, kKnobBodyGold)
       .WithColor(kBG, IColor(0, 0, 0, 0))
-      .WithColor(kFR, kColorKnobTrack)
+      .WithColor(kFR, IColor(255, 0x4A, 0x3A, 0x10)) // dark brown outline — visible against bright gold
       .WithColor(kX1, kColorGold)          // arc fill
-      .WithColor(kHL, kColorGold.WithOpacity(0.1f))
-      .WithDrawFrame(false)
+      .WithColor(kHL, kColorGold)           // bright gold body on press
+      .WithColor(kPR, kColorGold)
+      .WithDrawFrame(true)
+      .WithFrameThickness(1.f)
       .WithDrawShadows(false)
       .WithEmboss(false)
       .WithShowLabel(true)
       .WithShowValue(true)
       .WithRoundness(1.f)
       .WithWidgetFrac(0.75f)
-      .WithLabelText(IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
-      .WithValueText(IText(10, kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Top));
+      .WithLabelText(IText(15, kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
+      .WithValueText(IText(14, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Top));
 
-    // Stutter Rate + Depth — side by side in top portion of riser panel
-    const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
-    const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 2).GetCentredInside(75.f, 90.f);
-    const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 2).GetCentredInside(75.f, 90.f);
+    // Stutter Rate + Depth + Riser Volume — real-time knobs, prominently sized
+    const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
+    const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 3).GetCentredInside(95.f, 110.f);
+    const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 3).GetCentredInside(95.f, 110.f);
+    const IRECT riserVolBounds = knobArea.GetGridCell(2, 1, 3).GetCentredInside(95.f, 110.f);
 
     pGraphics->AttachControl(new IVKnobControl(stutterRateBounds, kParamStutterRate,
       "RATE", knobStyle, true), kCtrlTagStutterRate);
     pGraphics->AttachControl(new IVKnobControl(stutterDepthBounds, kParamStutterDepth,
       "DEPTH", knobStyle, true), kCtrlTagStutterDepth);
+    pGraphics->AttachControl(new IVKnobControl(riserVolBounds, kParamRiserVolume,
+      "VOLUME", knobStyle, true), kCtrlTagRiserVolume);
 
     // ── Riser panel: offline section ────────────────────────────────────
-    const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(124.f);
+    const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(144.f);
 
     // Offline section label
     const IRECT offlineLabelBounds = offlineArea.GetFromTop(18.f);
     pGraphics->AttachControl(new ITextControl(offlineLabelBounds, "OFFLINE",
-      IText(11, kColorSteel, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagOfflineSectionLabel);
+      IText(17, kColorSteel, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagOfflineSectionLabel);
 
-    // Steel knob style for offline params
+    // Steel knob style for offline params (smaller widget)
+    const IColor kKnobBodyWhite {255, 0x6A, 0x70, 0x78}; // cool white-grey tint
     const IVStyle offlineKnobStyle = knobStyle
-      .WithColor(kX1, kColorSteel);
+      .WithColor(kFG, kKnobBodyWhite)
+      .WithColor(kFR, IColor(255, 0x80, 0x88, 0x90)) // light silver ring
+      .WithColor(kX1, kColorSteel)
+      .WithColor(kHL, kColorWhite)          // white on press
+      .WithColor(kPR, kColorWhite)
+      .WithWidgetFrac(0.8f);
 
-    // Row of offline knobs: Lush | Length | Fade In | Volume
-    const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(90.f);
-    const IRECT lushBounds    = offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(70.f, 90.f);
-    const IRECT lengthBounds  = offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(70.f, 90.f);
-    const IRECT fadeInBounds  = offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(70.f, 90.f);
-    const IRECT riserVolBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(70.f, 90.f);
+    // Row of offline knobs: Lush | Length | Fade In | [Stretch toggle]
+    const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(80.f);
+    const IRECT lushBounds    = offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(60.f, 80.f);
+    const IRECT lengthBounds  = offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(60.f, 80.f);
+    const IRECT fadeInBounds  = offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(60.f, 80.f);
 
     pGraphics->AttachControl(new IVKnobControl(lushBounds, kParamLush,
       "LUSH", offlineKnobStyle, true), kCtrlTagLush);
@@ -296,50 +317,55 @@ RVRSE::RVRSE(const InstanceInfo& info)
       "LENGTH", offlineKnobStyle, true), kCtrlTagRiserLength);
     pGraphics->AttachControl(new IVKnobControl(fadeInBounds, kParamFadeIn,
       "FADE IN", offlineKnobStyle, true), kCtrlTagFadeIn);
-    pGraphics->AttachControl(new IVKnobControl(riserVolBounds, kParamRiserVolume,
-      "VOLUME", offlineKnobStyle, true), kCtrlTagRiserVolume);
 
-    // Stretch Quality toggle (small, below offline knobs)
+    // Stretch Quality — horizontal tab switch (HIGH | LOW)
     const IVStyle toggleStyle = DEFAULT_STYLE
       .WithColor(kFG, kColorDarkGrey)
       .WithColor(kBG, IColor(0, 0, 0, 0))
       .WithColor(kFR, kColorSteel)
-      .WithColor(kHL, kColorSteel.WithOpacity(0.1f))
+      .WithColor(kHL, kColorSteel.WithOpacity(0.2f))
+      .WithColor(kX1, kColorSteel)
       .WithDrawFrame(true)
       .WithFrameThickness(1.f)
       .WithDrawShadows(false)
       .WithEmboss(false)
       .WithRoundness(0.3f)
       .WithShowLabel(true)
-      .WithLabelText(IText(10, kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
-      .WithValueText(IText(10, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
+      .WithWidgetFrac(0.55f)
+      .WithLabelText(IText(11, kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
+      .WithValueText(IText(12, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
 
-    const IRECT stretchBounds = offlineArea.GetReducedFromTop(116.f).GetFromLeft(100.f).GetCentredInside(90.f, 30.f);
-    pGraphics->AttachControl(new IVToggleControl(stretchBounds, kParamStretchQuality,
-      "STRETCH", toggleStyle, "LOW", "HIGH"), kCtrlTagStretchQuality);
+    const IRECT stretchBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(90.f, 50.f);
+    pGraphics->AttachControl(new IVTabSwitchControl(stretchBounds, kParamStretchQuality,
+      {"HIGH", "LOW"}, "QUALITY", toggleStyle, EVShape::Rectangle, EDirection::Horizontal), kCtrlTagStretchQuality);
 
     // ── Hit panel contents ──────────────────────────────────────────────
     // Section label
     const IRECT hitLabelBounds = hitRect.GetPadded(-8.f).GetFromTop(20.f);
     pGraphics->AttachControl(new ITextControl(hitLabelBounds, "HIT",
-      IText(12, kColorBlue, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagHitSectionLabel);
+      IText(17, kColorBlue, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagHitSectionLabel);
 
-    // Hit Volume knob (blue accent)
+    // Hit Volume knob (blue accent — blue body)
+    const IColor kKnobBodyBlue {255, 0x28, 0x4A, 0x7A}; // deep blue body
     const IVStyle hitKnobStyle = knobStyle
-      .WithColor(kX1, kColorBlue);
+      .WithColor(kFG, kKnobBodyBlue)
+      .WithColor(kFR, IColor(255, 0x10, 0x30, 0x58)) // dark blue outline
+      .WithColor(kX1, kColorBlue)
+      .WithColor(kHL, kColorBlue)
+      .WithColor(kPR, kColorBlue);
 
-    const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(90.f);
-    const IRECT hitVolBounds = hitVolArea.GetCentredInside(75.f, 90.f);
+    const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
+    const IRECT hitVolBounds = hitVolArea.GetCentredInside(95.f, 110.f);
     pGraphics->AttachControl(new IVKnobControl(hitVolBounds, kParamHitVolume,
       "VOLUME", hitKnobStyle, true), kCtrlTagHitVolume);
 
-    // Logo (SVG)
-    const ISVG logo = pGraphics->LoadSVG(LOGO_FN);
-    const IRECT logoArea = hitRect.GetPadded(-8.f).GetReducedFromTop(124.f).GetFromTop(50.f);
-    const IRECT logoBounds = logoArea.GetCentredInside(80.f, 40.f);
-    pGraphics->AttachControl(new ISVGControl(logoBounds, logo), kCtrlTagLogo);
+    // Logo (PNG bitmap) — lower-right
+    const IBitmap logoBitmap = pGraphics->LoadBitmap(LOGO_FN);
+    const IRECT bottomArea = hitRect.GetPadded(-10.f).GetFromBottom(80.f);
+    const IRECT logoArea = bottomArea.GetFromRight(120.f);
+    pGraphics->AttachControl(new IBitmapControl(logoArea.GetCentredInside(80.f, 80.f), logoBitmap), kCtrlTagLogo);
 
-    // Support button
+    // Donate button — lower-left, vertically centered with logo
     const IVStyle supportStyle = DEFAULT_STYLE
       .WithColor(kFG, kColorDarkGrey)
       .WithColor(kBG, IColor(0, 0, 0, 0))
@@ -352,13 +378,12 @@ RVRSE::RVRSE(const InstanceInfo& info)
       .WithEmboss(false)
       .WithRoundness(0.3f)
       .WithShowValue(false)
-      .WithLabelText(IText(10, kColorBlue, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
+      .WithLabelText(IText(14, kColorBlue, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
 
-    const IRECT supportArea = hitRect.GetPadded(-8.f).GetFromBottom(36.f);
-    const IRECT supportBounds = supportArea.GetCentredInside(130.f, 26.f);
+    const IRECT supportBounds = bottomArea.GetReducedFromLeft(8.f).GetFromLeft(140.f).GetCentredInside(130.f, 26.f);
     pGraphics->AttachControl(new IVButtonControl(supportBounds, [](IControl* pCaller) {
       pCaller->GetUI()->OpenURL("https://samufl.com/#/portal/support");
-    }, "SUPPORT", supportStyle), kCtrlTagSupportButton);
+    }, "DONATE", supportStyle), kCtrlTagSupportButton);
 
     // Restore sample name if already loaded
     if (!mSampleFilePath.empty())
@@ -409,6 +434,22 @@ void RVRSE::OnIdle()
         bpmStr.Set("BPM: —");
       pCtrl->As<ITextControl>()->SetStr(bpmStr.Get());
       pCtrl->SetDirty(false);
+    }
+  }
+
+  // Update master volume display
+  if (GetUI())
+  {
+    const double vol = GetParam(kParamMasterVol)->Value();
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagMasterVolValue))
+    {
+      WDL_String volStr;
+      volStr.SetFormatted(16, "%.0f%%", vol);
+      if (strcmp(pCtrl->As<ITextControl>()->GetStr(), volStr.Get()) != 0)
+      {
+        pCtrl->As<ITextControl>()->SetStr(volStr.Get());
+        pCtrl->SetDirty(false);
+      }
     }
   }
 }

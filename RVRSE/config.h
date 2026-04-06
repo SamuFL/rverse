@@ -62,4 +62,4 @@
 
 #define ROBOTO_FN "Roboto-Regular.ttf"
 #define ROBOTO_BOLD_FN "Roboto-Bold.ttf"
-#define LOGO_FN "logo.svg"
+#define LOGO_FN "logo.png"

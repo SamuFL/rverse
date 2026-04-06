@@ -60,6 +60,8 @@ enum ECtrlTags
   kCtrlTagHitVolume,
   kCtrlTagSupportButton,
   kCtrlTagLogo,
+  kCtrlTagMasterVolLabel,
+  kCtrlTagMasterVolValue,
   kNumCtrlTags
 };
 

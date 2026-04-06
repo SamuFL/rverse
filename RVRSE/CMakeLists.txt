@@ -20,7 +20,9 @@ iplug_add_plugin(${PROJECT_NAME}
   RESOURCES
     resources/fonts/Roboto-Regular.ttf
     resources/fonts/Roboto-Bold.ttf
-    resources/img/logo.svg
+    resources/img/logo.png
+    resources/img/logo@2x.png
+    resources/img/logo@3x.png
   FORMATS
     MINIMAL_PLUGINS APP
 )
