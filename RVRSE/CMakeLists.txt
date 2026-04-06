@@ -26,3 +26,6 @@ iplug_add_plugin(${PROJECT_NAME}
 target_include_directories(_${PROJECT_NAME}-base INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/dr_libs
 )
+
+# signalsmith-stretch: spectral time-stretcher (fetched in top-level CMakeLists)
+target_link_libraries(_${PROJECT_NAME}-base INTERFACE signalsmith-stretch)

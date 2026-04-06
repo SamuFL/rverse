@@ -71,12 +71,6 @@ TEST_CASE("Constants: relational invariants", "[constants]")
     REQUIRE(kReverbTailSeconds > 0.0);
   }
 
-  SECTION("OLA window size is positive and power of 2")
-  {
-    REQUIRE(kOlaWindowSize > 0);
-    REQUIRE((kOlaWindowSize & (kOlaWindowSize - 1)) == 0);
-  }
-
   SECTION("Silence threshold is positive")
   {
     REQUIRE(kSilenceThreshold > 0.0f);

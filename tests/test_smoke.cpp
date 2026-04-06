@@ -30,7 +30,6 @@ TEST_CASE("Smoke: Constants are sane", "[smoke]")
   REQUIRE(rvrse::kStutterRateMinHz == 0.0);
   REQUIRE(rvrse::kStutterRateMaxHz > rvrse::kStutterRateMinHz);
   REQUIRE(rvrse::kStutterFadeMs > 0.0);
-  REQUIRE(rvrse::kOlaWindowSize > 0);
   REQUIRE(rvrse::kRiserLengthDefault >= rvrse::kRiserLengthMin);
   REQUIRE(rvrse::kRiserLengthDefault <= rvrse::kRiserLengthMax);
 }

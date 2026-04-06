@@ -1,12 +1,14 @@
 #pragma once
 
 /// @file TimeStretch.h
-/// @brief Overlap-Add (OLA) time-stretcher for the offline pipeline.
-///        Stretches or compresses a buffer without changing pitch.
-///        Quality is acceptable for MVP — not phase-vocoder grade.
+/// @brief Spectral time-stretcher for the offline pipeline.
+///        Uses signalsmith-stretch (MIT, spectral, polyphonic-aware) for
+///        high-quality stretching without pitch change.
 ///        Offline use only — never called from the audio thread.
 
 #include "Constants.h"
+
+#include <signalsmith-stretch/signalsmith-stretch.h>
 
 #include <algorithm>
 #include <cmath>
@@ -14,17 +16,20 @@
 
 namespace rvrse {
 
-/// Apply Overlap-Add time-stretching to a mono buffer.
+/// Apply spectral time-stretching to a mono buffer.
 ///
 /// @param input          Source buffer
 /// @param stretchFactor  Ratio of output length to input length.
 ///                       > 1.0 = slower/longer, < 1.0 = faster/shorter.
 ///                       Must be > 0.
+/// @param sampleRate     Sample rate in Hz (needed for signalsmith configuration).
+///                       Defaults to 44100 for backward compatibility.
 /// @return  Stretched output buffer
 ///
 /// @note Allocates the output buffer internally. Offline use only.
 inline std::vector<float> stretchBuffer(const std::vector<float>& input,
-                                        double stretchFactor)
+                                        double stretchFactor,
+                                        double sampleRate = 44100.0)
 {
   if (input.empty() || stretchFactor <= 0.0)
     return {};
@@ -36,81 +41,116 @@ inline std::vector<float> stretchBuffer(const std::vector<float>& input,
   if (std::abs(stretchFactor - 1.0) < 1e-6)
     return input;
 
-  // OLA parameters
-  const int windowSize = kOlaWindowSize;
-  const int hopOut = windowSize / 2; // 50% overlap in output
+  // Configure signalsmith-stretch for 1 channel (mono)
+  signalsmith::stretch::SignalsmithStretch<float> stretch;
+  stretch.presetDefault(1, static_cast<float>(sampleRate));
+  stretch.reset();
 
-  // Hop through the input at a rate determined by the stretch factor.
-  // hopIn = hopOut / stretchFactor  (how far we advance in the input per output hop)
-  const double hopIn = static_cast<double>(hopOut) / stretchFactor;
+  // Provide input latency worth of initial data via seek so the stretcher
+  // is primed and the output aligns correctly with the input start.
+  const int inLatency = stretch.inputLatency();
+  const int outLatency = stretch.outputLatency();
 
-  // Pre-compute a Hann window for smooth overlapping
-  std::vector<float> window(static_cast<size_t>(windowSize));
-  for (int i = 0; i < windowSize; ++i)
-  {
-    const double phase = static_cast<double>(i) / static_cast<double>(windowSize - 1);
-    window[static_cast<size_t>(i)] = static_cast<float>(0.5 * (1.0 - std::cos(2.0 * kPi * phase)));
-  }
+  // Build channel pointers for the API (it expects float*[channels])
+  // Feed full input + inputLatency silence for flush
+  const int totalInput = inputLen + inLatency;
+  const int totalOutput = outputLen + outLatency;
 
-  // Output buffer — zero-initialised for additive overlap
+  std::vector<float> paddedInput(static_cast<size_t>(totalInput), 0.0f);
+  std::copy(input.begin(), input.end(), paddedInput.begin());
+
+  std::vector<float> rawOutput(static_cast<size_t>(totalOutput), 0.0f);
+
+  // Process in one shot — signalsmith handles the stretch ratio via
+  // the input/output length ratio
+  const float* inPtr = paddedInput.data();
+  float* outPtr = rawOutput.data();
+  stretch.process(&inPtr, totalInput, &outPtr, totalOutput);
+
+  // Trim output latency from the front and excess from the back
   std::vector<float> output(static_cast<size_t>(outputLen), 0.0f);
-
-  // Normalisation buffer to track the accumulated window energy at each output sample
-  std::vector<float> normBuf(static_cast<size_t>(outputLen), 0.0f);
-
-  double inputPos = 0.0;   // Floating-point read position in input
-  int outputPos = 0;        // Integer write position in output
-
-  while (outputPos < outputLen)
+  const int copyStart = outLatency;
+  const int copyLen = std::min(outputLen, totalOutput - copyStart);
+  if (copyLen > 0)
   {
-    const int readStart = static_cast<int>(std::round(inputPos));
-
-    for (int i = 0; i < windowSize; ++i)
-    {
-      const int outIdx = outputPos + i;
-      if (outIdx >= outputLen) break;
-
-      // Read from input with boundary clamping
-      int inIdx = readStart + i;
-      float sample = 0.0f;
-      if (inIdx >= 0 && inIdx < inputLen)
-        sample = input[static_cast<size_t>(inIdx)];
-
-      const float w = window[static_cast<size_t>(i)];
-      output[static_cast<size_t>(outIdx)] += sample * w;
-      normBuf[static_cast<size_t>(outIdx)] += w;
-    }
-
-    inputPos += hopIn;
-    outputPos += hopOut;
-  }
-
-  // Normalise by accumulated window energy to prevent amplitude changes
-  for (int i = 0; i < outputLen; ++i)
-  {
-    if (normBuf[static_cast<size_t>(i)] > 1e-6f)
-      output[static_cast<size_t>(i)] /= normBuf[static_cast<size_t>(i)];
+    std::copy(rawOutput.begin() + copyStart,
+              rawOutput.begin() + copyStart + copyLen,
+              output.begin());
   }
 
   return output;
 }
 
-/// Apply Overlap-Add time-stretching to stereo buffers (deinterleaved L/R).
+/// Apply spectral time-stretching to stereo buffers (deinterleaved L/R).
 ///
 /// @param inputL / inputR   Source channel buffers
 /// @param stretchFactor     Ratio of output to input length (> 0)
 /// @param[out] outputL      Stretched left channel
 /// @param[out] outputR      Stretched right channel
+/// @param sampleRate        Sample rate in Hz
 ///
-/// @note Offline use only.
+/// @note Uses a single stereo stretcher instance for phase-coherent output.
+///       Offline use only.
 inline void stretchBufferStereo(const std::vector<float>& inputL,
                                 const std::vector<float>& inputR,
                                 double stretchFactor,
                                 std::vector<float>& outputL,
-                                std::vector<float>& outputR)
+                                std::vector<float>& outputR,
+                                double sampleRate = 44100.0)
 {
-  outputL = stretchBuffer(inputL, stretchFactor);
-  outputR = stretchBuffer(inputR, stretchFactor);
+  if (inputL.empty() || stretchFactor <= 0.0)
+  {
+    outputL.clear();
+    outputR.clear();
+    return;
+  }
+
+  // No stretching needed — just copy
+  if (std::abs(stretchFactor - 1.0) < 1e-6)
+  {
+    outputL = inputL;
+    outputR = inputR;
+    return;
+  }
+
+  const int inputLen = static_cast<int>(inputL.size());
+  const int outputLen = std::max(1, static_cast<int>(std::round(inputLen * stretchFactor)));
+
+  // Configure for 2 channels (stereo) — single instance for phase coherence
+  signalsmith::stretch::SignalsmithStretch<float> stretch;
+  stretch.presetDefault(2, static_cast<float>(sampleRate));
+  stretch.reset();
+
+  const int inLatency = stretch.inputLatency();
+  const int outLatency = stretch.outputLatency();
+
+  const int totalInput = inputLen + inLatency;
+  const int totalOutput = outputLen + outLatency;
+
+  // Pad inputs with silence for flush
+  std::vector<float> paddedL(static_cast<size_t>(totalInput), 0.0f);
+  std::vector<float> paddedR(static_cast<size_t>(totalInput), 0.0f);
+  std::copy(inputL.begin(), inputL.end(), paddedL.begin());
+  std::copy(inputR.begin(), inputR.end(), paddedR.begin());
+
+  std::vector<float> rawOutL(static_cast<size_t>(totalOutput), 0.0f);
+  std::vector<float> rawOutR(static_cast<size_t>(totalOutput), 0.0f);
+
+  const float* inPtrs[2] = { paddedL.data(), paddedR.data() };
+  float* outPtrs[2] = { rawOutL.data(), rawOutR.data() };
+  stretch.process(inPtrs, totalInput, outPtrs, totalOutput);
+
+  // Trim output latency from the front
+  outputL.resize(static_cast<size_t>(outputLen), 0.0f);
+  outputR.resize(static_cast<size_t>(outputLen), 0.0f);
+
+  const int copyStart = outLatency;
+  const int copyLen = std::min(outputLen, totalOutput - copyStart);
+  if (copyLen > 0)
+  {
+    std::copy(rawOutL.begin() + copyStart, rawOutL.begin() + copyStart + copyLen, outputL.begin());
+    std::copy(rawOutR.begin() + copyStart, rawOutR.begin() + copyStart + copyLen, outputR.begin());
+  }
 }
 
 /// Calculate the stretch factor needed to fit a given number of beats.

@@ -110,7 +110,7 @@ lushed_buffer[]
       ↓
 reversed_buffer[]
       ↓
-  [ OLA Time-Stretch ]  ←  Riser Length + host BPM
+  [ Spectral Time-Stretch ]  ←  Riser Length + host BPM
       ↓
 final_riser[]  →  ready for real-time playback
 ```
@@ -145,9 +145,10 @@ Implement as a stateless function:
 void applyReverb(const float* in, float* out, size_t numSamples, float lushAmount);
 ```
 
-### Time-Stretching (MVP)
+### Time-Stretching
 
-Use **OLA (Overlap-Add)**. Quality is less critical than correctness for the warmup. Stretch factor:
+Uses **signalsmith-stretch** (MIT, spectral, polyphonic-aware) for high-quality stretching.
+Originally OLA for MVP; upgraded to spectral for production quality. Stretch factor:
 
 ```
 stretchFactor = (riserLengthBeats × samplesPerBeat) / reversed_buffer.size()
@@ -191,7 +192,7 @@ constexpr int CC_RISER_TUNE    = 2;   // Breath controller
 | GUI | IGraphics (iPlug2 native) | Vector graphics, no extra dependencies |
 | Audio file I/O | dr_libs (header-only) | WAV + AIFF, single header, no build complexity |
 | Reverb DSP | Custom Schroeder (self-written) | No external libs needed |
-| Time-stretch | Custom OLA (self-written) | Sufficient quality for warmup scope |
+| Time-stretch | signalsmith-stretch (MIT, header-only) | Spectral, polyphonic-aware, transient-preserving |
 | CI/CD | GitHub Actions | Auto-build on Windows + macOS |
 | License | MIT | Permissive; warmup project should be maximally forkable |
 
@@ -246,7 +247,7 @@ rvrse/
 │   ├── RvrseProcessor.h / .cpp      ← offline pipeline orchestrator
 │   ├── RvrseVoice.h / .cpp          ← real-time playback voice (riser + hit)
 │   ├── Reverb.h / .cpp              ← Schroeder reverb, stateless
-│   ├── Stretcher.h / .cpp           ← OLA time-stretcher, stateless
+│   ├── Stretcher.h / .cpp           ← spectral time-stretcher (signalsmith-stretch)
 │   ├── Stutter.h / .cpp             ← real-time stutter gate (audio thread only)
 │   └── WaveformView.h / .cpp        ← IControl subclass for waveform display
 └── resources/

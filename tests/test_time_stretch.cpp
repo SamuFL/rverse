@@ -1,5 +1,5 @@
 /// @file test_time_stretch.cpp
-/// @brief Unit tests for TimeStretch.h — OLA time-stretcher.
+/// @brief Unit tests for TimeStretch.h — signalsmith-stretch based time-stretcher.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
@@ -32,10 +32,11 @@ TEST_CASE("TimeStretch: factor 1.0 is identity", "[timestretch]")
 TEST_CASE("TimeStretch: factor 2.0 doubles length", "[timestretch]")
 {
   std::vector<float> buf(4096, 0.3f);
-  auto result = stretchBuffer(buf, 2.0);
+  auto result = stretchBuffer(buf, 2.0, 44100.0);
 
-  // Allow ±1 window tolerance due to OLA framing
-  REQUIRE(result.size() == Approx(8192).margin(kOlaWindowSize));
+  // Spectral stretcher should produce exact target length
+  const int expected = static_cast<int>(std::round(4096 * 2.0));
+  REQUIRE(result.size() == static_cast<size_t>(expected));
 }
 
 // ---------------------------------------------------------------------------
@@ -45,9 +46,10 @@ TEST_CASE("TimeStretch: factor 2.0 doubles length", "[timestretch]")
 TEST_CASE("TimeStretch: factor 0.5 halves length", "[timestretch]")
 {
   std::vector<float> buf(4096, 0.3f);
-  auto result = stretchBuffer(buf, 0.5);
+  auto result = stretchBuffer(buf, 0.5, 44100.0);
 
-  REQUIRE(result.size() == Approx(2048).margin(kOlaWindowSize));
+  const int expected = static_cast<int>(std::round(4096 * 0.5));
+  REQUIRE(result.size() == static_cast<size_t>(expected));
 }
 
 // ---------------------------------------------------------------------------
@@ -83,23 +85,44 @@ TEST_CASE("TimeStretch: invalid factor returns empty", "[timestretch]")
 }
 
 // ---------------------------------------------------------------------------
-// Constant signal → amplitude preserved
+// Constant signal → amplitude roughly preserved
 // ---------------------------------------------------------------------------
 
-TEST_CASE("TimeStretch: constant signal amplitude preserved", "[timestretch]")
+TEST_CASE("TimeStretch: constant signal amplitude roughly preserved", "[timestretch]")
 {
   const float kValue = 0.5f;
   std::vector<float> buf(4096, kValue);
-  auto result = stretchBuffer(buf, 1.5);
+  auto result = stretchBuffer(buf, 1.5, 44100.0);
 
   REQUIRE(!result.empty());
 
-  // Skip the first and last windows (OLA edge effects)
-  const int skip = kOlaWindowSize;
-  for (size_t i = skip; i + skip < result.size(); ++i)
-  {
-    REQUIRE(result[i] == Approx(kValue).margin(0.05f));
-  }
+  // Compute RMS of the middle 50% (avoid edge effects)
+  const size_t start = result.size() / 4;
+  const size_t end = result.size() * 3 / 4;
+  double sumSq = 0.0;
+  for (size_t i = start; i < end; ++i)
+    sumSq += static_cast<double>(result[i]) * result[i];
+  const double rms = std::sqrt(sumSq / static_cast<double>(end - start));
+
+  // RMS of a constant 0.5 signal is 0.5. Allow generous margin for spectral artifacts.
+  REQUIRE(rms == Approx(kValue).margin(0.15));
+}
+
+// ---------------------------------------------------------------------------
+// Stereo stretching produces correct length
+// ---------------------------------------------------------------------------
+
+TEST_CASE("TimeStretch: stereo stretch correct length", "[timestretch]")
+{
+  std::vector<float> bufL(4096, 0.3f);
+  std::vector<float> bufR(4096, 0.3f);
+  std::vector<float> outL, outR;
+
+  stretchBufferStereo(bufL, bufR, 2.0, outL, outR, 44100.0);
+
+  const int expected = static_cast<int>(std::round(4096 * 2.0));
+  REQUIRE(outL.size() == static_cast<size_t>(expected));
+  REQUIRE(outR.size() == static_cast<size_t>(expected));
 }
 
 // ---------------------------------------------------------------------------

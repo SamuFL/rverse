@@ -33,7 +33,7 @@ target_include_directories(rvrse_tests PRIVATE
   ${CMAKE_SOURCE_DIR}/RVRSE/libs/dr_libs  # dr_wav.h (for SampleLoader tests later)
 )
 
-target_link_libraries(rvrse_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(rvrse_tests PRIVATE Catch2::Catch2WithMain signalsmith-stretch)
 
 # Register with CTest so `ctest` discovers and runs the tests
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)

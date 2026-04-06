@@ -309,7 +309,7 @@ private:
 
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(reversedL, reversedR, stretchFactor,
-                        riser->mLeft, riser->mRight);
+                        riser->mLeft, riser->mRight, sampleRate);
     riser->mSampleRate = sampleRate;
 
     // Store intermediate buffers for debug playback
