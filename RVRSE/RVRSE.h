@@ -22,6 +22,7 @@ enum EParams
   kParamRiserVolume,
   kParamHitVolume,
   kParamDebugStage,
+  kParamStretchQuality,
   kNumParams
 };
 

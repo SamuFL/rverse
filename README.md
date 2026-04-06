@@ -381,6 +381,7 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 | Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1) |
 | Stutter Depth | 0–1 | 0.5 | Gate depth (also via MIDI CC11) |
 | Debug Stage | Normal / Reverbed / Reversed / Riser Only | Normal | Diagnostic: audition intermediate pipeline buffers |
+| Stretch Quality | High / Low | High | High = best quality (larger FFT), Low = faster (~2×) for real-time tweaking |
 
 ### Current Limitations
 

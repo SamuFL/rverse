@@ -34,6 +34,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
   GetParam(kParamDebugStage)->InitEnum("Debug Stage", rvrse::kDebugNormal, {
     "Normal", "Reverbed", "Reversed", "Riser Only"
   });
+  GetParam(kParamStretchQuality)->InitEnum("Stretch Quality", rvrse::kStretchQualityDefault, {
+    "High", "Low"
+  });
 
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
@@ -299,6 +302,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const float hitVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);
   const auto debugStage = static_cast<rvrse::EDebugStage>(
     static_cast<int>(GetParam(kParamDebugStage)->Value()));
+  const auto stretchQuality = static_cast<rvrse::EStretchQuality>(
+    static_cast<int>(GetParam(kParamStretchQuality)->Value()));
   const double sr = GetSampleRate();
 
   // Read host BPM and propagate to the offline pipeline when it changes.
@@ -325,6 +330,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mLastRiserLength = riserLengthBeats;
     mProcessor.setRiserLength(riserLengthBeats, offline);
   }
+
+  // Propagate Stretch Quality (triggers stretch rebuild if changed)
+  mProcessor.setStretchQuality(stretchQuality, offline);
 
   // Check if a new sample is ready from the loader thread (lock-free flag)
   if (mNewSampleReady.load(std::memory_order_acquire))

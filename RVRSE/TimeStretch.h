@@ -9,6 +9,8 @@
 ///        Implementation lives in TimeStretch.cpp, compiled with -O2 even in
 ///        Debug builds — spectral FFT code is orders of magnitude slower at -O0.
 
+#include "Constants.h"
+
 #include <cmath>
 #include <vector>
 
@@ -22,12 +24,14 @@ namespace rvrse {
 ///                       Must be > 0.
 /// @param sampleRate     Sample rate in Hz (needed for signalsmith configuration).
 ///                       Defaults to 44100 for backward compatibility.
+/// @param quality        Stretcher quality preset (High or Low).
 /// @return  Stretched output buffer
 ///
 /// @note Allocates the output buffer internally. Offline use only.
 std::vector<float> stretchBuffer(const std::vector<float>& input,
                                  double stretchFactor,
-                                 double sampleRate = 44100.0);
+                                 double sampleRate = 44100.0,
+                                 EStretchQuality quality = kStretchQualityHigh);
 
 /// Apply spectral time-stretching to stereo buffers (deinterleaved L/R).
 ///
@@ -36,6 +40,7 @@ std::vector<float> stretchBuffer(const std::vector<float>& input,
 /// @param[out] outputL      Stretched left channel
 /// @param[out] outputR      Stretched right channel
 /// @param sampleRate        Sample rate in Hz
+/// @param quality           Stretcher quality preset (High or Low).
 ///
 /// @note Uses a single stereo stretcher instance for phase-coherent output.
 ///       Offline use only.
@@ -44,7 +49,8 @@ void stretchBufferStereo(const std::vector<float>& inputL,
                          double stretchFactor,
                          std::vector<float>& outputL,
                          std::vector<float>& outputR,
-                         double sampleRate = 44100.0);
+                         double sampleRate = 44100.0,
+                         EStretchQuality quality = kStretchQualityHigh);
 
 /// Calculate the stretch factor needed to fit a given number of beats.
 ///

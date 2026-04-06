@@ -138,6 +138,20 @@ public:
     rebuildAsync(EPipelineStage::Reverb);
   }
 
+  /// Set the stretch quality preset. Triggers stretch rebuild if changed.
+  void setStretchQuality(EStretchQuality quality, bool offline = false)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      if (mStretchQuality == quality) return;
+      mStretchQuality = quality;
+    }
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
+  }
+
   // --- Audio-thread-safe polling ---
 
   /// @return true if a new riser buffer is ready to be consumed (lock-free).
@@ -189,6 +203,7 @@ private:
     // Snapshot parameters under lock
     std::shared_ptr<SampleData> sample;
     double riserLengthBeats, bpm, sampleRate;
+    EStretchQuality quality;
     std::vector<float> cachedRevL, cachedRevR;
     std::vector<float> cachedRvbL, cachedRvbR;
 
@@ -198,6 +213,7 @@ private:
       riserLengthBeats = mRiserLengthBeats;
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
+      quality = mStretchQuality;
       cachedRevL = mCachedReversedL;
       cachedRevR = mCachedReversedR;
       cachedRvbL = mCachedReverbedL;
@@ -218,7 +234,7 @@ private:
 
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(cachedRevL, cachedRevR, stretchFactor,
-                        riser->mLeft, riser->mRight, sampleRate);
+                        riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
 
     riser->mReverbedL = std::move(cachedRvbL);
@@ -248,6 +264,7 @@ private:
     std::shared_ptr<SampleData> sample;
     float lush;
     double riserLengthBeats, bpm, sampleRate;
+    EStretchQuality quality;
     std::vector<float> cachedRevL, cachedRevR;
     std::vector<float> cachedRvbL, cachedRvbR;
 
@@ -258,6 +275,7 @@ private:
       riserLengthBeats = mRiserLengthBeats;
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
+      quality = mStretchQuality;
 
       if (fromStage == EPipelineStage::Stretch)
       {
@@ -382,7 +400,7 @@ private:
 
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(reversedL, reversedR, stretchFactor,
-                        riser->mLeft, riser->mRight, sampleRate);
+                        riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
 
     // Store intermediate buffers for debug playback
@@ -422,6 +440,7 @@ private:
   double mRiserLengthBeats = kRiserLengthDefault;
   double mBPM = kDefaultBPM;
   double mOutputSampleRate = 44100.0;
+  EStretchQuality mStretchQuality = static_cast<EStretchQuality>(kStretchQualityDefault);
 
   // --- Cached intermediate buffers (protected by mParamMutex) ---
   std::vector<float> mCachedReversedL;

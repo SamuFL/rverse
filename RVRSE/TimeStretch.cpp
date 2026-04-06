@@ -12,11 +12,26 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+
+/// Configure the stretcher with the appropriate quality preset.
+void applyQualityPreset(signalsmith::stretch::SignalsmithStretch<float>& stretch,
+                        int channels, float sampleRate, rvrse::EStretchQuality quality)
+{
+  if (quality == rvrse::kStretchQualityLow)
+    stretch.presetCheaper(channels, sampleRate);
+  else
+    stretch.presetDefault(channels, sampleRate);
+}
+
+} // anonymous namespace
+
 namespace rvrse {
 
 std::vector<float> stretchBuffer(const std::vector<float>& input,
                                  double stretchFactor,
-                                 double sampleRate)
+                                 double sampleRate,
+                                 EStretchQuality quality)
 {
   if (input.empty() || stretchFactor <= 0.0)
     return {};
@@ -29,10 +44,8 @@ std::vector<float> stretchBuffer(const std::vector<float>& input,
     return input;
 
   // Configure signalsmith-stretch for 1 channel (mono).
-  // presetCheaper: smaller FFT blocks + wider hop = significantly faster,
-  // with minimal quality loss for reverb-tail material.
   signalsmith::stretch::SignalsmithStretch<float> stretch;
-  stretch.presetCheaper(1, static_cast<float>(sampleRate));
+  applyQualityPreset(stretch, 1, static_cast<float>(sampleRate), quality);
   stretch.reset();
 
   const int inLatency = stretch.inputLatency();
@@ -70,7 +83,8 @@ void stretchBufferStereo(const std::vector<float>& inputL,
                          double stretchFactor,
                          std::vector<float>& outputL,
                          std::vector<float>& outputR,
-                         double sampleRate)
+                         double sampleRate,
+                         EStretchQuality quality)
 {
   if (inputL.empty() || stretchFactor <= 0.0)
   {
@@ -91,9 +105,8 @@ void stretchBufferStereo(const std::vector<float>& inputL,
   const int outputLen = std::max(1, static_cast<int>(std::round(inputLen * stretchFactor)));
 
   // Configure for 2 channels (stereo) — single instance for phase coherence.
-  // presetCheaper for performance (see mono version for rationale).
   signalsmith::stretch::SignalsmithStretch<float> stretch;
-  stretch.presetCheaper(2, static_cast<float>(sampleRate));
+  applyQualityPreset(stretch, 2, static_cast<float>(sampleRate), quality);
   stretch.reset();
 
   const int inLatency = stretch.inputLatency();
