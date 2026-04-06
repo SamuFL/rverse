@@ -62,6 +62,7 @@ enum ECtrlTags
   kCtrlTagLogo,
   kCtrlTagMasterVolLabel,
   kCtrlTagMasterVolValue,
+  kCtrlTagWaveformDisplay,
   kNumCtrlTags
 };
 
@@ -137,6 +138,11 @@ private:
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
   std::shared_ptr<rvrse::RiserData> mRiserBuffer;
+
+  // --- Waveform display state (UI thread only) ---
+  std::shared_ptr<rvrse::RiserData> mWaveformLastRiser; ///< Last riser pointer fed to waveform
+  std::shared_ptr<rvrse::SampleData> mWaveformLastHit;  ///< Last hit pointer fed to waveform
+  std::vector<float> mWaveformMonoBuf; ///< Temp buffer for stereo→mono mix
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state

@@ -14,6 +14,7 @@ iplug_add_plugin(${PROJECT_NAME}
     SampleData.h
     SampleLoader.h
     SampleLoader.cpp
+    WaveformControl.h
     TimeStretch.cpp
     dr_libs_impl.cpp
     resources/resource.h

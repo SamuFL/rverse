@@ -3,6 +3,7 @@
 #include "BufferUtils.h"
 #include "Constants.h"
 #include "SampleLoader.h"
+#include "WaveformControl.h"
 
 #include <algorithm>
 #include <cmath>
@@ -74,6 +75,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(b);
       pGraphics->GetControlWithTag(kCtrlTagHeaderPanel)->SetTargetAndDrawRECTs(headerRect);
       pGraphics->GetControlWithTag(kCtrlTagWaveformPanel)->SetTargetAndDrawRECTs(waveformRect);
+      pGraphics->GetControlWithTag(kCtrlTagWaveformDisplay)->SetTargetAndDrawRECTs(waveformRect.GetPadded(-6.f));
       pGraphics->GetControlWithTag(kCtrlTagRiserPanel)->SetTargetAndDrawRECTs(riserRect);
       pGraphics->GetControlWithTag(kCtrlTagHitPanel)->SetTargetAndDrawRECTs(hitRect);
       pGraphics->GetControlWithTag(kCtrlTagFooterPanel)->SetTargetAndDrawRECTs(footerRect);
@@ -154,6 +156,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
     // Zone panels — rounded rects for waveform, riser, hit panels
     pGraphics->AttachControl(new IPanelControl(headerRect, kColorHeaderBg), kCtrlTagHeaderPanel);
     pGraphics->AttachControl(MakeRoundedPanel(waveformRect, kColorWaveformBg, 6.f), kCtrlTagWaveformPanel);
+    pGraphics->AttachControl(new rvrse::WaveformControl(waveformRect.GetPadded(-6.f)), kCtrlTagWaveformDisplay);
     pGraphics->AttachControl(MakeRoundedPanel(riserRect, kColorDarkGrey, 6.f), kCtrlTagRiserPanel);
     pGraphics->AttachControl(MakeRoundedPanel(hitRect, kColorDarkGrey, 6.f), kCtrlTagHitPanel);
     pGraphics->AttachControl(new IPanelControl(footerRect, kColorHeaderBg), kCtrlTagFooterPanel);
@@ -449,6 +452,56 @@ void RVRSE::OnIdle()
       {
         pCtrl->As<ITextControl>()->SetStr(volStr.Get());
         pCtrl->SetDirty(false);
+      }
+    }
+  }
+
+  // Update waveform display
+  if (GetUI())
+  {
+    auto* pWaveform = dynamic_cast<rvrse::WaveformControl*>(
+      GetUI()->GetControlWithTag(kCtrlTagWaveformDisplay));
+    if (pWaveform)
+    {
+      // Feed riser data when pointer changes
+      if (mRiserBuffer && mRiserBuffer->IsReady() && mRiserBuffer != mWaveformLastRiser)
+      {
+        const auto& riser = mRiserBuffer;
+        const int nFrames = riser->NumFrames();
+        mWaveformMonoBuf.resize(nFrames);
+        for (int i = 0; i < nFrames; ++i)
+          mWaveformMonoBuf[i] = (riser->mLeft[i] + riser->mRight[i]) * 0.5f;
+        pWaveform->SetRiserData(mWaveformMonoBuf.data(), nFrames);
+        mWaveformLastRiser = mRiserBuffer;
+      }
+
+      // Feed hit data when pointer changes
+      if (mPlaySample && mPlaySample->IsLoaded() && mPlaySample != mWaveformLastHit)
+      {
+        const auto& hit = mPlaySample;
+        const int nFrames = hit->NumFrames();
+        mWaveformMonoBuf.resize(nFrames);
+        for (int i = 0; i < nFrames; ++i)
+          mWaveformMonoBuf[i] = (hit->mLeft[i] + (hit->mNumChannels > 1 ? hit->mRight[i] : hit->mLeft[i])) * 0.5f;
+        pWaveform->SetHitData(mWaveformMonoBuf.data(), nFrames);
+        mWaveformLastHit = mPlaySample;
+      }
+
+      // Update playhead position
+      if (mRiserBuffer && mPlaySample)
+      {
+        const int totalFrames = mRiserBuffer->NumFrames() + mPlaySample->NumFrames();
+        if (totalFrames > 0)
+        {
+          float pos = -1.f;
+          const int riserPos = mRiserPos;
+          const int hitPos = mHitPos;
+          if (riserPos >= 0)
+            pos = static_cast<float>(riserPos) / static_cast<float>(totalFrames);
+          else if (hitPos >= 0)
+            pos = static_cast<float>(mRiserBuffer->NumFrames() + hitPos) / static_cast<float>(totalFrames);
+          pWaveform->SetPlayheadPos(pos);
+        }
       }
     }
   }
