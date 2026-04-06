@@ -374,7 +374,7 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 |---|---|---|---|
 | Master Volume | 0–100% | 100% | Overall output level |
 | Lush | 0–100% | 40% | Reverb amount — triggers offline rebuild |
-| Riser Length | 0.25–16 beats | 4 | Time-stretch target — triggers offline rebuild |
+| Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 | Time-stretch target — triggers offline rebuild |
 | Fade In | 0–100% | 60% | Linear ramp over portion of riser length |
 | Riser Volume | -60 to +6 dB | 0 dB | Independent riser voice gain |
 | Hit Volume | -60 to +6 dB | 0 dB | Independent hit voice gain |

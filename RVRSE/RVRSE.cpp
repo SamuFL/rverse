@@ -23,8 +23,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
     rvrse::kStutterDepthDefault / 100.0, 0., 1.0, 0.01, "");
   GetParam(kParamLush)->InitDouble("Lush",
     rvrse::kLushDefault, 0., 100.0, 0.1, "%");
-  GetParam(kParamRiserLength)->InitDouble("Riser Length",
-    rvrse::kRiserLengthDefault, rvrse::kRiserLengthMin, rvrse::kRiserLengthMax, 0.25, "beats");
+  GetParam(kParamRiserLength)->InitEnum("Riser Length", rvrse::kRiserLengthDefault, {
+    "1/4", "1/2", "1", "2", "4", "8", "16"
+  });
   GetParam(kParamFadeIn)->InitDouble("Fade In",
     rvrse::kFadeInDefault, 0., 100.0, 0.1, "%");
   GetParam(kParamRiserVolume)->InitDouble("Riser Volume",
@@ -296,7 +297,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const auto stutterRateHz = static_cast<float>(GetParam(kParamStutterRate)->Value());
   const float stutterDepth = static_cast<float>(GetParam(kParamStutterDepth)->Value());
   const float lush = static_cast<float>(GetParam(kParamLush)->Value() / 100.0);
-  const double riserLengthBeats = GetParam(kParamRiserLength)->Value();
+  const int riserLengthIdx = static_cast<int>(GetParam(kParamRiserLength)->Value());
+  const double riserLengthBeats = rvrse::kRiserLengthValues[
+    std::clamp(riserLengthIdx, 0, rvrse::kNumRiserLengths - 1)];
   const float fadeInPct = static_cast<float>(GetParam(kParamFadeIn)->Value() / 100.0);
   const float riserVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamRiserVolume)->Value()) / 20.0f);
   const float hitVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);

@@ -65,7 +65,7 @@ RVRSE reads the host BPM via iPlug2's `ITimeInfo`. When a MIDI note-on arrives:
 | Parameter | Range | Default | Description |
 |---|---|---|---|
 | Lush | 0 – 100% | 40% | Reverb wet amount + room size (linked). 0 = dry reversed sample. 100 = fully washed-out reverb tail, reversed. |
-| Riser Length | 0.25 – 16 beats | 4 beats | How many beats before the hit the riser begins. Tempo-synced via host BPM. Snaps to musical values (1/4, 1/2, 1, 2, 4, 8, 16). |
+| Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 beats | How many beats before the hit the riser begins. Tempo-synced via host BPM. Discrete musical values only — no in-between positions. |
 
 ### Riser Section — Real-Time Parameters
 > These are computed per-sample in the audio thread. Full MIDI CC support. Changing them is instantaneous with no glitches.
