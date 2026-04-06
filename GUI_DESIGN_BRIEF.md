@@ -279,7 +279,8 @@ Based on the **SamuFL brand kit**, adapted for a dark studio environment.
 
 ## 8. Typography Specification
 
-Using **Roboto-Regular** (already loaded in the plugin) for everything.
+Using the **iPlug2 default font** (Roboto-Regular is bundled by default in iPlug2) for all text.
+No custom font embedding required.
 
 | Element | Size | Color | Weight | Alignment |
 |---|---|---|---|---|
@@ -369,9 +370,28 @@ For inspiration, think:
 
 ---
 
-## 12. Current State
+## 12. Current State & Visual Reference
 
 The plugin currently has a minimal placeholder UI: title text, a Load Sample button, and a sample name display on a dark gray background. No knobs are exposed in the GUI yet (all parameters work via DAW automation / generic host UI only). The feature branch `feature/rverse-ebv-igraphics-gui` is ready for implementation.
 
+### Stitch Design Reference (Source of Truth for Visual Layout)
+
+Three companion files provide the **authoritative visual reference** for the GUI:
+
+| File | Format | What it provides |
+|---|---|---|
+| `STITCH-DESIGN.md` | Markdown | Design system spec: color logic, "No-Line" rule, elevation, component styles, do's/don'ts, interaction states |
+| `stitch-code.html` | HTML+Tailwind | Pixel-precise mockup at 1024×768 with exact colors, font sizes, layout proportions, control placement |
+| `stitch-screen.png` | PNG | Visual screenshot of the rendered HTML mockup |
+
+**Implementation notes vs. stitch mockup:**
+1. The Length slider in the mockup shows 6 ticks (1/4 → 8) — **add the missing "16" tick** (7 discrete values total).
+2. "Engine v2.4" label in the mockup is a design artifact — **drop it**.
+3. "RV" placeholder in the Hit panel bottom → **replace with actual `logo.svg`** from `RVRSE/resources/img/logo.svg`.
+4. "SUPPORT THE PROJECT" button → **links to `https://samufl.com/#/portal/support`** (€5 donation page).
+5. Fonts: Use the **iPlug2 default font** (Roboto-Regular bundled by iPlug2) — no custom font embedding.
+6. "Tail Preview" in Hit panel = hit sample waveform preview (custom `ILambdaControl`).
+7. Web-specific CSS effects (backdrop-blur, animate-pulse, CSS clip-path waveforms) → use NanoVG equivalents where practical; prioritize functionality over pixel-perfect CSS replication.
+
 ### Logo
-A **SamuFL brand logo** SVG is available in `RVRSE/resources/img/logo.svg`. It should be displayed in the header bar, either replacing the text "RVRSE" title or alongside it. SVG is ideal — resolution-independent, scales perfectly at any DPI. Use `pGraphics->LoadSVG(LOGO_FN)` to load it and `ISVGControl` to display it. Define `#define LOGO_FN "logo.svg"` in `config.h`.
+A **SamuFL brand logo** SVG is available in `RVRSE/resources/img/logo.svg`. It should be displayed in the Hit panel (bottom-right area, replacing the "RV" placeholder). SVG is ideal — resolution-independent, scales perfectly at any DPI. Use `pGraphics->LoadSVG(LOGO_FN)` to load it and `ISVGControl` to display it. Define `#define LOGO_FN "logo.svg"` in `config.h`.
