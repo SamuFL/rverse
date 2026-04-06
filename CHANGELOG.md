@@ -22,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Footer zone: master volume slider with label/value, MIDI activity indicator (blue dot), version string (rverse-ebv)
 - Resize support: corner resizer with smart layout scaling — waveform absorbs squeeze, panels maintain minimum heights (rverse-ebv)
 - Stretch Quality parameter (High / Low) — defaults to High for best audio quality; Low mode (~2× faster) available for real-time tweaking or resource-limited systems (rverse-g4j)
-
-### Changed
 - Riser Length is now a discrete parameter with 7 musical values (1/4, 1/2, 1, 2, 4, 8, 16 beats) instead of continuous 0.25–16 range — snaps to exact beat divisions (rverse-ebv)
 - Replaced OLA time-stretcher with signalsmith-stretch (MIT, spectral, polyphonic-aware) for significantly better audio quality at all stretch ratios — transient smearing at riser end eliminated (rverse-g4j)
 - Stretch-only rebuilds (riser length, BPM changes) run synchronously during offline/bounce rendering so automation is respected immediately; async during real-time playback (rverse-g4j)
