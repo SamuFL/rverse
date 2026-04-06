@@ -79,12 +79,14 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagFooterPanel)->SetTargetAndDrawRECTs(footerRect);
 
       // Reposition header contents
-      const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f);
+      const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f).GetFromTop(headerH * 0.65f);
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
       const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 34.f);
       pGraphics->GetControlWithTag(kCtrlTagLoadButton)->SetTargetAndDrawRECTs(loadBtnBounds);
-      const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f);
+      const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
       pGraphics->GetControlWithTag(kCtrlTagSampleName)->SetTargetAndDrawRECTs(sampleBounds);
+      const IRECT bpmBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromBottom(headerH * 0.4f);
+      pGraphics->GetControlWithTag(kCtrlTagBPMDisplay)->SetTargetAndDrawRECTs(bpmBounds);
       const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
       pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
       return;
@@ -114,10 +116,12 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(new IPanelControl(footerRect, kColorHeaderBg), kCtrlTagFooterPanel);
 
     // ── Header contents ────────────────────────────────────────────────
-    const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f);
+    // Title: top-left, bold gold
+    const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f).GetFromTop(headerH * 0.65f);
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
-      IText(40, kColorGold, "Roboto-Bold", EAlign::Near)), kCtrlTagTitle);
+      IText(40, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagTitle);
 
+    // Load Sample button: centered
     const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f).GetVShifted(1.f);
     const IVStyle loadBtnStyle = DEFAULT_STYLE
       .WithColor(kFG, kColorDarkGrey)
@@ -144,10 +148,15 @@ RVRSE::RVRSE(const InstanceInfo& info)
         });
     }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
 
-    // Sample name display
-    const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f);
+    // Sample name: top-right area
+    const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
     pGraphics->AttachControl(new ITextControl(sampleBounds, "No sample loaded",
-      IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Far)), kCtrlTagSampleName);
+      IText(11, kColorTextSecondary, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagSampleName);
+
+    // BPM display: bottom-right area — updated from ProcessBlock when host tempo changes
+    const IRECT bpmBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromBottom(headerH * 0.4f);
+    pGraphics->AttachControl(new ITextControl(bpmBounds, "BPM: —",
+      IText(11, kColorTextMuted, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagBPMDisplay);
 
     // Version string (footer)
     const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
@@ -186,6 +195,27 @@ RVRSE::RVRSE(const InstanceInfo& info)
   };
 #endif
 }
+
+#if IPLUG_EDITOR
+void RVRSE::OnIdle()
+{
+  // Update BPM display when host tempo changes
+  if (GetUI() && std::abs(mLastBPM - mLastDisplayedBPM) > 0.01)
+  {
+    mLastDisplayedBPM = mLastBPM;
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagBPMDisplay))
+    {
+      WDL_String bpmStr;
+      if (mLastBPM > 0.0)
+        bpmStr.SetFormatted(32, "BPM: %.1f", mLastBPM);
+      else
+        bpmStr.Set("BPM: —");
+      pCtrl->As<ITextControl>()->SetStr(bpmStr.Get());
+      pCtrl->SetDirty(false);
+    }
+  }
+}
+#endif
 
 void RVRSE::LoadSampleFromFile(const char* filePath)
 {

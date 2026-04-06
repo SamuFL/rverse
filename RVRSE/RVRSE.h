@@ -40,6 +40,8 @@ enum ECtrlTags
   kCtrlTagFooterPanel,
   // Footer
   kCtrlTagVersionNumber,
+  // BPM display
+  kCtrlTagBPMDisplay,
   kNumCtrlTags
 };
 
@@ -56,6 +58,7 @@ public:
 
 #if IPLUG_EDITOR
   bool OnHostRequestingSupportedViewConfiguration(int width, int height) override { return true; }
+  void OnIdle() override;
 #endif
   
 #if IPLUG_DSP
@@ -107,6 +110,7 @@ private:
   // --- Offline pipeline ---
   rvrse::RvrseProcessor mProcessor;   ///< Offline pipeline orchestrator (reverb → reverse → stretch)
   double mLastBPM = 0.0;              ///< Last BPM sent to the processor (avoids redundant calls)
+  double mLastDisplayedBPM = -1.0;    ///< Last BPM shown in GUI (avoids redundant UI updates)
   float mLastLush = -1.0f;            ///< Last Lush value sent to processor
   double mLastRiserLength = -1.0;     ///< Last Riser Length sent to processor
   int mLastStretchQuality = -1;       ///< Last Stretch Quality sent to processor
