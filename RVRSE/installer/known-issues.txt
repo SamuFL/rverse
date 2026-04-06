@@ -1,4 +1,4 @@
-RVRSE changelog
-www.acmeinc.com
+RVRSE known issues
+https://samufl.com
 
-00/00/00 - v1.00 initial release
+For the latest issues, see: https://github.com/SamuFL/rverse/issues

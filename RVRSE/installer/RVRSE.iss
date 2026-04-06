@@ -1,11 +1,11 @@
 [Setup]
 AppName=RVRSE
-AppContact=spam@spam.com
-AppCopyright=Copyright (C) 2025 MANUFACTURER
-AppPublisher=MANUFACTURER
-AppPublisherURL=http://www.spam.com
-AppSupportURL=http://www.spam.com
-AppVersion=0.0.0
+AppContact=info@samufl.com
+AppCopyright=Copyright (C) 2026 SamuFL
+AppPublisher=SamuFL
+AppPublisherURL=https://samufl.com
+AppSupportURL=https://github.com/SamuFL/rverse/issues
+AppVersion=0.1.0
 VersionInfoVersion=1.0.0
 DefaultDirName={pf}\RVRSE
 DefaultGroupName=RVRSE

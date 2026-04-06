@@ -10,7 +10,7 @@
 			<key>factoryFunction</key>
 			<string>RVRSE_Factory</string>
 			<key>manufacturer</key>
-			<string>Acme</string>
+			<string>SmFL</string>
 			<key>name</key>
 			<string>SamuFL: RVRSE</string>
 			<key>sandboxSafe</key>
@@ -20,17 +20,17 @@
 			<key>type</key>
 			<string>aufx</string>
 			<key>version</key>
-			<integer>0</integer>
+			<integer>256</integer>
 		</dict>
 	</array>
 	<key>AudioUnit Version</key>
-	<string>0x00000000</string>
+	<string>0x00000100</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
 	<string>RVRSE</string>
 	<key>CFBundleGetInfoString</key>
-	<string>RVRSE v0.0.0 Copyright 2025 Acme Inc</string>
+	<string>RVRSE v0.1.0 Copyright 2026 SamuFL</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.SamuFL.audiounit.RVRSE</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -40,11 +40,11 @@
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.0.0</string>
+	<string>0.1.0</string>
 	<key>CFBundleSignature</key>
 	<string>9c0G</string>
 	<key>CFBundleVersion</key>
-	<string>0.0.0</string>
+	<string>0.1.0</string>
 	<key>CSResourcesFileMapped</key>
 	<true/>
 	<key>LSMinimumSystemVersion</key>
