@@ -93,25 +93,34 @@ public:
   }
 
   /// Set the riser length in beats. Only re-stretches (skips reverb + reverse).
-  void setRiserLength(double beats)
+  /// When offline, performs a synchronous rebuild so bounce/export picks up the
+  /// change immediately. In real-time mode, uses async to avoid blocking audio.
+  void setRiserLength(double beats, bool offline = false)
   {
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       if (std::abs(mRiserLengthBeats - beats) < 1e-9) return;
       mRiserLengthBeats = beats;
     }
-    rebuildAsync(EPipelineStage::Stretch);
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   /// Set the host BPM. Only re-stretches.
-  void setBPM(double bpm)
+  /// Same offline/real-time branching as setRiserLength.
+  void setBPM(double bpm, bool offline = false)
   {
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       if (std::abs(mBPM - bpm) < 1e-9) return;
       mBPM = bpm;
     }
-    rebuildAsync(EPipelineStage::Stretch);
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   /// Set the output sample rate. Triggers full rebuild if changed.
@@ -127,6 +136,20 @@ public:
       mCachedReverbedR.clear();
     }
     rebuildAsync(EPipelineStage::Reverb);
+  }
+
+  /// Set the stretch quality preset. Triggers stretch rebuild if changed.
+  void setStretchQuality(EStretchQuality quality, bool offline = false)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      if (mStretchQuality == quality) return;
+      mStretchQuality = quality;
+    }
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   // --- Audio-thread-safe polling ---
@@ -166,6 +189,74 @@ private:
     }).detach();
   }
 
+  /// Perform a stretch-only rebuild synchronously on the calling thread.
+  /// Falls back to async if cached reversed buffers aren't available yet
+  /// (i.e. the initial reverb+reverse pass hasn't completed).
+  ///
+  /// Only called during offline/bounce rendering where real-time deadlines
+  /// don't apply. Never call this during real-time playback.
+  void rebuildStretchSync()
+  {
+    // Invalidate in-flight builds and capture our generation token
+    const int myGen = mGeneration.fetch_add(1, std::memory_order_release) + 1;
+
+    // Snapshot parameters under lock
+    std::shared_ptr<SampleData> sample;
+    double riserLengthBeats, bpm, sampleRate;
+    EStretchQuality quality;
+    std::vector<float> cachedRevL, cachedRevR;
+    std::vector<float> cachedRvbL, cachedRvbR;
+
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      sample = mSourceSample;
+      riserLengthBeats = mRiserLengthBeats;
+      bpm = mBPM;
+      sampleRate = mOutputSampleRate;
+      quality = mStretchQuality;
+      cachedRevL = mCachedReversedL;
+      cachedRevR = mCachedReversedR;
+      cachedRvbL = mCachedReverbedL;
+      cachedRvbR = mCachedReverbedR;
+    }
+
+    // No cached buffers yet — fall back to async (first load still in progress)
+    if (cachedRevL.empty() || !sample || !sample->IsLoaded())
+    {
+      rebuildAsync(EPipelineStage::Stretch);
+      return;
+    }
+
+    // --- Synchronous stretch ---
+    const double stretchFactor = calcStretchFactor(
+      static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate
+    );
+
+    auto riser = std::make_shared<RiserData>();
+    stretchBufferStereo(cachedRevL, cachedRevR, stretchFactor,
+                        riser->mLeft, riser->mRight, sampleRate, quality);
+    riser->mSampleRate = sampleRate;
+
+    riser->mReverbedL = std::move(cachedRvbL);
+    riser->mReverbedR = std::move(cachedRvbR);
+    riser->mReversedL = std::move(cachedRevL);
+    riser->mReversedR = std::move(cachedRevR);
+
+    // Tail fade-out
+    if (kRiserTailFadeBeats > 0.0)
+    {
+      const double samplesPerBeat = (sampleRate * 60.0) / bpm;
+      const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * kRiserTailFadeBeats));
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+    }
+
+    // Only publish if no newer rebuild has been requested
+    if (mGeneration.load(std::memory_order_acquire) != myGen) return;
+
+    std::atomic_store(&mRiserOutput, riser);
+    mNewRiserReady.store(true, std::memory_order_release);
+  }
+
   /// Execute the pipeline synchronously (called on background thread).
   void runPipeline(EPipelineStage fromStage, int generation)
   {
@@ -175,6 +266,7 @@ private:
     std::shared_ptr<SampleData> sample;
     float lush;
     double riserLengthBeats, bpm, sampleRate;
+    EStretchQuality quality;
     std::vector<float> cachedRevL, cachedRevR;
     std::vector<float> cachedRvbL, cachedRvbR;
 
@@ -185,6 +277,7 @@ private:
       riserLengthBeats = mRiserLengthBeats;
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
+      quality = mStretchQuality;
 
       if (fromStage == EPipelineStage::Stretch)
       {
@@ -309,7 +402,7 @@ private:
 
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(reversedL, reversedR, stretchFactor,
-                        riser->mLeft, riser->mRight);
+                        riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
 
     // Store intermediate buffers for debug playback
@@ -349,6 +442,7 @@ private:
   double mRiserLengthBeats = kRiserLengthDefault;
   double mBPM = kDefaultBPM;
   double mOutputSampleRate = 44100.0;
+  EStretchQuality mStretchQuality = static_cast<EStretchQuality>(kStretchQualityDefault);
 
   // --- Cached intermediate buffers (protected by mParamMutex) ---
   std::vector<float> mCachedReversedL;

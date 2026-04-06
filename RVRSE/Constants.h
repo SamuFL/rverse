@@ -71,8 +71,18 @@ constexpr float kReverbMinDamping    = 0.2f;    ///< Comb LP damping at Lush = 0
 constexpr float kReverbMaxDamping    = 0.5f;    ///< Comb LP damping at Lush = 1
 constexpr float kReverbAllpassGain   = 0.5f;    ///< Allpass feedback coefficient
 
-// --- Time-Stretching (OLA) ---
-constexpr int   kOlaWindowSize       = 2048;    ///< OLA analysis/synthesis window size in samples
+// --- Time-Stretching (signalsmith-stretch) ---
+// Quality preset selection for the spectral stretcher.
+// High = presetDefault (larger FFT, more overlap, better transients)
+// Low  = presetCheaper (smaller FFT, wider hop, ~2x faster)
+enum EStretchQuality
+{
+  kStretchQualityHigh = 0,  ///< Best quality — recommended for rendering/mixdown
+  kStretchQualityLow  = 1   ///< Faster — for real-time tweaking or resource-limited systems
+};
+
+constexpr int kNumStretchQualities = 2;
+constexpr int kStretchQualityDefault = kStretchQualityHigh;
 
 // --- Riser Tail Fade-Out ---
 /// Fraction of a beat used for the riser tail fade-out (BPM-adaptive).

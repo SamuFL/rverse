@@ -41,6 +41,7 @@ Run these tests manually after every change to the DSP pipeline or plugin behavi
 | 7 | Riser Volume    | -60 to +6       | 0         | dB    | 0.1   |
 | 8 | Hit Volume      | -60 to +6       | 0         | dB    | 0.1   |
 | 9 | Debug Stage     | Normal / Reverbed / Reversed / Riser Only | Normal | — | enum |
+| 10 | Stretch Quality | High / Low | High | — | enum |
 
 ---
 
@@ -308,6 +309,76 @@ pipeline buffers, allowing isolation of each processing stage for diagnostics.
 - [ ] Reverbed and Reversed modes play without fade-in or stutter processing
 - [ ] Riser Only mode plays with full processing chain (fade-in, stutter, volume)
 - [ ] No clicks or crashes when switching debug stages during playback
+
+---
+
+## Test Scenario 6a — Stretch Quality Parameter
+
+**Goal:** Verify that the Stretch Quality parameter switches between High and Low
+quality modes and triggers a re-stretch when changed.
+
+> **Usage hint:** Default to High for mixing/rendering. Switch to Low when
+> iterating on riser length in real-time or on resource-constrained systems.
+
+### Pre-condition
+
+- Sample loaded and riser generated (Scenario 1 passing)
+- DAW tempo set to 120 BPM, Riser Length = 8 beats (long stretch to make quality difference audible)
+
+### Tests
+
+#### 6a.1 — High quality (default)
+- Verify **Stretch Quality = High** is the default.
+- Trigger note → listen to riser. Note tonal quality and detail in the reverb tail.
+- The riser should sound smooth with no obvious metallic or phasey artefacts.
+
+#### 6a.2 — Low quality
+- Switch **Stretch Quality = Low**.
+- Wait for re-stretch to complete (processing indicator, if visible).
+- Trigger note → compare with 6a.1.
+- Low should be audibly different (slightly less defined) but still musically usable.
+
+#### 6a.3 — Re-stretch on change
+- With riser playing, switch between High and Low.
+- The riser should re-generate after each switch.
+- Next note-on should play the newly generated riser.
+
+#### 6a.4 — Offline bounce respects quality
+- Set **Stretch Quality = High**. Bounce MIDI track to audio.
+- Set **Stretch Quality = Low**. Bounce again.
+- Compare bounced audio — should hear the same quality difference as real-time A/B.
+
+### Pass Criteria
+
+- [ ] High is the default stretch quality
+- [ ] Switching quality triggers a re-stretch
+- [ ] A/B quality difference is audible on long stretch ratios (≥ 4 beats)
+- [ ] Offline bounce respects the selected quality setting
+- [ ] No clicks, crashes, or stale buffers when switching quality
+
+---
+
+## Test Scenario 6b — Offline Bounce Automation
+
+**Goal:** Verify that riser length automation is respected during offline bounce/export.
+
+### Pre-condition
+
+- Sample loaded and riser generated
+- DAW supports offline bounce with automation
+
+### Tests
+
+#### 6b.1 — Varying riser length during bounce
+- Create automation: riser length 2 beats at bar 1, 8 beats at bar 5, 4 beats at bar 9.
+- Place MIDI note-on events at each bar.
+- Bounce the track offline.
+- Verify each note in the bounced audio uses the correct riser length.
+
+### Pass Criteria
+
+- [ ] Each note in the bounce uses the riser length active at that point in automation
+- [ ] No notes use a stale/previous riser length
 
 ---
 

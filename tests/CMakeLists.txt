@@ -24,6 +24,7 @@ add_executable(rvrse_tests
   test_sample_loader.cpp
   ${CMAKE_SOURCE_DIR}/RVRSE/SampleLoader.cpp
   ${CMAKE_SOURCE_DIR}/RVRSE/dr_libs_impl.cpp
+  ${CMAKE_SOURCE_DIR}/RVRSE/TimeStretch.cpp
 )
 
 target_compile_features(rvrse_tests PRIVATE cxx_std_17)
@@ -33,7 +34,16 @@ target_include_directories(rvrse_tests PRIVATE
   ${CMAKE_SOURCE_DIR}/RVRSE/libs/dr_libs  # dr_wav.h (for SampleLoader tests later)
 )
 
-target_link_libraries(rvrse_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(rvrse_tests PRIVATE Catch2::Catch2WithMain signalsmith-stretch)
+
+# Spectral stretcher FFT is orders of magnitude slower at -O0.
+# Force -O2 for TimeStretch.cpp even in Debug test builds.
+# MSVC Debug: skipped (see RVRSE/CMakeLists.txt for rationale).
+if(NOT MSVC)
+  set_source_files_properties(${CMAKE_SOURCE_DIR}/RVRSE/TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
+    "$<$<CONFIG:Debug>:-O2>"
+  )
+endif()
 
 # Register with CTest so `ctest` discovers and runs the tests
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)

@@ -34,6 +34,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
   GetParam(kParamDebugStage)->InitEnum("Debug Stage", rvrse::kDebugNormal, {
     "Normal", "Reverbed", "Reversed", "Riser Only"
   });
+  GetParam(kParamStretchQuality)->InitEnum("Stretch Quality", rvrse::kStretchQualityDefault, {
+    "High", "Low"
+  });
 
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
@@ -299,15 +302,18 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const float hitVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);
   const auto debugStage = static_cast<rvrse::EDebugStage>(
     static_cast<int>(GetParam(kParamDebugStage)->Value()));
+  const auto stretchQuality = static_cast<rvrse::EStretchQuality>(
+    static_cast<int>(GetParam(kParamStretchQuality)->Value()));
   const double sr = GetSampleRate();
 
   // Read host BPM and propagate to the offline pipeline when it changes.
   // GetTempo() reads from the host-provided ITimeInfo (populated each block).
   const double hostBPM = GetTempo();
+  const bool offline = GetRenderingOffline();
   if (hostBPM > 0.0 && std::abs(hostBPM - mLastBPM) > 0.01)
   {
     mLastBPM = hostBPM;
-    mProcessor.setBPM(hostBPM);
+    mProcessor.setBPM(hostBPM, offline);
   }
 
   // Propagate Lush to the offline processor (triggers reverb rebuild)
@@ -317,11 +323,19 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mProcessor.setLush(lush);
   }
 
-  // Propagate Riser Length to the offline processor (triggers stretch rebuild)
+  // Propagate Riser Length to the offline processor (triggers stretch rebuild).
+  // Pass offline flag so the processor uses synchronous stretch during bounce.
   if (std::abs(riserLengthBeats - mLastRiserLength) > 1e-6)
   {
     mLastRiserLength = riserLengthBeats;
-    mProcessor.setRiserLength(riserLengthBeats);
+    mProcessor.setRiserLength(riserLengthBeats, offline);
+  }
+
+  // Propagate Stretch Quality (triggers stretch rebuild if changed)
+  if (stretchQuality != mLastStretchQuality)
+  {
+    mLastStretchQuality = stretchQuality;
+    mProcessor.setStretchQuality(stretchQuality, offline);
   }
 
   // Check if a new sample is ready from the loader thread (lock-free flag)

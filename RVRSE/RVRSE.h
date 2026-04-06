@@ -22,6 +22,7 @@ enum EParams
   kParamRiserVolume,
   kParamHitVolume,
   kParamDebugStage,
+  kParamStretchQuality,
   kNumParams
 };
 
@@ -99,6 +100,7 @@ private:
   double mLastBPM = 0.0;              ///< Last BPM sent to the processor (avoids redundant calls)
   float mLastLush = -1.0f;            ///< Last Lush value sent to processor
   double mLastRiserLength = -1.0;     ///< Last Riser Length sent to processor
+  int mLastStretchQuality = -1;       ///< Last Stretch Quality sent to processor
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
   std::shared_ptr<rvrse::RiserData> mRiserBuffer;

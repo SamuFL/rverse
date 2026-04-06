@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Stretch Quality parameter (High / Low) — defaults to High for best audio quality; Low mode (~2× faster) available for real-time tweaking or resource-limited systems (rverse-g4j)
+
+### Changed
+- Replaced OLA time-stretcher with signalsmith-stretch (MIT, spectral, polyphonic-aware) for significantly better audio quality at all stretch ratios — transient smearing at riser end eliminated (rverse-g4j)
+- Stretch-only rebuilds (riser length, BPM changes) run synchronously during offline/bounce rendering so automation is respected immediately; async during real-time playback (rverse-g4j)
+
+### Fixed
+- Plugin GUI crash (SIGABRT in NanoVG font rendering) caused by missing font resource in deployed VST3/AU bundles — switched macOS non-Xcode deployment from COPY to SYMLINK to avoid iPlug2 resource bundling race condition (pre-existing bug)
+
+### Added
 - Persist loaded sample path across DAW sessions — save/restore via `SerializeState`/`UnserializeState` with versioned chunk format. Shows "Missing: filename" if file is gone on reload. (rverse-7dr)
 - GitHub Actions CI: macOS (Apple Silicon, Ninja) + Windows (VS2022) — builds all plugin formats and runs 42 unit tests on pushes to develop/main and PRs targeting them (rverse-lxg)
 - Expose 5 new DAW-automatable parameters via generic editor: Lush (0–100%), Riser Length (0.25–16 beats), Fade In (0–100%), Riser Volume (-60 to +6 dB), Hit Volume (-60 to +6 dB) (rverse-nqg)

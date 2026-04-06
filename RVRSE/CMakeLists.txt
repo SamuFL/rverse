@@ -14,6 +14,7 @@ iplug_add_plugin(${PROJECT_NAME}
     SampleData.h
     SampleLoader.h
     SampleLoader.cpp
+    TimeStretch.cpp
     dr_libs_impl.cpp
     resources/resource.h
   RESOURCES
@@ -22,7 +23,20 @@ iplug_add_plugin(${PROJECT_NAME}
     MINIMAL_PLUGINS APP
 )
 
+# Spectral stretcher FFT is orders of magnitude slower at -O0.
+# Force -O2 for TimeStretch.cpp even in Debug builds.
+# MSVC Debug: skipped — /O2 conflicts with /RTC1 (runtime checks) and there's no
+# clean per-file way to remove it. Release builds already use /O2 on all compilers.
+if(NOT MSVC)
+  set_source_files_properties(TimeStretch.cpp PROPERTIES COMPILE_OPTIONS
+    "$<$<CONFIG:Debug>:-O2>"
+  )
+endif()
+
 # dr_libs headers live in RVRSE/libs/dr_libs
 target_include_directories(_${PROJECT_NAME}-base INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/dr_libs
 )
+
+# signalsmith-stretch: spectral time-stretcher (fetched in top-level CMakeLists)
+target_link_libraries(_${PROJECT_NAME}-base INTERFACE signalsmith-stretch)

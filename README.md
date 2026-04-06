@@ -130,7 +130,7 @@ Every source file belongs to exactly one layer:
 | `SampleLoader.h/.cpp` | **Offline** | Stateless `LoadSample()` — reads WAV/AIFF from disk via dr_wav |
 | `Reverb.h` | **Offline** | Schroeder/Moorer reverb (8 comb filters + 4 allpass filters) |
 | `BufferUtils.h` | **Offline** | `reverseBuffer`, `resampleLinear`, `applyTailFadeOut` |
-| `TimeStretch.h` | **Offline** | OLA time-stretcher with Hann windowing |
+| `TimeStretch.h` | **Offline** | Spectral time-stretcher (signalsmith-stretch, MIT) |
 | `RvrseProcessor.h` | **Offline** | Pipeline orchestrator — chains all offline stages |
 | `Stutter.h` | **Real-Time** | Per-sample trapezoidal gate with continuous Hz rate (audio thread only, MIDI CC responsive) |
 | `RVRSE.h` | **Both** | Main plugin class — owns all state, bridges offline ↔ real-time |
@@ -206,9 +206,9 @@ Cache reversed buffers ★             [Optimisation: skip reverb on BPM-only ch
 Reverse the buffer                   [reverseBufferStereo — BufferUtils.h]
     │
     ▼
-Time-stretch via OLA                 [stretchBufferStereo — TimeStretch.h]
+Time-stretch (spectral)               [stretchBufferStereo — TimeStretch.h]
     Target length = riserLengthBeats × (60 / BPM) × sampleRate
-    Hann window, 50% overlap
+    signalsmith-stretch: polyphonic, transient-aware
     │
     ▼
 Tail fade-out                        [applyTailFadeOutStereo — BufferUtils.h]
@@ -289,9 +289,13 @@ git submodule update --init --recursive
 ### Build (macOS)
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DIPLUG_DEPLOY_METHOD=SYMLINK
 cmake --build build
 ```
+
+> **Note:** Use `-DIPLUG_DEPLOY_METHOD=SYMLINK` on macOS with non-Xcode generators
+> (Make, Ninja) to avoid a resource deployment race condition. Symlink mode lets
+> the DAW read directly from the build output where resources are bundled correctly.
 
 ### Build (Windows)
 
@@ -377,6 +381,7 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 | Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1) |
 | Stutter Depth | 0–1 | 0.5 | Gate depth (also via MIDI CC11) |
 | Debug Stage | Normal / Reverbed / Reversed / Riser Only | Normal | Diagnostic: audition intermediate pipeline buffers |
+| Stretch Quality | High / Low | High | High = best quality (larger FFT), Low = faster (~2×) for real-time tweaking |
 
 ### Current Limitations
 
@@ -384,7 +389,6 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 - No preset system.
 - No pitch shift (planned).
 - Single-voice only — overlapping notes cut the previous voice.
-- OLA time-stretcher may introduce pitch artefacts at large stretch ratios (known issue, improvement tracked).
 
 ---
 
@@ -400,7 +404,7 @@ rverse/
 │   ├── SampleLoader.h / .cpp # Audio file loading (dr_wav)
 │   ├── Reverb.h              # Schroeder/Moorer reverb
 │   ├── BufferUtils.h         # Buffer utilities (reverse, resample, fade)
-│   ├── TimeStretch.h         # OLA time-stretcher
+│   ├── TimeStretch.h         # Spectral time-stretcher (signalsmith-stretch)
 │   ├── RvrseProcessor.h      # Offline pipeline orchestrator
 │   ├── Stutter.h             # Real-time stutter gate (audio thread only)
 │   ├── dr_libs_impl.cpp      # dr_wav implementation unit
@@ -415,7 +419,7 @@ rverse/
 │   ├── test_constants.cpp    # Constants.h relational invariants
 │   ├── test_buffer_utils.cpp # Reverse, resample, fade, trim
 │   ├── test_reverb.cpp       # Schroeder reverb properties
-│   ├── test_time_stretch.cpp # OLA stretcher factors + edge cases
+│   ├── test_time_stretch.cpp # Spectral stretcher factors + edge cases
 │   ├── test_stutter.cpp      # Gate symmetry, convergence, phase
 │   └── test_sample_loader.cpp# WAV loading, deinterleave, error handling
 ├── RVRSE_BRIEF.md            # Full product specification
@@ -446,7 +450,7 @@ the full dependency tree.
 |-------|----------|-------------|--------|
 | `rverse-nqg` | P1 | Expose DSP params (Lush, Riser Length, Fade In, Riser Volume, Hit Volume) | ✅ Done (PR #5) |
 | `rverse-l9x` | P1 | Debug playback mode — expose intermediate pipeline buffers | ✅ Done (in PR #5) |
-| `rverse-g4j` | P1 | Upgrade OLA time-stretcher to phase vocoder or WSOLA | Open |
+| `rverse-g4j` | P1 | Upgrade time-stretcher to signalsmith-stretch (spectral) | ✅ Done (PR #8) |
 | `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | Blocked by `rverse-nqg` |
 | `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | Open |
 | `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | ✅ Done (PR #6) |
