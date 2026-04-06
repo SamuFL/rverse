@@ -28,10 +28,43 @@ enum EParams
 
 enum ECtrlTags
 {
-  kCtrlTagVersionNumber = 0,
-  kCtrlTagTitle,
+  // Header
+  kCtrlTagTitle = 0,
   kCtrlTagLoadButton,
-  kCtrlTagSampleName
+  kCtrlTagSampleName,
+  // Zone panels (backgrounds)
+  kCtrlTagHeaderPanel,
+  kCtrlTagWaveformPanel,
+  kCtrlTagRiserPanel,
+  kCtrlTagHitPanel,
+  kCtrlTagFooterPanel,
+  // Footer
+  kCtrlTagVersionNumber,
+  kCtrlTagMasterVolSlider,
+  kCtrlTagMidiIndicator,
+  // BPM display
+  kCtrlTagBPMDisplay,
+  // Riser panel knobs
+  kCtrlTagStutterRate,
+  kCtrlTagStutterDepth,
+  kCtrlTagRiserSectionLabel,
+  // Riser offline knobs
+  kCtrlTagLush,
+  kCtrlTagRiserLength,
+  kCtrlTagFadeIn,
+  kCtrlTagRiserVolume,
+  kCtrlTagStretchQuality,
+  kCtrlTagOfflineSectionLabel,
+  // Hit panel
+  kCtrlTagHitSectionLabel,
+  kCtrlTagHitVolume,
+  kCtrlTagSupportButton,
+  kCtrlTagLogo,
+  kCtrlTagMasterVolLabel,
+  kCtrlTagMasterVolValue,
+  kCtrlTagWaveformDisplay,
+  kCtrlTagHitPreview,
+  kNumCtrlTags
 };
 
 using namespace iplug;
@@ -47,6 +80,7 @@ public:
 
 #if IPLUG_EDITOR
   bool OnHostRequestingSupportedViewConfiguration(int width, int height) override { return true; }
+  void OnIdle() override;
 #endif
   
 #if IPLUG_DSP
@@ -82,11 +116,7 @@ private:
   IMidiQueue mMidiQueue;       ///< Sample-accurate MIDI message queue
   float mVelocityGain = 1.0f;  ///< Velocity-scaled gain for current note (0.0–1.0)
 
-  // --- Riser voice ---
-  int mRiserPos = -1;          ///< Current playback position in riser buffer (-1 = not playing)
-
   // --- Hit voice ---
-  int mHitPos = -1;            ///< Current playback position in hit sample (-1 = not playing)
   int mHitOffset = -1;         ///< Sample offset at which hit fires (riser length in samples)
   int mSamplesFromNoteOn = -1; ///< Counter from note-on to trigger hit at mHitOffset
 
@@ -97,14 +127,33 @@ private:
 
   // --- Offline pipeline ---
   rvrse::RvrseProcessor mProcessor;   ///< Offline pipeline orchestrator (reverb → reverse → stretch)
-  double mLastBPM = 0.0;              ///< Last BPM sent to the processor (avoids redundant calls)
+  std::atomic<double> mLastBPM { 0.0 };  ///< Last BPM from host (written by audio thread, read by UI)
+  double mLastDisplayedBPM = -1.0;    ///< Last BPM shown in GUI (avoids redundant UI updates)
   float mLastLush = -1.0f;            ///< Last Lush value sent to processor
   double mLastRiserLength = -1.0;     ///< Last Riser Length sent to processor
   int mLastStretchQuality = -1;       ///< Last Stretch Quality sent to processor
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
+  /// NOTE: shared_ptr read/write across threads is technically a data race in C++17.
+  /// In practice, swaps happen once per ProcessBlock and reads once per UI frame,
+  /// making collision vanishingly unlikely on aligned pointer stores (x86/ARM64).
+  /// A fully correct fix requires C++20 std::atomic<shared_ptr> or a mutex snapshot.
   std::shared_ptr<rvrse::RiserData> mRiserBuffer;
+
+  // --- Playback positions (audio thread writes, UI thread reads for playhead) ---
+  std::atomic<int> mRiserPos { -1 };  ///< Current playback position in riser buffer (-1 = not playing)
+  std::atomic<int> mHitPos { -1 };    ///< Current playback position in hit sample (-1 = not playing)
+
+  // --- Waveform display state (UI thread only) ---
+  std::shared_ptr<rvrse::RiserData> mWaveformLastRiser; ///< Last riser pointer fed to waveform
+  std::shared_ptr<rvrse::SampleData> mWaveformLastHit;  ///< Last hit pointer fed to waveform
+  std::vector<float> mWaveformMonoBuf; ///< Temp buffer for stereo→mono mix
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state
+
+  // --- MIDI activity indicator ---
+  std::atomic<int> mMidiActivityCounter { 0 }; ///< Incremented by audio thread on any MIDI event
+  int mMidiLastSeenCounter = 0;                ///< UI thread's last seen counter value
+  int mMidiCooldownFrames = 0;                 ///< OnIdle frames remaining before dimming
 };

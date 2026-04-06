@@ -439,7 +439,7 @@ private:
   std::mutex mParamMutex;
   std::shared_ptr<SampleData> mSourceSample;
   float mLush = static_cast<float>(kLushDefault / 100.0);
-  double mRiserLengthBeats = kRiserLengthDefault;
+  double mRiserLengthBeats = kRiserLengthValues[kRiserLengthDefault];
   double mBPM = kDefaultBPM;
   double mOutputSampleRate = 44100.0;
   EStretchQuality mStretchQuality = static_cast<EStretchQuality>(kStretchQualityDefault);

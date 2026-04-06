@@ -36,7 +36,7 @@ Run these tests manually after every change to the DSP pipeline or plugin behavi
 | 2 | Stutter Rate    | 0–30            | 0 (off)   | Hz    | 0.1   |
 | 3 | Stutter Depth   | 0–1             | 0.5       |       | 0.01  |
 | 4 | Lush            | 0–100           | 40        | %     | 0.1   |
-| 5 | Riser Length     | 0.25–16         | 4         | beats | 0.25  |
+| 5 | Riser Length     | 1/4–16 (discrete) | 4 | beats | —     |
 | 6 | Fade In         | 0–100           | 60        | %     | 0.1   |
 | 7 | Riser Volume    | -60 to +6       | 0         | dB    | 0.1   |
 | 8 | Hit Volume      | -60 to +6       | 0         | dB    | 0.1   |
@@ -116,13 +116,16 @@ otherwise stated.
 
 ### 2.3 Riser Length
 
+Riser Length is a **discrete** parameter. Only the following musical values are valid:
+1/4, 1/2, 1, 2, 4, 8, 16 beats. No intermediate values.
+
 | Test | Value | BPM | Expected Riser Duration |
 |------|-------|-----|------------------------|
 | 2.3a | 4 beats (default) | 120 | ~2 seconds |
 | 2.3b | 1 beat | 120 | ~0.5 seconds |
 | 2.3c | 8 beats | 120 | ~4 seconds |
 | 2.3d | 16 beats | 120 | ~8 seconds |
-| 2.3e | 0.25 beats | 120 | ~0.125 seconds (very short burst before hit) |
+| 2.3e | 1/4 beat | 120 | ~0.125 seconds (very short burst before hit) |
 | 2.3f | 4 beats | 60 | ~4 seconds (half the BPM = double the duration) |
 | 2.3g | 4 beats | 180 | ~1.33 seconds (faster BPM = shorter duration) |
 

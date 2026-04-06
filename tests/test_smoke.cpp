@@ -30,8 +30,8 @@ TEST_CASE("Smoke: Constants are sane", "[smoke]")
   REQUIRE(rvrse::kStutterRateMinHz == 0.0);
   REQUIRE(rvrse::kStutterRateMaxHz > rvrse::kStutterRateMinHz);
   REQUIRE(rvrse::kStutterFadeMs > 0.0);
-  REQUIRE(rvrse::kRiserLengthDefault >= rvrse::kRiserLengthMin);
-  REQUIRE(rvrse::kRiserLengthDefault <= rvrse::kRiserLengthMax);
+  REQUIRE(rvrse::kRiserLengthDefault >= 0);
+  REQUIRE(rvrse::kRiserLengthDefault < rvrse::kNumRiserLengths);
 }
 
 TEST_CASE("Smoke: reverseBuffer round-trips", "[smoke]")

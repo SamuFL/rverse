@@ -14,11 +14,16 @@ iplug_add_plugin(${PROJECT_NAME}
     SampleData.h
     SampleLoader.h
     SampleLoader.cpp
+    WaveformControl.h
     TimeStretch.cpp
     dr_libs_impl.cpp
     resources/resource.h
   RESOURCES
     resources/fonts/Roboto-Regular.ttf
+    resources/fonts/Roboto-Bold.ttf
+    resources/img/logo.png
+    resources/img/logo@2x.png
+    resources/img/logo@3x.png
   FORMATS
     MINIMAL_PLUGINS APP
 )

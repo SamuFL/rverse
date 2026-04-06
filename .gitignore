@@ -41,3 +41,4 @@ Makefile
 # iPlug2 dependencies (downloaded at build time)
 iPlug2/Dependencies/Build/
 iPlug2/Dependencies/IPlug/
+.agents/

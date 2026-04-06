@@ -9,11 +9,16 @@ using namespace rvrse;
 
 TEST_CASE("Constants: relational invariants", "[constants]")
 {
-  SECTION("Riser length range")
+  SECTION("Riser length discrete values")
   {
-    REQUIRE(kRiserLengthMin > 0.0);
-    REQUIRE(kRiserLengthMin <= kRiserLengthDefault);
-    REQUIRE(kRiserLengthDefault <= kRiserLengthMax);
+    REQUIRE(kNumRiserLengths == 7);
+    REQUIRE(kRiserLengthDefault >= 0);
+    REQUIRE(kRiserLengthDefault < kNumRiserLengths);
+    REQUIRE(kRiserLengthValues[0] == 0.25);
+    REQUIRE(kRiserLengthValues[kNumRiserLengths - 1] == 16.0);
+    // Values must be strictly increasing
+    for (int i = 1; i < kNumRiserLengths; ++i)
+      REQUIRE(kRiserLengthValues[i] > kRiserLengthValues[i - 1]);
   }
 
   SECTION("Stutter rate range")

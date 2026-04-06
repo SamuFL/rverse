@@ -15,10 +15,32 @@ constexpr int CC_STUTTER_RATE  = 1;   ///< Mod wheel → Stutter Rate
 constexpr int CC_STUTTER_DEPTH = 11;  ///< Expression pedal → Stutter Depth
 constexpr int CC_RISER_TUNE    = 2;   ///< Breath controller → Riser Tune
 
-// --- Riser Length musical values (in beats) ---
-constexpr double kRiserLengthMin     = 0.25;   ///< 1/4 beat
-constexpr double kRiserLengthMax     = 16.0;   ///< 16 beats
-constexpr double kRiserLengthDefault = 4.0;    ///< 4 beats
+// --- Riser Length discrete values (in beats) ---
+/// Riser length is a discrete parameter with musically meaningful values.
+/// The enum index is stored/serialized; use kRiserLengthValues[] to get beats.
+enum ERiserLength
+{
+  kRiserLen_1_4  = 0, ///< 1/4 beat
+  kRiserLen_1_2  = 1, ///< 1/2 beat
+  kRiserLen_1    = 2, ///< 1 beat
+  kRiserLen_2    = 3, ///< 2 beats
+  kRiserLen_4    = 4, ///< 4 beats
+  kRiserLen_8    = 5, ///< 8 beats
+  kRiserLen_16   = 6  ///< 16 beats
+};
+
+constexpr int kNumRiserLengths = 7;
+constexpr int kRiserLengthDefault = kRiserLen_4;  ///< Default: 4 beats
+
+/// Lookup table: enum index → beat value
+constexpr double kRiserLengthValues[kNumRiserLengths] = {
+  0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0
+};
+
+/// Display labels for each riser length value
+constexpr const char* kRiserLengthLabels[kNumRiserLengths] = {
+  "1/4", "1/2", "1", "2", "4", "8", "16"
+};
 
 // --- Parameter defaults ---
 constexpr double kLushDefault        = 40.0;   ///< Reverb wet amount (0–100%)

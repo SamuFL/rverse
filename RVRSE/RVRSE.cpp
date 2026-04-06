@@ -3,6 +3,7 @@
 #include "BufferUtils.h"
 #include "Constants.h"
 #include "SampleLoader.h"
+#include "WaveformControl.h"
 
 #include <algorithm>
 #include <cmath>
@@ -11,6 +12,7 @@
 
 #if IPLUG_EDITOR
 #include "IControls.h"
+#include "GUIColors.h"
 #endif
 
 RVRSE::RVRSE(const InstanceInfo& info)
@@ -23,8 +25,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
     rvrse::kStutterDepthDefault / 100.0, 0., 1.0, 0.01, "");
   GetParam(kParamLush)->InitDouble("Lush",
     rvrse::kLushDefault, 0., 100.0, 0.1, "%");
-  GetParam(kParamRiserLength)->InitDouble("Riser Length",
-    rvrse::kRiserLengthDefault, rvrse::kRiserLengthMin, rvrse::kRiserLengthMax, 0.25, "beats");
+  GetParam(kParamRiserLength)->InitEnum("Riser Length", rvrse::kRiserLengthDefault, {
+    "1/4", "1/2", "1", "2", "4", "8", "16"
+  });
   GetParam(kParamFadeIn)->InitDouble("Fade In",
     rvrse::kFadeInDefault, 0., 100.0, 0.1, "%");
   GetParam(kParamRiserVolume)->InitDouble("Riser Volume",
@@ -44,64 +47,369 @@ RVRSE::RVRSE(const InstanceInfo& info)
   };
   
   mLayoutFunc = [&](IGraphics* pGraphics) {
-    const IRECT bounds = pGraphics->GetBounds();
-    const IRECT innerBounds = bounds.GetPadded(-10.f);
-    const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
-    const IRECT titleBounds = innerBounds.GetCentredInside(300, 60).GetVShifted(-80.f);
-    const IRECT loadBtnBounds = innerBounds.GetCentredInside(200, 40);
-    const IRECT sampleNameBounds = innerBounds.GetCentredInside(600, 24).GetVShifted(40.f);
+    using namespace rvrse::gui;
+    const IRECT b = pGraphics->GetBounds();
+    const float w = b.W();
+    const float h = b.H();
 
+    // ── Scale layout proportions relative to default 1024×620 ──────────
+    const float scaleY = h / 620.f;
+    const float gap      = kZoneGap;
+    // Header and footer never shrink below their design size
+    const float headerH  = std::max(kHeaderHeight, kHeaderHeight * scaleY);
+    const float footerH  = std::max(kFooterHeight, kFooterHeight * scaleY);
+    // Panels need a minimum height for their fixed-layout knobs/labels
+    constexpr float kMinPanelH = 246.f;
+    // At or above default size: waveform scales proportionally.
+    // When shrinking: waveform absorbs squeeze to protect panels.
+    const float fixedH   = headerH + footerH + gap * 4.f;
+    const float proportionalWaveH = kWaveformHeight * scaleY;
+    const float maxWaveH = h - fixedH - kMinPanelH;       // what's left after panels get their min
+    const float waveH    = std::max(40.f, std::min(proportionalWaveH, maxWaveH));
+
+    // ── Zone rects ─────────────────────────────────────────────────────
+    const IRECT headerRect   = b.GetFromTop(headerH);
+    const IRECT footerRect   = b.GetFromBottom(footerH);
+    const IRECT waveformRect = IRECT(b.L + gap, headerRect.B + gap,
+                                     b.R - gap, headerRect.B + gap + waveH);
+    const float panelTop    = waveformRect.B + gap;
+    const float panelBottom = footerRect.T - gap;
+    const float panelMid    = b.L + gap + (w - 2.f * gap) * kRiserPanelPct;
+    const IRECT riserRect   = IRECT(b.L + gap, panelTop, panelMid - gap * 0.5f, panelBottom);
+    const IRECT hitRect     = IRECT(panelMid + gap * 0.5f, panelTop, b.R - gap, panelBottom);
+
+    // ── Resize path — reposition existing controls ─────────────────────
     if (pGraphics->NControls()) {
-      pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
+      pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(b);
+      pGraphics->GetControlWithTag(kCtrlTagHeaderPanel)->SetTargetAndDrawRECTs(headerRect);
+      pGraphics->GetControlWithTag(kCtrlTagWaveformPanel)->SetTargetAndDrawRECTs(waveformRect);
+      pGraphics->GetControlWithTag(kCtrlTagWaveformDisplay)->SetTargetAndDrawRECTs(waveformRect.GetPadded(-6.f));
+      pGraphics->GetControlWithTag(kCtrlTagRiserPanel)->SetTargetAndDrawRECTs(riserRect);
+      pGraphics->GetControlWithTag(kCtrlTagHitPanel)->SetTargetAndDrawRECTs(hitRect);
+      pGraphics->GetControlWithTag(kCtrlTagFooterPanel)->SetTargetAndDrawRECTs(footerRect);
+
+      // Reposition header contents
+      const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f).GetFromTop(headerH * 0.65f);
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
-      pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
+      const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 34.f);
       pGraphics->GetControlWithTag(kCtrlTagLoadButton)->SetTargetAndDrawRECTs(loadBtnBounds);
-      pGraphics->GetControlWithTag(kCtrlTagSampleName)->SetTargetAndDrawRECTs(sampleNameBounds);
+      const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
+      pGraphics->GetControlWithTag(kCtrlTagSampleName)->SetTargetAndDrawRECTs(sampleBounds);
+      const IRECT bpmBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromBottom(headerH * 0.4f);
+      pGraphics->GetControlWithTag(kCtrlTagBPMDisplay)->SetTargetAndDrawRECTs(bpmBounds);
+      const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
+      pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
+      // Footer: master vol slider + MIDI indicator
+      const IRECT masterArea = footerRect.GetPadded(-8.f).GetFromLeft(220.f);
+      const IRECT masterLabelRow = masterArea.GetFromTop(22.f);
+      const IRECT masterSliderBounds = masterArea.GetReducedFromTop(20.f).GetCentredInside(200.f, 24.f);
+      pGraphics->GetControlWithTag(kCtrlTagMasterVolLabel)->SetTargetAndDrawRECTs(masterLabelRow.GetFromLeft(110.f));
+      pGraphics->GetControlWithTag(kCtrlTagMasterVolValue)->SetTargetAndDrawRECTs(masterLabelRow.GetFromRight(110.f));
+      pGraphics->GetControlWithTag(kCtrlTagMasterVolSlider)->SetTargetAndDrawRECTs(masterSliderBounds);
+      const IRECT midiBounds = footerRect.GetPadded(-8.f).GetMidHPadded(30.f);
+      pGraphics->GetControlWithTag(kCtrlTagMidiIndicator)->SetTargetAndDrawRECTs(midiBounds);
+      // Riser panel contents
+      const IRECT riserLabelBounds = riserRect.GetPadded(-8.f).GetFromTop(20.f);
+      pGraphics->GetControlWithTag(kCtrlTagRiserSectionLabel)->SetTargetAndDrawRECTs(riserLabelBounds);
+      const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
+      const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 3).GetCentredInside(95.f, 110.f);
+      pGraphics->GetControlWithTag(kCtrlTagStutterRate)->SetTargetAndDrawRECTs(stutterRateBounds);
+      const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 3).GetCentredInside(95.f, 110.f);
+      pGraphics->GetControlWithTag(kCtrlTagStutterDepth)->SetTargetAndDrawRECTs(stutterDepthBounds);
+      const IRECT riserVolBounds = knobArea.GetGridCell(2, 1, 3).GetCentredInside(95.f, 110.f);
+      pGraphics->GetControlWithTag(kCtrlTagRiserVolume)->SetTargetAndDrawRECTs(riserVolBounds);
+      // Offline section
+      const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(144.f);
+      const IRECT offlineLabelBounds = offlineArea.GetFromTop(18.f);
+      pGraphics->GetControlWithTag(kCtrlTagOfflineSectionLabel)->SetTargetAndDrawRECTs(offlineLabelBounds);
+      const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(80.f);
+      pGraphics->GetControlWithTag(kCtrlTagLush)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(60.f, 80.f));
+      pGraphics->GetControlWithTag(kCtrlTagRiserLength)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(60.f, 80.f));
+      pGraphics->GetControlWithTag(kCtrlTagFadeIn)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(60.f, 80.f));
+      const IRECT stretchBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(90.f, 50.f);
+      pGraphics->GetControlWithTag(kCtrlTagStretchQuality)->SetTargetAndDrawRECTs(stretchBounds);
+      // Hit panel
+      const IRECT hitLabelBounds = hitRect.GetPadded(-8.f).GetFromTop(20.f);
+      pGraphics->GetControlWithTag(kCtrlTagHitSectionLabel)->SetTargetAndDrawRECTs(hitLabelBounds);
+      const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
+      pGraphics->GetControlWithTag(kCtrlTagHitVolume)->SetTargetAndDrawRECTs(
+        hitVolArea.GetCentredInside(95.f, 110.f));
+      const IRECT hitPreviewArea = hitRect.GetPadded(-10.f)
+        .GetReducedFromTop(140.f).GetReducedFromBottom(84.f);
+      pGraphics->GetControlWithTag(kCtrlTagHitPreview)->SetTargetAndDrawRECTs(hitPreviewArea);
+      const IRECT bottomArea = hitRect.GetPadded(-10.f).GetFromBottom(80.f);
+      const IRECT logoArea = bottomArea.GetFromRight(120.f);
+      pGraphics->GetControlWithTag(kCtrlTagLogo)->SetTargetAndDrawRECTs(logoArea);
+      pGraphics->GetControlWithTag(kCtrlTagSupportButton)->SetTargetAndDrawRECTs(
+        bottomArea.GetReducedFromLeft(8.f).GetFromLeft(140.f).GetCentredInside(130.f, 26.f));
       return;
     }
 
+    // ── First-time setup ───────────────────────────────────────────────
     pGraphics->SetLayoutOnResize(true);
     pGraphics->AttachCornerResizer(EUIResizerMode::Size, true);
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
-    pGraphics->AttachPanelBackground(COLOR_DARK_GRAY);
+    pGraphics->LoadFont("Roboto-Bold", ROBOTO_BOLD_FN);
 
-    // Title
+    // Reset waveform tracking so OnIdle re-feeds data to the new controls
+    mWaveformLastRiser.reset();
+    mWaveformLastHit.reset();
+
+    // Main background
+    pGraphics->AttachPanelBackground(kColorDark);
+
+    // Helper: draw a filled rounded rect panel
+    auto MakeRoundedPanel = [](const IRECT& bounds, const IColor& color, float radius) {
+      return new ILambdaControl(bounds, [color, radius](ILambdaControl* pCaller, IGraphics& g, IRECT& r) {
+        g.FillRoundRect(color, r, radius);
+      }, DEFAULT_ANIMATION_DURATION, false, false);
+    };
+
+    // Zone panels — rounded rects for waveform, riser, hit panels
+    pGraphics->AttachControl(new IPanelControl(headerRect, kColorHeaderBg), kCtrlTagHeaderPanel);
+    pGraphics->AttachControl(MakeRoundedPanel(waveformRect, kColorWaveformBg, 6.f), kCtrlTagWaveformPanel);
+    pGraphics->AttachControl(new rvrse::WaveformControl(waveformRect.GetPadded(-6.f)), kCtrlTagWaveformDisplay);
+    pGraphics->AttachControl(MakeRoundedPanel(riserRect, kColorDarkGrey, 6.f), kCtrlTagRiserPanel);
+    pGraphics->AttachControl(MakeRoundedPanel(hitRect, kColorDarkGrey, 6.f), kCtrlTagHitPanel);
+    pGraphics->AttachControl(new IPanelControl(footerRect, kColorHeaderBg), kCtrlTagFooterPanel);
+
+    // ── Header contents ────────────────────────────────────────────────
+    // Title: top-left, bold gold
+    const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f).GetFromTop(headerH * 0.65f);
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
-      IText(40, COLOR_WHITE)), kCtrlTagTitle);
+      IText(44, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagTitle);
 
-    // Version info
-    WDL_String buildInfoStr;
-    GetBuildInfoStr(buildInfoStr, __DATE__, __TIME__);
-    pGraphics->AttachControl(new ITextControl(versionBounds, buildInfoStr.Get(),
-      IText(12, COLOR_LIGHT_GRAY).WithAlign(EAlign::Far)), kCtrlTagVersionNumber);
-
-    // Load Sample button
-    const IVStyle buttonStyle = DEFAULT_STYLE
-      .WithColor(kFG, IColor(255, 100, 180, 255))
-      .WithColor(kBG, IColor(255, 40, 40, 40))
-      .WithRoundness(0.3f);
+    // Load Sample button: centered
+    const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f).GetVShifted(1.f);
+    const IVStyle loadBtnStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kPR, kColorDarkGrey)
+      .WithColor(kFR, kColorGold)
+      .WithColor(kHL, kColorGold.WithOpacity(0.1f))
+      .WithDrawFrame(true)
+      .WithFrameThickness(1.5f)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithRoundness(0.3f)
+      .WithShowValue(false)
+      .WithLabelText(IText(15, kColorGold, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
 
     pGraphics->AttachControl(new IVButtonControl(loadBtnBounds, [this](IControl* pCaller) {
-      // Spawn file dialog from the UI thread
       WDL_String fileName;
       WDL_String path;
       pCaller->GetUI()->PromptForFile(fileName, path, EFileAction::Open,
         rvrse::kSupportedAudioExts,
         [this, pCaller](const WDL_String& fileName, const WDL_String& path) {
-          // Note: on macOS, iPlug2 sets fileName to the FULL path,
-          // and path to the directory with trailing slash.
           if (fileName.GetLength() > 0)
-          {
             LoadSampleFromFile(fileName.Get());
-          }
         });
-    }, "LOAD SAMPLE", buttonStyle), kCtrlTagLoadButton);
+    }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
 
-    // Sample name display — default text, updated below if a sample is already loaded
-    pGraphics->AttachControl(new ITextControl(sampleNameBounds, "No sample loaded",
-      IText(14, IColor(200, 180, 180, 180))), kCtrlTagSampleName);
+    // Sample name: top-right area
+    const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
+    pGraphics->AttachControl(new ITextControl(sampleBounds, "No sample loaded",
+      IText(15, kColorTextPrimary, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagSampleName);
 
-    // Restore sample name display if a sample is already loaded (e.g. editor was closed/reopened)
+    // BPM display: bottom-right area — updated from ProcessBlock when host tempo changes
+    const IRECT bpmBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromBottom(headerH * 0.4f);
+    pGraphics->AttachControl(new ITextControl(bpmBounds, "BPM: —",
+      IText(14, kColorTextSecondary, "Roboto-Regular", EAlign::Far, EVAlign::Middle)), kCtrlTagBPMDisplay);
+
+    // Version string (footer — right)
+    const IRECT versionBounds = footerRect.GetPadded(-8.f).GetFromRight(200.f);
+    pGraphics->AttachControl(new ITextControl(versionBounds, "RVRSE v" PLUG_VERSION_STR,
+      IText(13, kColorTextPrimary, "Roboto-Regular", EAlign::Far)), kCtrlTagVersionNumber);
+
+    // ── Footer contents ─────────────────────────────────────────────────
+    // Master Volume horizontal slider (left side of footer)
+    // Master volume: label + value above, slider below
+    const IRECT masterArea = footerRect.GetPadded(-8.f).GetFromLeft(220.f);
+    const IRECT masterLabelRow = masterArea.GetFromTop(22.f);
+    const IRECT masterSliderBounds = masterArea.GetReducedFromTop(20.f).GetCentredInside(200.f, 24.f);
+
+    pGraphics->AttachControl(new ITextControl(masterLabelRow.GetFromLeft(110.f), "VOLUME",
+      IText(14, kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagMasterVolLabel);
+    pGraphics->AttachControl(new ITextControl(masterLabelRow.GetFromRight(110.f), "100%",
+      IText(14, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagMasterVolValue);
+
+    const IVStyle sliderStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorGold)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kFR, kColorKnobTrack)
+      .WithColor(kX1, kColorGold)
+      .WithColor(kHL, kColorGold.WithOpacity(0.15f))
+      .WithDrawFrame(false)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithShowLabel(false)
+      .WithShowValue(false)
+      .WithRoundness(1.f);
+
+    pGraphics->AttachControl(new IVSliderControl(masterSliderBounds, kParamMasterVol,
+      "", sliderStyle, true, EDirection::Horizontal, DEFAULT_GEARING, 8.f, 2.f), kCtrlTagMasterVolSlider);
+
+    // MIDI indicator (center of footer) — blue dot, lights up on MIDI input
+    const IRECT midiBounds = footerRect.GetPadded(-8.f).GetMidHPadded(30.f);
+    pGraphics->AttachControl(new ILambdaControl(midiBounds,
+      [](ILambdaControl* pCaller, IGraphics& g, IRECT& r) {
+        const float dotR = 4.f;
+        const float cx = r.MW();
+        const float cy = r.MH();
+        const float opacity = 0.15f + 0.85f * static_cast<float>(pCaller->GetValue());
+        g.FillCircle(rvrse::gui::kColorBlue.WithOpacity(opacity), cx, cy, dotR);
+        const IText label(11, rvrse::gui::kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Top);
+        IRECT textR = r.GetFromBottom(12.f);
+        g.DrawText(label, "MIDI", textR);
+      }, DEFAULT_ANIMATION_DURATION, false, false), kCtrlTagMidiIndicator);
+
+    // ── Riser panel contents ────────────────────────────────────────────
+    // Section label at top of riser panel
+    const IRECT riserLabelBounds = riserRect.GetPadded(-8.f).GetFromTop(20.f);
+    pGraphics->AttachControl(new ITextControl(riserLabelBounds, "RISER — REAL-TIME",
+      IText(17, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagRiserSectionLabel);
+
+    // Knob style: solid gold body for real-time knobs
+    const IColor kKnobBodyGold {255, 0x7A, 0x68, 0x28}; // rich warm gold
+    const IVStyle knobStyle = DEFAULT_STYLE
+      .WithColor(kFG, kKnobBodyGold)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kFR, IColor(255, 0x4A, 0x3A, 0x10)) // dark brown outline — visible against bright gold
+      .WithColor(kX1, kColorGold)          // arc fill
+      .WithColor(kHL, kColorGold)           // bright gold body on press
+      .WithColor(kPR, kColorGold)
+      .WithDrawFrame(true)
+      .WithFrameThickness(1.f)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithShowLabel(true)
+      .WithShowValue(true)
+      .WithRoundness(1.f)
+      .WithWidgetFrac(0.75f)
+      .WithLabelText(IText(15, kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
+      .WithValueText(IText(14, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Top));
+
+    // Stutter Rate + Depth + Riser Volume — real-time knobs, prominently sized
+    const IRECT knobArea = riserRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
+    const IRECT stutterRateBounds = knobArea.GetGridCell(0, 1, 3).GetCentredInside(95.f, 110.f);
+    const IRECT stutterDepthBounds = knobArea.GetGridCell(1, 1, 3).GetCentredInside(95.f, 110.f);
+    const IRECT riserVolBounds = knobArea.GetGridCell(2, 1, 3).GetCentredInside(95.f, 110.f);
+
+    pGraphics->AttachControl(new IVKnobControl(stutterRateBounds, kParamStutterRate,
+      "RATE", knobStyle, true), kCtrlTagStutterRate);
+    pGraphics->AttachControl(new IVKnobControl(stutterDepthBounds, kParamStutterDepth,
+      "DEPTH", knobStyle, true), kCtrlTagStutterDepth);
+    pGraphics->AttachControl(new IVKnobControl(riserVolBounds, kParamRiserVolume,
+      "VOLUME", knobStyle, true), kCtrlTagRiserVolume);
+
+    // ── Riser panel: offline section ────────────────────────────────────
+    const IRECT offlineArea = riserRect.GetPadded(-8.f).GetReducedFromTop(144.f);
+
+    // Offline section label
+    const IRECT offlineLabelBounds = offlineArea.GetFromTop(18.f);
+    pGraphics->AttachControl(new ITextControl(offlineLabelBounds, "OFFLINE",
+      IText(17, kColorSteel, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagOfflineSectionLabel);
+
+    // Steel knob style for offline params (smaller widget)
+    const IColor kKnobBodyWhite {255, 0x6A, 0x70, 0x78}; // cool white-grey tint
+    const IVStyle offlineKnobStyle = knobStyle
+      .WithColor(kFG, kKnobBodyWhite)
+      .WithColor(kFR, IColor(255, 0x80, 0x88, 0x90)) // light silver ring
+      .WithColor(kX1, kColorSteel)
+      .WithColor(kHL, kColorWhite)          // white on press
+      .WithColor(kPR, kColorWhite)
+      .WithWidgetFrac(0.8f);
+
+    // Row of offline knobs: Lush | Length | Fade In | [Stretch toggle]
+    const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(80.f);
+    const IRECT lushBounds    = offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(60.f, 80.f);
+    const IRECT lengthBounds  = offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(60.f, 80.f);
+    const IRECT fadeInBounds  = offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(60.f, 80.f);
+
+    pGraphics->AttachControl(new IVKnobControl(lushBounds, kParamLush,
+      "LUSH", offlineKnobStyle, true), kCtrlTagLush);
+    pGraphics->AttachControl(new IVKnobControl(lengthBounds, kParamRiserLength,
+      "LENGTH", offlineKnobStyle, true), kCtrlTagRiserLength);
+    pGraphics->AttachControl(new IVKnobControl(fadeInBounds, kParamFadeIn,
+      "FADE IN", offlineKnobStyle, true), kCtrlTagFadeIn);
+
+    // Stretch Quality — horizontal tab switch (HIGH | LOW)
+    const IVStyle toggleStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kFR, kColorSteel)
+      .WithColor(kHL, kColorSteel.WithOpacity(0.2f))
+      .WithColor(kX1, kColorSteel)
+      .WithDrawFrame(true)
+      .WithFrameThickness(1.f)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithRoundness(0.3f)
+      .WithShowLabel(true)
+      .WithWidgetFrac(0.55f)
+      .WithLabelText(IText(11, kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
+      .WithValueText(IText(12, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
+
+    const IRECT stretchBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(90.f, 50.f);
+    pGraphics->AttachControl(new IVTabSwitchControl(stretchBounds, kParamStretchQuality,
+      {"HIGH", "LOW"}, "QUALITY", toggleStyle, EVShape::Rectangle, EDirection::Horizontal), kCtrlTagStretchQuality);
+
+    // ── Hit panel contents ──────────────────────────────────────────────
+    // Section label
+    const IRECT hitLabelBounds = hitRect.GetPadded(-8.f).GetFromTop(20.f);
+    pGraphics->AttachControl(new ITextControl(hitLabelBounds, "HIT",
+      IText(17, kColorBlue, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagHitSectionLabel);
+
+    // Hit Volume knob (blue accent — blue body)
+    const IColor kKnobBodyBlue {255, 0x28, 0x4A, 0x7A}; // deep blue body
+    const IVStyle hitKnobStyle = knobStyle
+      .WithColor(kFG, kKnobBodyBlue)
+      .WithColor(kFR, IColor(255, 0x10, 0x30, 0x58)) // dark blue outline
+      .WithColor(kX1, kColorBlue)
+      .WithColor(kHL, kColorBlue)
+      .WithColor(kPR, kColorBlue);
+
+    const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
+    const IRECT hitVolBounds = hitVolArea.GetCentredInside(95.f, 110.f);
+    pGraphics->AttachControl(new IVKnobControl(hitVolBounds, kParamHitVolume,
+      "VOLUME", hitKnobStyle, true), kCtrlTagHitVolume);
+
+    // Hit waveform preview — between volume knob and bottom area
+    const IRECT hitPreviewArea = hitRect.GetPadded(-10.f)
+      .GetReducedFromTop(140.f)   // below volume knob
+      .GetReducedFromBottom(84.f); // above logo/donate
+    pGraphics->AttachControl(new rvrse::HitPreviewControl(hitPreviewArea), kCtrlTagHitPreview);
+
+    // Logo (PNG bitmap) — lower-right
+    const IBitmap logoBitmap = pGraphics->LoadBitmap(LOGO_FN);
+    const IRECT bottomArea = hitRect.GetPadded(-10.f).GetFromBottom(80.f);
+    const IRECT logoArea = bottomArea.GetFromRight(120.f);
+    pGraphics->AttachControl(new IBitmapControl(logoArea.GetCentredInside(80.f, 80.f), logoBitmap), kCtrlTagLogo);
+
+    // Donate button — lower-left, vertically centered with logo
+    const IVStyle supportStyle = DEFAULT_STYLE
+      .WithColor(kFG, kColorDarkGrey)
+      .WithColor(kBG, IColor(0, 0, 0, 0))
+      .WithColor(kPR, kColorDarkGrey)
+      .WithColor(kFR, kColorBlue)
+      .WithColor(kHL, kColorBlue.WithOpacity(0.1f))
+      .WithDrawFrame(true)
+      .WithFrameThickness(1.f)
+      .WithDrawShadows(false)
+      .WithEmboss(false)
+      .WithRoundness(0.3f)
+      .WithShowValue(false)
+      .WithLabelText(IText(14, kColorBlue, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
+
+    const IRECT supportBounds = bottomArea.GetReducedFromLeft(8.f).GetFromLeft(140.f).GetCentredInside(130.f, 26.f);
+    pGraphics->AttachControl(new IVButtonControl(supportBounds, [](IControl* pCaller) {
+      pCaller->GetUI()->OpenURL("https://samufl.com/#/portal/support");
+    }, "DONATE", supportStyle), kCtrlTagSupportButton);
+
+    // Restore sample name if already loaded
     if (!mSampleFilePath.empty())
     {
       if (auto* pCtrl = pGraphics->GetControlWithTag(kCtrlTagSampleName))
@@ -133,6 +441,127 @@ RVRSE::RVRSE(const InstanceInfo& info)
   };
 #endif
 }
+
+#if IPLUG_EDITOR
+void RVRSE::OnIdle()
+{
+  // Update BPM display when host tempo changes
+  const double currentBPM = mLastBPM.load(std::memory_order_relaxed);
+  if (GetUI() && std::abs(currentBPM - mLastDisplayedBPM) > 0.01)
+  {
+    mLastDisplayedBPM = currentBPM;
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagBPMDisplay))
+    {
+      WDL_String bpmStr;
+      if (currentBPM > 0.0)
+        bpmStr.SetFormatted(32, "BPM: %.1f", currentBPM);
+      else
+        bpmStr.Set("BPM: —");
+      pCtrl->As<ITextControl>()->SetStr(bpmStr.Get());
+      pCtrl->SetDirty(false);
+    }
+  }
+
+  // Update master volume display
+  if (GetUI())
+  {
+    const double vol = GetParam(kParamMasterVol)->Value();
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagMasterVolValue))
+    {
+      WDL_String volStr;
+      volStr.SetFormatted(16, "%.0f%%", vol);
+      if (strcmp(pCtrl->As<ITextControl>()->GetStr(), volStr.Get()) != 0)
+      {
+        pCtrl->As<ITextControl>()->SetStr(volStr.Get());
+        pCtrl->SetDirty(false);
+      }
+    }
+  }
+
+  // Update MIDI activity indicator
+  if (GetUI())
+  {
+    const int counter = mMidiActivityCounter.load(std::memory_order_relaxed);
+    if (counter != mMidiLastSeenCounter)
+    {
+      mMidiLastSeenCounter = counter;
+      mMidiCooldownFrames = 8; // ~130ms at 60fps
+    }
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagMidiIndicator))
+    {
+      const double val = (mMidiCooldownFrames > 0) ? 1.0 : 0.0;
+      if (pCtrl->GetValue() != val)
+      {
+        pCtrl->SetValue(val);
+        pCtrl->SetDirty(false);
+      }
+    }
+    if (mMidiCooldownFrames > 0) mMidiCooldownFrames--;
+  }
+
+  // Update waveform display
+  if (GetUI())
+  {
+    auto* pWaveform = dynamic_cast<rvrse::WaveformControl*>(
+      GetUI()->GetControlWithTag(kCtrlTagWaveformDisplay));
+    if (pWaveform)
+    {
+      // Feed riser data when pointer changes
+      if (mRiserBuffer && mRiserBuffer->IsReady() && mRiserBuffer != mWaveformLastRiser)
+      {
+        const auto& riser = mRiserBuffer;
+        const int nFrames = riser->NumFrames();
+        mWaveformMonoBuf.resize(nFrames);
+        for (int i = 0; i < nFrames; ++i)
+          mWaveformMonoBuf[i] = (riser->mLeft[i] + riser->mRight[i]) * 0.5f;
+        pWaveform->SetRiserData(mWaveformMonoBuf.data(), nFrames);
+        mWaveformLastRiser = mRiserBuffer;
+      }
+
+      // Feed hit data when pointer changes
+      if (mPlaySample && mPlaySample->IsLoaded() && mPlaySample != mWaveformLastHit)
+      {
+        const auto& hit = mPlaySample;
+        const int nFrames = hit->NumFrames();
+        mWaveformMonoBuf.resize(nFrames);
+        for (int i = 0; i < nFrames; ++i)
+          mWaveformMonoBuf[i] = (hit->mLeft[i] + (hit->mNumChannels > 1 ? hit->mRight[i] : hit->mLeft[i])) * 0.5f;
+        pWaveform->SetHitData(mWaveformMonoBuf.data(), nFrames);
+
+        // Also feed the hit preview control
+        auto* pHitPreview = dynamic_cast<rvrse::HitPreviewControl*>(
+          GetUI()->GetControlWithTag(kCtrlTagHitPreview));
+        if (pHitPreview)
+          pHitPreview->SetData(mWaveformMonoBuf.data(), nFrames);
+
+        mWaveformLastHit = mPlaySample;
+      }
+
+      // Update visual volume and fade-in envelope
+      pWaveform->SetRiserVolumeDb(static_cast<float>(GetParam(kParamRiserVolume)->Value()));
+      pWaveform->SetHitVolumeDb(static_cast<float>(GetParam(kParamHitVolume)->Value()));
+      pWaveform->SetFadeInFrac(static_cast<float>(GetParam(kParamFadeIn)->Value()) / 100.f);
+
+      // Update playhead position
+      if (mRiserBuffer && mPlaySample)
+      {
+        const int totalFrames = mRiserBuffer->NumFrames() + mPlaySample->NumFrames();
+        if (totalFrames > 0)
+        {
+          float pos = -1.f;
+          const int riserPos = mRiserPos.load(std::memory_order_relaxed);
+          const int hitPos = mHitPos.load(std::memory_order_relaxed);
+          if (riserPos >= 0)
+            pos = static_cast<float>(riserPos) / static_cast<float>(totalFrames);
+          else if (hitPos >= 0)
+            pos = static_cast<float>(mRiserBuffer->NumFrames() + hitPos) / static_cast<float>(totalFrames);
+          pWaveform->SetPlayheadPos(pos);
+        }
+      }
+    }
+  }
+}
+#endif
 
 void RVRSE::LoadSampleFromFile(const char* filePath)
 {
@@ -296,7 +725,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const auto stutterRateHz = static_cast<float>(GetParam(kParamStutterRate)->Value());
   const float stutterDepth = static_cast<float>(GetParam(kParamStutterDepth)->Value());
   const float lush = static_cast<float>(GetParam(kParamLush)->Value() / 100.0);
-  const double riserLengthBeats = GetParam(kParamRiserLength)->Value();
+  const int riserLengthIdx = static_cast<int>(GetParam(kParamRiserLength)->Value());
+  const double riserLengthBeats = rvrse::kRiserLengthValues[
+    std::clamp(riserLengthIdx, 0, rvrse::kNumRiserLengths - 1)];
   const float fadeInPct = static_cast<float>(GetParam(kParamFadeIn)->Value() / 100.0);
   const float riserVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamRiserVolume)->Value()) / 20.0f);
   const float hitVolumeGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);
@@ -363,6 +794,11 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   const auto& hit = mPlaySample;
   const auto& riser = mRiserBuffer;
 
+  // Local copies of atomic positions for the per-sample loop (avoids atomic
+  // loads on every access; written back after the loop for UI thread visibility)
+  int riserPos = mRiserPos.load(std::memory_order_relaxed);
+  int hitPos   = mHitPos.load(std::memory_order_relaxed);
+
   for (int s = 0; s < nFrames; s++)
   {
     // Process MIDI events at this sample offset
@@ -380,8 +816,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
         if (riser && riser->IsReady())
         {
-          mRiserPos = 0;
-          mHitPos = -1;
+          riserPos = 0;
+          hitPos = -1;
 
           // In debug modes, play the selected buffer; only trigger hit in Normal mode
           if (debugStage == rvrse::kDebugNormal)
@@ -397,18 +833,18 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         else if (hit && hit->IsLoaded())
         {
           // No riser available yet — fall back to direct hit playback
-          mRiserPos = -1;
+          riserPos = -1;
           mSamplesFromNoteOn = -1;
-          mHitPos = 0;
+          hitPos = 0;
         }
       }
       else if (msg.StatusMsg() == IMidiMsg::kNoteOff ||
                (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() == 0))
       {
         // Note-off: begin fade-out on both voices and kill the hit trigger
-        if (mRiserPos >= 0)
+        if (riserPos >= 0)
           mRiserFadeRemaining = mFadeOutLength;
-        if (mHitPos >= 0)
+        if (hitPos >= 0)
           mHitFadeRemaining = mFadeOutLength;
 
         // Stop the hit trigger counter so the hit can't re-trigger after fade-out
@@ -432,7 +868,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     float riserL = 0.0f;
     float riserR = 0.0f;
 
-    if (mRiserPos >= 0 && riser && riser->IsReady())
+    if (riserPos >= 0 && riser && riser->IsReady())
     {
       // Select the active buffer based on debug stage
       const float* bufL = riser->mLeft.data();
@@ -455,10 +891,10 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       // Precompute fade-in length (constant for this buffer)
       const int fadeInLen = static_cast<int>(static_cast<float>(bufLen) * fadeInPct);
 
-      if (mRiserPos < bufLen)
+      if (riserPos < bufLen)
       {
-        riserL = bufL[mRiserPos];
-        riserR = bufR[mRiserPos];
+        riserL = bufL[riserPos];
+        riserR = bufR[riserPos];
 
         const bool isDebugRaw = (debugStage == rvrse::kDebugReverbed ||
                                  debugStage == rvrse::kDebugReversed);
@@ -466,9 +902,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         if (!isDebugRaw)
         {
           // Apply fade-in envelope over the first fadeInPct of the buffer
-          if (fadeInPct > 0.0f && fadeInLen > 1 && mRiserPos < fadeInLen)
+          if (fadeInPct > 0.0f && fadeInLen > 1 && riserPos < fadeInLen)
           {
-            const float fadeGain = static_cast<float>(mRiserPos) / static_cast<float>(fadeInLen - 1);
+            const float fadeGain = static_cast<float>(riserPos) / static_cast<float>(fadeInLen - 1);
             riserL *= fadeGain;
             riserR *= fadeGain;
           }
@@ -495,24 +931,24 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           riserL *= fadeGain;
           riserR *= fadeGain;
           mRiserFadeRemaining--;
-          if (mRiserFadeRemaining == 0) mRiserPos = -1;
+          if (mRiserFadeRemaining == 0) riserPos = -1;
         }
 
-        if (mRiserPos >= 0) mRiserPos++;
+        if (riserPos >= 0) riserPos++;
       }
       else
       {
         // Buffer finished naturally
-        mRiserPos = -1;
+        riserPos = -1;
       }
     }
 
     // --- Check if it's time to fire the hit ---
-    if (mSamplesFromNoteOn >= 0 && mHitPos < 0)
+    if (mSamplesFromNoteOn >= 0 && hitPos < 0)
     {
       if (mSamplesFromNoteOn >= mHitOffset && hit && hit->IsLoaded())
       {
-        mHitPos = 0; // Fire the hit!
+        hitPos = 0; // Fire the hit!
       }
       mSamplesFromNoteOn++;
     }
@@ -521,12 +957,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     float hitL = 0.0f;
     float hitR = 0.0f;
 
-    if (mHitPos >= 0 && hit && hit->IsLoaded())
+    if (hitPos >= 0 && hit && hit->IsLoaded())
     {
-      if (mHitPos < hit->NumFrames())
+      if (hitPos < hit->NumFrames())
       {
-        hitL = hit->mLeft[mHitPos] * mVelocityGain * hitVolumeGain;
-        hitR = hit->mRight[mHitPos] * mVelocityGain * hitVolumeGain;
+        hitL = hit->mLeft[hitPos] * mVelocityGain * hitVolumeGain;
+        hitR = hit->mRight[hitPos] * mVelocityGain * hitVolumeGain;
 
         if (mHitFadeRemaining > 0)
         {
@@ -534,15 +970,15 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           hitL *= fadeGain;
           hitR *= fadeGain;
           mHitFadeRemaining--;
-          if (mHitFadeRemaining == 0) mHitPos = -1;
+          if (mHitFadeRemaining == 0) hitPos = -1;
         }
 
-        if (mHitPos >= 0) mHitPos++;
+        if (hitPos >= 0) hitPos++;
       }
       else
       {
         // Hit finished naturally
-        mHitPos = -1;
+        hitPos = -1;
         mSamplesFromNoteOn = -1;
       }
     }
@@ -555,12 +991,16 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     if (nChans >= 2) outputs[1][s] = outR;
   }
 
+  // Write back local position copies so UI thread can read them
+  mRiserPos.store(riserPos, std::memory_order_relaxed);
+  mHitPos.store(hitPos, std::memory_order_relaxed);
+
   mMidiQueue.Flush(nFrames);
 }
 
 void RVRSE::ProcessMidiMsg(const IMidiMsg& msg)
 {
-  TRACE
+  ++mMidiActivityCounter;
   mMidiQueue.Add(msg);
 }
 

@@ -25,12 +25,12 @@
 #define PLUG_DOES_STATE_CHUNKS 1
 #define PLUG_HAS_UI 1
 #define PLUG_WIDTH 1024
-#define PLUG_HEIGHT 768
+#define PLUG_HEIGHT 620
 #define PLUG_FPS 60
 #define PLUG_SHARED_RESOURCES 0
 #define PLUG_HOST_RESIZE 1
-#define PLUG_MIN_WIDTH 256
-#define PLUG_MIN_HEIGHT 256
+#define PLUG_MIN_WIDTH 800
+#define PLUG_MIN_HEIGHT 620
 #define PLUG_MAX_WIDTH 8192
 #define PLUG_MAX_HEIGHT 8192
 
@@ -61,3 +61,5 @@
 #define APP_SIGNAL_VECTOR_SIZE 64
 
 #define ROBOTO_FN "Roboto-Regular.ttf"
+#define ROBOTO_BOLD_FN "Roboto-Bold.ttf"
+#define LOGO_FN "logo.png"
