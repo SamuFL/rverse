@@ -305,4 +305,110 @@ private:
   float mFadeInFrac = 0.f;   ///< Fade-in as fraction of riser length
 };
 
+/// Lightweight hit sample waveform preview for the hit panel.
+class HitPreviewControl : public IControl
+{
+public:
+  HitPreviewControl(const IRECT& bounds)
+  : IControl(bounds)
+  {
+    SetWantsMidi(false);
+  }
+
+  void SetData(const float* data, int numFrames)
+  {
+    const int numBins = static_cast<int>(mRECT.W());
+    if (numBins <= 0 || numFrames <= 0 || !data)
+    {
+      mPeaks.Clear();
+      SetDirty(false);
+      return;
+    }
+
+    mPeaks.mMin.resize(numBins);
+    mPeaks.mMax.resize(numBins);
+    mPeaks.mNumBins = numBins;
+
+    const float framesPerBin = static_cast<float>(numFrames) / static_cast<float>(numBins);
+    for (int bin = 0; bin < numBins; ++bin)
+    {
+      const int s = static_cast<int>(bin * framesPerBin);
+      const int e = std::min(static_cast<int>((bin + 1) * framesPerBin), numFrames);
+      float lo = 0.f, hi = 0.f;
+      for (int f = s; f < e; ++f)
+      {
+        lo = std::min(lo, data[f]);
+        hi = std::max(hi, data[f]);
+      }
+      mPeaks.mMin[bin] = lo;
+      mPeaks.mMax[bin] = hi;
+    }
+    SetDirty(false);
+  }
+
+  void Draw(IGraphics& g) override
+  {
+    const IRECT r = mRECT;
+
+    // Dark background fill
+    g.FillRect(IColor(255, 0x0A, 0x10, 0x1A), r);
+    // Subtle border
+    g.DrawRect(gui::kColorSeparator, r, nullptr, 1.f);
+
+    if (mPeaks.IsEmpty())
+    {
+      const IText emptyText(11, gui::kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Middle);
+      g.DrawText(emptyText, "No sample", r);
+      return;
+    }
+
+    const float w = r.W();
+    const float midY = r.MH();
+    const float halfH = r.H() * 0.40f;
+    const int numPx = static_cast<int>(w);
+
+    float peak = 0.001f;
+    for (int i = 0; i < mPeaks.mNumBins; ++i)
+    {
+      peak = std::max(peak, std::abs(mPeaks.mMin[i]));
+      peak = std::max(peak, std::abs(mPeaks.mMax[i]));
+    }
+
+    const float bpp = static_cast<float>(mPeaks.mNumBins) / static_cast<float>(numPx);
+
+    for (int px = 0; px < numPx; ++px)
+    {
+      const int binStart = static_cast<int>(px * bpp);
+      int binEnd = static_cast<int>((px + 1) * bpp);
+      if (binEnd <= binStart) binEnd = binStart + 1;
+      if (binEnd > mPeaks.mNumBins) binEnd = mPeaks.mNumBins;
+
+      float lo = 0.f, hi = 0.f;
+      for (int b = binStart; b < binEnd; ++b)
+      {
+        lo = std::min(lo, mPeaks.mMin[b]);
+        hi = std::max(hi, mPeaks.mMax[b]);
+      }
+
+      const float minVal = std::clamp(lo / peak, -1.f, 1.f);
+      const float maxVal = std::clamp(hi / peak, -1.f, 1.f);
+
+      const float x = r.L + static_cast<float>(px);
+      const float y1 = midY - maxVal * halfH;
+      const float y2 = midY - minVal * halfH;
+
+      g.DrawLine(gui::kColorBlue.WithOpacity(0.06f), x, midY - halfH, x, midY + halfH, nullptr, 1.f);
+      g.DrawLine(gui::kColorBlue, x, y1, x, y2, nullptr, 1.f);
+    }
+
+    // Zero-axis line
+    g.DrawLine(gui::kColorSeparator, r.L, midY, r.R, midY, nullptr, 0.5f);
+  }
+
+  void OnMouseDown(float x, float y, const IMouseMod& mod) override {}
+
+private:
+  WaveformPeaks mPeaks;
+};
+
 } // namespace rvrse

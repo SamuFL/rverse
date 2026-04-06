@@ -129,6 +129,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
       const IRECT hitVolArea = hitRect.GetPadded(-8.f).GetReducedFromTop(28.f).GetFromTop(110.f);
       pGraphics->GetControlWithTag(kCtrlTagHitVolume)->SetTargetAndDrawRECTs(
         hitVolArea.GetCentredInside(95.f, 110.f));
+      const IRECT hitPreviewArea = hitRect.GetPadded(-10.f)
+        .GetReducedFromTop(140.f).GetReducedFromBottom(84.f);
+      pGraphics->GetControlWithTag(kCtrlTagHitPreview)->SetTargetAndDrawRECTs(hitPreviewArea);
       const IRECT bottomArea = hitRect.GetPadded(-10.f).GetFromBottom(80.f);
       const IRECT logoArea = bottomArea.GetFromRight(120.f);
       pGraphics->GetControlWithTag(kCtrlTagLogo)->SetTargetAndDrawRECTs(logoArea);
@@ -362,6 +365,12 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(new IVKnobControl(hitVolBounds, kParamHitVolume,
       "VOLUME", hitKnobStyle, true), kCtrlTagHitVolume);
 
+    // Hit waveform preview — between volume knob and bottom area
+    const IRECT hitPreviewArea = hitRect.GetPadded(-10.f)
+      .GetReducedFromTop(140.f)   // below volume knob
+      .GetReducedFromBottom(84.f); // above logo/donate
+    pGraphics->AttachControl(new rvrse::HitPreviewControl(hitPreviewArea), kCtrlTagHitPreview);
+
     // Logo (PNG bitmap) — lower-right
     const IBitmap logoBitmap = pGraphics->LoadBitmap(LOGO_FN);
     const IRECT bottomArea = hitRect.GetPadded(-10.f).GetFromBottom(80.f);
@@ -484,6 +493,13 @@ void RVRSE::OnIdle()
         for (int i = 0; i < nFrames; ++i)
           mWaveformMonoBuf[i] = (hit->mLeft[i] + (hit->mNumChannels > 1 ? hit->mRight[i] : hit->mLeft[i])) * 0.5f;
         pWaveform->SetHitData(mWaveformMonoBuf.data(), nFrames);
+
+        // Also feed the hit preview control
+        auto* pHitPreview = dynamic_cast<rvrse::HitPreviewControl*>(
+          GetUI()->GetControlWithTag(kCtrlTagHitPreview));
+        if (pHitPreview)
+          pHitPreview->SetData(mWaveformMonoBuf.data(), nFrames);
+
         mWaveformLastHit = mPlaySample;
       }
 

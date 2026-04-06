@@ -63,6 +63,7 @@ enum ECtrlTags
   kCtrlTagMasterVolLabel,
   kCtrlTagMasterVolValue,
   kCtrlTagWaveformDisplay,
+  kCtrlTagHitPreview,
   kNumCtrlTags
 };
 
