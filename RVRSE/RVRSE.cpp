@@ -332,7 +332,11 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   }
 
   // Propagate Stretch Quality (triggers stretch rebuild if changed)
-  mProcessor.setStretchQuality(stretchQuality, offline);
+  if (stretchQuality != mLastStretchQuality)
+  {
+    mLastStretchQuality = stretchQuality;
+    mProcessor.setStretchQuality(stretchQuality, offline);
+  }
 
   // Check if a new sample is ready from the loader thread (lock-free flag)
   if (mNewSampleReady.load(std::memory_order_acquire))

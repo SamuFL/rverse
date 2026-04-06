@@ -247,7 +247,7 @@ rvrse/
 │   ├── RvrseProcessor.h / .cpp      ← offline pipeline orchestrator
 │   ├── RvrseVoice.h / .cpp          ← real-time playback voice (riser + hit)
 │   ├── Reverb.h / .cpp              ← Schroeder reverb, stateless
-│   ├── Stretcher.h / .cpp           ← spectral time-stretcher (signalsmith-stretch)
+│   ├── TimeStretch.h / .cpp         ← spectral time-stretcher (signalsmith-stretch)
 │   ├── Stutter.h / .cpp             ← real-time stutter gate (audio thread only)
 │   └── WaveformView.h / .cpp        ← IControl subclass for waveform display
 └── resources/

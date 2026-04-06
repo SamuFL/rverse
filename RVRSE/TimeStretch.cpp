@@ -86,7 +86,7 @@ void stretchBufferStereo(const std::vector<float>& inputL,
                          double sampleRate,
                          EStretchQuality quality)
 {
-  if (inputL.empty() || stretchFactor <= 0.0)
+  if (inputL.empty() || inputR.empty() || inputL.size() != inputR.size() || stretchFactor <= 0.0)
   {
     outputL.clear();
     outputR.clear();

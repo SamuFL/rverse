@@ -6,8 +6,8 @@
 ///        high-quality stretching without pitch change.
 ///        Offline use only — never called from the audio thread.
 ///
-///        Implementation lives in TimeStretch.cpp, compiled with -O2 even in
-///        Debug builds — spectral FFT code is orders of magnitude slower at -O0.
+///        Implementation lives in TimeStretch.cpp, compiled with -O2 in
+///        non-MSVC Debug builds — spectral FFT code is orders of magnitude slower at -O0.
 
 #include "Constants.h"
 

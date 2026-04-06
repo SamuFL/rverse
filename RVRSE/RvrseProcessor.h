@@ -197,8 +197,8 @@ private:
   /// don't apply. Never call this during real-time playback.
   void rebuildStretchSync()
   {
-    // Invalidate in-flight builds
-    mGeneration.fetch_add(1, std::memory_order_release);
+    // Invalidate in-flight builds and capture our generation token
+    const int myGen = mGeneration.fetch_add(1, std::memory_order_release) + 1;
 
     // Snapshot parameters under lock
     std::shared_ptr<SampleData> sample;
@@ -250,7 +250,9 @@ private:
       applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
     }
 
-    // Publish result
+    // Only publish if no newer rebuild has been requested
+    if (mGeneration.load(std::memory_order_acquire) != myGen) return;
+
     std::atomic_store(&mRiserOutput, riser);
     mNewRiserReady.store(true, std::memory_order_release);
   }
