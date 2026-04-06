@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Full IGraphics GUI with dark theme (dark green/blue palette, gold/blue accents) — responsive layout with corner resizer (rverse-ebv)
+- Dual waveform display: riser (gold) + hit (blue) with shared amplitude normalization and animated playhead (rverse-ebv)
+- Hit preview waveform in hit panel showing original loaded sample (rverse-ebv)
+- Riser panel: real-time section (Stutter Rate, Stutter Depth, Riser Volume — gold knobs) + offline section (Lush, Riser Length, Fade In — steel knobs, Stretch Quality toggle) (rverse-ebv)
+- Hit panel: volume knob (blue accent), hit waveform preview, logo, donate/support button (rverse-ebv)
+- Header zone: plugin title, Load Sample button with native file dialog, sample info display, BPM display (rverse-ebv)
+- Footer zone: master volume slider with label/value, MIDI activity indicator (blue dot), version string (rverse-ebv)
+- Resize support: corner resizer with smart layout scaling — waveform absorbs squeeze, panels maintain minimum heights (rverse-ebv)
 - Stretch Quality parameter (High / Low) — defaults to High for best audio quality; Low mode (~2× faster) available for real-time tweaking or resource-limited systems (rverse-g4j)
 
 ### Changed

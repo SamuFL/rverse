@@ -54,10 +54,18 @@ RVRSE::RVRSE(const InstanceInfo& info)
 
     // ── Scale layout proportions relative to default 1024×620 ──────────
     const float scaleY = h / 620.f;
-    const float headerH  = kHeaderHeight  * scaleY;
-    const float footerH  = kFooterHeight  * scaleY;
-    const float waveH    = kWaveformHeight * scaleY;
     const float gap      = kZoneGap;
+    // Header and footer never shrink below their design size
+    const float headerH  = std::max(kHeaderHeight, kHeaderHeight * scaleY);
+    const float footerH  = std::max(kFooterHeight, kFooterHeight * scaleY);
+    // Panels need a minimum height for their fixed-layout knobs/labels
+    constexpr float kMinPanelH = 246.f;
+    // At or above default size: waveform scales proportionally.
+    // When shrinking: waveform absorbs squeeze to protect panels.
+    const float fixedH   = headerH + footerH + gap * 4.f;
+    const float proportionalWaveH = kWaveformHeight * scaleY;
+    const float maxWaveH = h - fixedH - kMinPanelH;       // what's left after panels get their min
+    const float waveH    = std::max(40.f, std::min(proportionalWaveH, maxWaveH));
 
     // ── Zone rects ─────────────────────────────────────────────────────
     const IRECT headerRect   = b.GetFromTop(headerH);
@@ -957,7 +965,6 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
 void RVRSE::ProcessMidiMsg(const IMidiMsg& msg)
 {
-  TRACE
   mMidiQueue.Add(msg);
 }
 

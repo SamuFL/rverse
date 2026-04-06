@@ -147,4 +147,9 @@ private:
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state
+
+  // --- MIDI activity indicator ---
+  std::atomic<int> mMidiActivityCounter { 0 }; ///< Incremented by audio thread on any MIDI event
+  int mMidiLastSeenCounter = 0;                ///< UI thread's last seen counter value
+  int mMidiCooldownFrames = 0;                 ///< OnIdle frames remaining before dimming
 };

@@ -6,9 +6,9 @@ RVRSE generates a reverse-reverb riser automatically from any loaded hit sample,
 original hit at a tempo-synced beat boundary. One sample in → complete transition out. No manual
 editing, no extra samples needed.
 
-> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline, stutter gate, and all DAW
-> parameters working. CI running on macOS + Windows. Debug playback mode available.
-> GUI and release packaging still in progress.
+> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline, stutter gate, IGraphics GUI, and all
+> DAW parameters working. CI running on macOS + Windows. Dark-themed native GUI with waveform
+> display, dual control panels, and hit preview. Release packaging still in progress.
 > See [CHANGELOG.md](./CHANGELOG.md) and the Release Preparation Epic (`rverse-0v6`) for details.
 
 ---
@@ -135,6 +135,8 @@ Every source file belongs to exactly one layer:
 | `Stutter.h` | **Real-Time** | Per-sample trapezoidal gate with continuous Hz rate (audio thread only, MIDI CC responsive) |
 | `RVRSE.h` | **Both** | Main plugin class — owns all state, bridges offline ↔ real-time |
 | `RVRSE.cpp` | **Both** | Constructor (GUI), `LoadSampleFromFile`, `ProcessBlock`, `OnReset` |
+| `WaveformControl.h` | **GUI** | Dual waveform display (riser + hit) and hit preview control |
+| `GUIColors.h` | **GUI** | Brand palette, layout constants, text styles |
 | `dr_libs_impl.cpp` | Build | Single translation unit for `DR_WAV_IMPLEMENTATION` |
 
 ---
@@ -385,7 +387,6 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 
 ### Current Limitations
 
-- No custom GUI yet — use the DAW's generic parameter editor or MIDI CC for all controls.
 - No preset system.
 - No pitch shift (planned).
 - Single-voice only — overlapping notes cut the previous voice.
@@ -400,6 +401,8 @@ rverse/
 │   ├── RVRSE.h / .cpp        # Main plugin class (GUI + ProcessBlock)
 │   ├── config.h              # iPlug2 plugin configuration
 │   ├── Constants.h           # All numeric constants
+│   ├── GUIColors.h           # Brand palette and layout constants
+│   ├── WaveformControl.h     # Waveform display controls (riser + hit + preview)
 │   ├── SampleData.h          # Sample data struct
 │   ├── SampleLoader.h / .cpp # Audio file loading (dr_wav)
 │   ├── Reverb.h              # Schroeder/Moorer reverb
@@ -423,9 +426,12 @@ rverse/
 │   ├── test_stutter.cpp      # Gate symmetry, convergence, phase
 │   └── test_sample_loader.cpp# WAV loading, deinterleave, error handling
 ├── RVRSE_BRIEF.md            # Full product specification
+├── GUI_DESIGN_BRIEF.md       # GUI design specification
+├── STITCH-DESIGN.md          # Visual design system
 ├── UAT_PLAYBOOK.md           # Manual test scenarios and pass criteria
 ├── CHANGELOG.md              # Release notes (Keep a Changelog format)
 ├── AGENTS.md                 # AI agent instructions and workflow rules
+├── docs/prototypes/          # Archived HTML/PNG design prototypes
 └── LICENSE                   # MIT license
 ```
 
@@ -451,7 +457,7 @@ the full dependency tree.
 | `rverse-nqg` | P1 | Expose DSP params (Lush, Riser Length, Fade In, Riser Volume, Hit Volume) | ✅ Done (PR #5) |
 | `rverse-l9x` | P1 | Debug playback mode — expose intermediate pipeline buffers | ✅ Done (in PR #5) |
 | `rverse-g4j` | P1 | Upgrade time-stretcher to signalsmith-stretch (spectral) | ✅ Done (PR #8) |
-| `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | Blocked by `rverse-nqg` |
+| `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | ✅ Done |
 | `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | Open |
 | `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | ✅ Done (PR #6) |
 

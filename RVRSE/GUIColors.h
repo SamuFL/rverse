@@ -30,12 +30,11 @@ const IColor kColorTextMuted     {255, 0x4A, 0x56, 0x68}; // #4A5568
 // ── Knob accent variants ──────────────────────────────────────────────
 const IColor kColorSteel         {255, 0xA0, 0xAE, 0xC0}; // #A0AEC0 — offline knobs
 
-// ── Layout proportions (in pixels at default 1024×768) ─────────────────
+// ── Layout proportions (in pixels at default 1024×620) ─────────────────
 constexpr float kHeaderHeight  = 60.f;
 constexpr float kFooterHeight  = 55.f;
 constexpr float kWaveformHeight = 170.f;
 constexpr float kZoneGap       = 4.f;
-constexpr float kPanelPad      = 4.f;
 constexpr float kRiserPanelPct = 0.6f; // riser panel = 60% of width
 
 } // namespace gui
