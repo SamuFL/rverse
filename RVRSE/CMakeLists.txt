@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(RVRSE VERSION 1.0.0)
+project(RVRSE VERSION 0.1.0)
 
 set(IPLUG2_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../iPlug2 CACHE PATH "iPlug2 root directory")
 include(${IPLUG2_DIR}/iPlug2.cmake)
