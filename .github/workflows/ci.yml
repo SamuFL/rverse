@@ -73,9 +73,12 @@ jobs:
 
       - name: Validate AU (pluginval)
         run: |
-          # AU plugins must be registered in a system location for pluginval to find them
+          # AU plugins must be registered in a system location for pluginval to find them.
+          # The SYMLINK deploy method may have created a symlink here already — remove it
+          # and do a real copy so pluginval gets an actual bundle.
           mkdir -p ~/Library/Audio/Plug-Ins/Components
-          cp -R build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
+          rm -rf ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+          cp -R -L build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           sleep 2
           pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
