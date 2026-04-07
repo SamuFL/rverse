@@ -216,6 +216,7 @@ without audible clicks or artefacts.
 
 - [ ] Stutter rate sweeps smoothly from off to maximum and back
 - [ ] Stutter depth fades smoothly between dry and full stutter
+- [ ] GUI knobs visually track CC input in real-time (Rate and Depth move as CC values change)
 - [ ] No audible clicks at any point during continuous modulation
 - [ ] No CPU spikes or audio dropouts during rapid modulation
 
