@@ -244,8 +244,18 @@ private:
     }
 
     // --- Synchronous stretch ---
-    // Stretch to targetBeats + overlap so the riser extends past the beat boundary
-    const double totalBeats = riserLengthBeats + kRiserOverlapBeats;
+    // Compute stretch factor for the base riser length (on-beat target)
+    const double baseStretchFactor = calcStretchFactor(
+      static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate
+    );
+
+    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
+    // get a longer crossfade to mask the smeared transient tail
+    const double overlapBeats = std::min(
+      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
+      kRiserOverlapBeatsMax
+    );
+    const double totalBeats = riserLengthBeats + overlapBeats;
     const double stretchFactor = calcStretchFactor(
       static_cast<int>(cachedRevL.size()), totalBeats, bpm, sampleRate
     );
@@ -266,11 +276,15 @@ private:
     riser->mReversedR = std::move(cachedRevR);
 #endif
 
-    // Tail fade-out
+    // Tail fade-out — when enabled, scale with overlap so the fade covers the full overlap region
     if (kRiserTailFadeBeats > 0.0)
     {
-      const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * kRiserTailFadeBeats));
-      applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
+      if (fadeSamples > 0)
+      {
+        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      }
     }
 
     // Only publish if no newer rebuild has been requested
@@ -431,8 +445,18 @@ private:
     }
 
     // --- Stage 3: Time-Stretch ---
-    // Stretch to targetBeats + overlap so the riser extends past the beat boundary
-    const double totalBeats = riserLengthBeats + kRiserOverlapBeats;
+    // Compute stretch factor for the base riser length (on-beat target)
+    const double baseStretchFactor = calcStretchFactor(
+      static_cast<int>(reversedL.size()), riserLengthBeats, bpm, sampleRate
+    );
+
+    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
+    // get a longer crossfade to mask the smeared transient tail
+    const double overlapBeats = std::min(
+      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
+      kRiserOverlapBeatsMax
+    );
+    const double totalBeats = riserLengthBeats + overlapBeats;
     const double stretchFactor = calcStretchFactor(
       static_cast<int>(reversedL.size()), totalBeats, bpm, sampleRate
     );
@@ -455,13 +479,17 @@ private:
 #endif
 
     // --- Stage 4: Tail fade-out ---
-    // Short fade at the end of the riser so the reversed transient doesn't
-    // produce a hard click when it meets the dry hit.
-    // Controlled by kRiserTailFadeBeats in Constants.h. Set to 0 to disable.
+    // When enabled, fade covers at least kRiserTailFadeBeats or the full overlap,
+    // whichever is longer, so the riser decays smoothly through the entire overlap
+    // region into the hit. Set kRiserTailFadeBeats to 0.0 to disable.
     if (kRiserTailFadeBeats > 0.0)
     {
-      const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * kRiserTailFadeBeats));
-      applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
+      if (fadeSamples > 0)
+      {
+        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      }
     }
 
     // Final abort check before publishing

@@ -133,6 +133,20 @@ Riser Length is a **discrete** parameter. Only the following musical values are 
 > fire at the end of the riser regardless of length — verify the riser→hit timing is correct
 > for each setting.
 
+#### 2.3h Adaptive Riser-to-Hit Overlap (Stretch-Dependent)
+
+Test at **extreme** riser lengths to verify the adaptive overlap scales correctly:
+
+| Test | Riser Length | Sample | Expected |
+|------|-------------|--------|----------|
+| 2.3h-1 | 16 beats, 60 BPM | Short kick (<100 ms) | Riser end crossfades smoothly into hit — no audible gap or volume dip before hit |
+| 2.3h-2 | 1/4 beat, 180 BPM | Snare with tail (>1 s) | Minimal overlap (near 1/32 beat) — no over-bleed |
+| 2.3h-3 | 16 beats, 60 BPM | Snare with tail (>1 s) | Large overlap — riser tail gently merges into hit without hard cut |
+
+> At high stretch ratios (e.g. 16 beats at 60 BPM with a short sample), the overlap
+> scales up automatically. The hit must still fire **exactly** on-beat; only the riser
+> tail extends further past the boundary.
+
 ### 2.4 Fade In
 
 | Test | Value | Expected Outcome |

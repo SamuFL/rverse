@@ -1,6 +1,8 @@
 #pragma once
 
 #include "IPlug_include_in_plug_hdr.h"
+#include "IPlugQueue.h"
+#include "IPlugStructs.h"
 #include "RvrseProcessor.h"
 #include "SampleData.h"
 #include "Stutter.h"
@@ -151,6 +153,9 @@ private:
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state
+
+  // --- CC → UI param update queue (audio thread pushes, OnIdle drains) ---
+  IPlugQueue<ParamTuple> mCCParamQueue { 32 };
 
   // --- MIDI activity indicator ---
   std::atomic<int> mMidiActivityCounter { 0 }; ///< Incremented by audio thread on any MIDI event
