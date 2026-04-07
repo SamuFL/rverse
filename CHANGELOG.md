@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - AUv3 Framework plists (iOS + macOS) had stale version strings (1.0/1.0.0 instead of 0.1.0) — now synced via `sync-version.py` (rverse-jaj)
 - CMakeLists.txt project version was 1.0.0 instead of 0.1.0 — now synced (rverse-jaj)
+- AU plists had stale iPlug2 template values: type was `aufx` (effect) instead of `aumu` (instrument), subtype was `9c0G` instead of `5SpI` matching config.h `PLUG_UNIQUE_ID` — caused pluginval Class Data mismatch failure (rverse-nwe)
 - Plugin GUI crash (SIGABRT in NanoVG font rendering) caused by missing font resource in deployed VST3/AU bundles — switched macOS non-Xcode deployment from COPY to SYMLINK to avoid iPlug2 resource bundling race condition (pre-existing bug)
 
 ### Added
