@@ -17,9 +17,24 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Version consistency check
+  # ---------------------------------------------------------------------------
+  version-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check version sync
+        run: python3 scripts/sync-version.py --check
+
+  # ---------------------------------------------------------------------------
   # macOS — Ninja, Debug
   # ---------------------------------------------------------------------------
   macos:
+    needs: [version-check]
     runs-on: macos-14
     timeout-minutes: 30
 
@@ -49,6 +64,32 @@ jobs:
           cmake --build build/macos-ninja --config Debug --target rvrse_tests
           ctest --test-dir build/macos-ninja --output-on-failure
 
+      - name: Download pluginval (pinned v1.0.4)
+        run: |
+          curl -fsSL "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip" -o pluginval.zip
+          echo "3c4c533bda0c5059eea3ddaea752d757ee2025041f0f47e6bcb0e87f6082b29f  pluginval.zip" | shasum -a 256 --check
+          unzip -q pluginval.zip
+
+      - name: Validate VST3 (pluginval)
+        run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.vst3"
+
+      - name: Validate AU (pluginval)
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          rm -rf ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+          cp -R -L build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 2
+          pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+
+      - name: Upload pluginval logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-dev-macOS-pluginval-logs
+          path: pluginval-logs/**
+          retention-days: 14
+
       - name: Package macOS zip
         run: |
           cd build/macos-ninja/out
@@ -72,6 +113,7 @@ jobs:
   # Windows — Visual Studio 2022, Debug
   # ---------------------------------------------------------------------------
   windows:
+    needs: [version-check]
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -98,6 +140,24 @@ jobs:
         run: |
           cmake --build build/windows-vs2022 --config Debug --target rvrse_tests
           ctest --test-dir build/windows-vs2022 -C Debug --output-on-failure
+
+      - name: Download pluginval (pinned v1.0.4)
+        run: |
+          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip" -OutFile pluginval.zip
+          $hash = (Get-FileHash pluginval.zip -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "c08e61ce3b96db41636f8ec7e76f4c7e2c13ebdac7fa1b5a1f52b4f32ec715ab") { throw "pluginval SHA256 mismatch: $hash" }
+          Expand-Archive pluginval.zip -DestinationPath .
+
+      - name: Validate VST3 (pluginval)
+        run: ./pluginval.exe --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/windows-vs2022/out/RVRSE.vst3"
+
+      - name: Upload pluginval logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-dev-Windows-pluginval-logs
+          path: pluginval-logs/**
+          retention-days: 14
 
       - name: Package Windows zip
         shell: bash
