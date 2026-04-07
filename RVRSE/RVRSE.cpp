@@ -445,6 +445,13 @@ RVRSE::RVRSE(const InstanceInfo& info)
 #if IPLUG_EDITOR
 void RVRSE::OnIdle()
 {
+  // Drain CC→UI param updates queued by the audio thread
+  ParamTuple p;
+  while (mCCParamQueue.Pop(p))
+  {
+    SendParameterValueFromDelegate(p.idx, p.value, false);
+  }
+
   // Update BPM display when host tempo changes
   const double currentBPM = mLastBPM.load(std::memory_order_relaxed);
   if (GetUI() && std::abs(currentBPM - mLastDisplayedBPM) > 0.01)
@@ -866,14 +873,14 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
         {
           const double val = msg.ControlChange(cc) * rvrse::kStutterRateMaxHz;
           GetParam(kParamStutterRate)->Set(val);
-          SendParameterValueFromAPI(kParamStutterRate, val, false);
+          mCCParamQueue.Push({kParamStutterRate, val});
           stutterRateHz = static_cast<float>(val);
         }
         else if (cc == static_cast<IMidiMsg::EControlChangeMsg>(rvrse::CC_STUTTER_DEPTH))
         {
           const double val = msg.ControlChange(cc);
           GetParam(kParamStutterDepth)->Set(val);
-          SendParameterValueFromAPI(kParamStutterDepth, val, false);
+          mCCParamQueue.Push({kParamStutterDepth, val});
           stutterDepth = static_cast<float>(val);
         }
       }

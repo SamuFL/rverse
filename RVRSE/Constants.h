@@ -115,15 +115,13 @@ constexpr int kStretchQualityDefault = kStretchQualityHigh;
 /// Examples: 1/16 = 0.0625 (subtle), 1/4 = 0.25 (gentle), 1.0 = full beat.
 constexpr double kRiserTailFadeBeats = 0.0625;  ///< 1/16 of a beat
 
-/// Extra riser length beyond the beat boundary (in beats).
-/// The riser is stretched to (targetBeats + kRiserOverlapBeats), so it extends
-/// past the hit point, creating a crossfade with the hit's attack. The tail
-/// fade (kRiserTailFadeBeats) still applies to the full buffer, meaning the
-/// fade begins before the beat boundary and the riser decays through the overlap.
-/// Must be <= kRiserTailFadeBeats for the overlap to sit within the fade region.
-constexpr double kRiserOverlapBeats = 1.0 / 32.0;  ///< 1/32 of a beat
-static_assert(kRiserOverlapBeats <= kRiserTailFadeBeats,
-              "kRiserOverlapBeats must be <= kRiserTailFadeBeats");
+/// Base overlap in beats when the stretch factor is 1.0 (no stretching).
+/// At higher stretch ratios the overlap scales proportionally so the stretched
+/// transient blends smoothly into the hit. The actual overlap is:
+///   overlapBeats = min(kRiserOverlapBeatsBase * stretchFactor, kRiserOverlapBeatsMax)
+/// Both the tail fade and the overlap scale together to keep the crossfade musical.
+constexpr double kRiserOverlapBeatsBase = 1.0 / 32.0;  ///< 1/32 of a beat at 1× stretch
+constexpr double kRiserOverlapBeatsMax  = 1.0;          ///< Cap at 1 beat for extreme stretches
 
 // --- Audio ---
 constexpr double kDefaultBPM         = 120.0;
