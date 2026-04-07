@@ -346,7 +346,7 @@ cmake -B build -DBUILD_TESTING=OFF
 ### Version Management
 
 The canonical version lives in `RVRSE/config.h` (`PLUG_VERSION_STR` and `PLUG_VERSION_HEX`).
-After changing it, run the sync script to propagate to plists, installer, and CMakeLists:
+After changing it, run the sync script to propagate to plists, installer, and `RVRSE/CMakeLists.txt`:
 
 ```bash
 python3 scripts/sync-version.py          # apply updates
