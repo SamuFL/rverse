@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Version sync script (`scripts/sync-version.py`) — reads canonical version from `config.h` and propagates to all plists, Inno Setup installer, and CMakeLists.txt; CI check mode (`--check`) prevents version drift (rverse-jaj)
+- Pluginval validation in CI — VST3 validated on both platforms, AU on macOS; strictness level 5, hard gate on failure (rverse-nwe)
 - Full IGraphics GUI with dark theme (dark green/blue palette, gold/blue accents) — responsive layout with corner resizer (rverse-ebv)
 - Dual waveform display: riser (gold) + hit (blue) with shared amplitude normalization and animated playhead (rverse-ebv)
 - Hit preview waveform in hit panel showing original loaded sample (rverse-ebv)
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - AUv3 Framework plists (iOS + macOS) had stale version strings (1.0/1.0.0 instead of 0.1.0) — now synced via `sync-version.py` (rverse-jaj)
 - CMakeLists.txt project version was 1.0.0 instead of 0.1.0 — now synced (rverse-jaj)
+- AU plists had stale iPlug2 template values: type was `aufx` (effect) instead of `aumu` (instrument), subtype was `9c0G` instead of `5SpI` matching config.h `PLUG_UNIQUE_ID` — caused pluginval Class Data mismatch failure (rverse-nwe)
 - Plugin GUI crash (SIGABRT in NanoVG font rendering) caused by missing font resource in deployed VST3/AU bundles — switched macOS non-Xcode deployment from COPY to SYMLINK to avoid iPlug2 resource bundling race condition (pre-existing bug)
 
 ### Added

@@ -63,6 +63,35 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build/macos-ninja --output-on-failure
 
+      - name: Download pluginval (pinned v1.0.4)
+        run: |
+          curl -fsSL "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip" -o pluginval.zip
+          echo "3c4c533bda0c5059eea3ddaea752d757ee2025041f0f47e6bcb0e87f6082b29f  pluginval.zip" | shasum -a 256 --check
+          unzip -q pluginval.zip
+
+      - name: Validate VST3 (pluginval)
+        run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.vst3"
+
+      - name: Validate AU (pluginval)
+        run: |
+          # AU plugins must be registered in a system location for pluginval to find them.
+          # The SYMLINK deploy method may have created a symlink here already — remove it
+          # and do a real copy so pluginval gets an actual bundle.
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          rm -rf ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+          cp -R -L build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 2
+          pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+
+      - name: Upload pluginval logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-macOS-pluginval-logs
+          path: pluginval-logs/**
+          retention-days: 14
+
       - name: Upload artefacts
         if: success()
         uses: actions/upload-artifact@v6
@@ -105,6 +134,24 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build/windows-vs2022 -C Debug --output-on-failure
+
+      - name: Download pluginval (pinned v1.0.4)
+        run: |
+          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip" -OutFile pluginval.zip
+          $hash = (Get-FileHash pluginval.zip -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "c08e61ce3b96db41636f8ec7e76f4c7e2c13ebdac7fa1b5a1f52b4f32ec715ab") { throw "pluginval SHA256 mismatch: $hash" }
+          Expand-Archive pluginval.zip -DestinationPath .
+
+      - name: Validate VST3 (pluginval)
+        run: ./pluginval.exe --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/windows-vs2022/out/RVRSE.vst3"
+
+      - name: Upload pluginval logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-Windows-pluginval-logs
+          path: pluginval-logs/**
+          retention-days: 14
 
       - name: Upload artefacts
         if: success()

@@ -16,9 +16,9 @@
 			<key>sandboxSafe</key>
 			<true/>
 			<key>subtype</key>
-			<string>9c0G</string>
+			<string>5SpI</string>
 			<key>type</key>
-			<string>aufx</string>
+			<string>aumu</string>
 			<key>version</key>
 			<integer>256</integer>
 		</dict>
@@ -42,7 +42,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.1.0</string>
 	<key>CFBundleSignature</key>
-	<string>9c0G</string>
+	<string>5SpI</string>
 	<key>CFBundleVersion</key>
 	<string>0.1.0</string>
 	<key>CSResourcesFileMapped</key>
