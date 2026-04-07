@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -256,7 +257,7 @@ private:
 
     // Record where the exact beat boundary falls (before the overlap region)
     const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    riser->mBeatAlignedFrames = static_cast<int>(riserLengthBeats * samplesPerBeat);
+    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
 
 #ifndef NDEBUG
     riser->mReverbedL = std::move(cachedRvbL);
@@ -443,7 +444,7 @@ private:
 
     // Record where the exact beat boundary falls (before the overlap region)
     const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    riser->mBeatAlignedFrames = static_cast<int>(riserLengthBeats * samplesPerBeat);
+    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
 
 #ifndef NDEBUG
     // Store intermediate buffers for debug playback

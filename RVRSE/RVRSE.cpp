@@ -722,6 +722,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 {
   const int nChans = NOutChansConnected();
   const double masterVol = GetParam(kParamMasterVol)->Value() / 100.0;
+  auto stutterRateHz = static_cast<float>(GetParam(kParamStutterRate)->Value());
+  float stutterDepth = static_cast<float>(GetParam(kParamStutterDepth)->Value());
   const float lush = static_cast<float>(GetParam(kParamLush)->Value() / 100.0);
   const int riserLengthIdx = static_cast<int>(GetParam(kParamRiserLength)->Value());
   const double riserLengthBeats = rvrse::kRiserLengthValues[
@@ -865,21 +867,19 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
           const double val = msg.ControlChange(cc) * rvrse::kStutterRateMaxHz;
           GetParam(kParamStutterRate)->Set(val);
           SendParameterValueFromAPI(kParamStutterRate, val, false);
+          stutterRateHz = static_cast<float>(val);
         }
         else if (cc == static_cast<IMidiMsg::EControlChangeMsg>(rvrse::CC_STUTTER_DEPTH))
         {
           const double val = msg.ControlChange(cc);
           GetParam(kParamStutterDepth)->Set(val);
           SendParameterValueFromAPI(kParamStutterDepth, val, false);
+          stutterDepth = static_cast<float>(val);
         }
       }
 
       mMidiQueue.Remove();
     }
-
-    // Read stutter params after MIDI processing so CC changes take effect immediately
-    const auto stutterRateHz = static_cast<float>(GetParam(kParamStutterRate)->Value());
-    const float stutterDepth = static_cast<float>(GetParam(kParamStutterDepth)->Value());
 
     // --- Generate riser/debug output ---
     float riserL = 0.0f;
