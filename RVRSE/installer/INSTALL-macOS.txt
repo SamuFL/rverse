@@ -1,0 +1,35 @@
+RVRSE — Installation Guide (macOS)
+-----------------------------------
+
+Thank you for downloading RVRSE!
+
+Copy the plugin format(s) you use to the standard macOS plugin directories:
+
+  AU:    ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+  VST3:  ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
+  CLAP:  ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
+  App:   /Applications/RVRSE.app  (standalone, optional)
+
+Then relaunch your DAW and scan for new plugins.
+
+IMPORTANT — macOS Security
+---------------------------
+This build is not code-signed or notarized. On first launch, macOS
+will block it. To allow it:
+
+  1. Open System Settings → Privacy & Security
+  2. Scroll down — you'll see a message about RVRSE being blocked
+  3. Click "Open Anyway"
+
+Alternatively, right-click the plugin file → Open before moving it
+to the plugin directory.
+
+This only needs to be done once per format.
+
+Links
+-----
+  Homepage:    https://samufl.com
+  Source code: https://github.com/SamuFL/rverse
+  Issues:      https://github.com/SamuFL/rverse/issues
+
+License: MIT — see https://github.com/SamuFL/rverse/blob/main/LICENSE
