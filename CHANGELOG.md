@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Version sync script (`scripts/sync-version.py`) — reads canonical version from `config.h` and propagates to all plists, Inno Setup installer, and CMakeLists.txt; CI check mode (`--check`) prevents version drift (rverse-jaj)
+- Pluginval validation in CI — VST3 validated on both platforms, AU on macOS; strictness level 5, hard gate on failure (rverse-nwe)
 - Full IGraphics GUI with dark theme (dark green/blue palette, gold/blue accents) — responsive layout with corner resizer (rverse-ebv)
 - Dual waveform display: riser (gold) + hit (blue) with shared amplitude normalization and animated playhead (rverse-ebv)
 - Hit preview waveform in hit panel showing original loaded sample (rverse-ebv)

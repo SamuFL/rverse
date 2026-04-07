@@ -63,6 +63,17 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build/macos-ninja --output-on-failure
 
+      - name: Download pluginval
+        run: |
+          curl -fsSL "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip" -o pluginval.zip
+          unzip -q pluginval.zip
+
+      - name: Validate VST3 (pluginval)
+        run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.vst3"
+
+      - name: Validate AU (pluginval)
+        run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.component"
+
       - name: Upload artefacts
         if: success()
         uses: actions/upload-artifact@v6
@@ -105,6 +116,14 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build/windows-vs2022 -C Debug --output-on-failure
+
+      - name: Download pluginval
+        run: |
+          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile pluginval.zip
+          Expand-Archive pluginval.zip -DestinationPath .
+
+      - name: Validate VST3 (pluginval)
+        run: ./pluginval.exe --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/windows-vs2022/out/RVRSE.vst3"
 
       - name: Upload artefacts
         if: success()
