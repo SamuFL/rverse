@@ -40,17 +40,21 @@ def expected_hex(version: str) -> str:
     return f"0x{val:08x}"
 
 
-def check_config_hex(version: str) -> list[str]:
-    """Verify PLUG_VERSION_HEX matches PLUG_VERSION_STR."""
+def check_config_hex(version: str) -> None:
+    """Verify PLUG_VERSION_HEX matches PLUG_VERSION_STR.
+
+    A mismatch is a hard error because this script does not rewrite config.h,
+    so continuing would leave the canonical source of truth out of sync while
+    other satellite files may have been updated.
+    """
     text = CONFIG_H.read_text()
     m = re.search(r"#define\s+PLUG_VERSION_HEX\s+(0x[0-9a-fA-F]+)", text)
     if not m:
-        return ["config.h: PLUG_VERSION_HEX not found"]
+        sys.exit("ERROR: config.h: PLUG_VERSION_HEX not found")
     actual = m.group(1).lower()
     want = expected_hex(version)
     if actual != want:
-        return [f"config.h: PLUG_VERSION_HEX is {actual}, expected {want}"]
-    return []
+        sys.exit(f"ERROR: config.h: PLUG_VERSION_HEX is {actual}, expected {want}")
 
 
 def sync_plists(version: str, check_only: bool) -> list[str]:
@@ -123,8 +127,9 @@ def main():
     version = read_config_version()
     print(f"Canonical version: {version}")
 
+    check_config_hex(version)
+
     all_diffs: list[str] = []
-    all_diffs.extend(check_config_hex(version))
     all_diffs.extend(sync_plists(version, args.check))
     all_diffs.extend(sync_iss(version, args.check))
     all_diffs.extend(sync_cmake(version, args.check))
