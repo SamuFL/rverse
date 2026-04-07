@@ -276,11 +276,15 @@ private:
     riser->mReversedR = std::move(cachedRevR);
 #endif
 
-    // Tail fade-out — scale with overlap so the fade covers the full overlap region
-    const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+    // Tail fade-out — when enabled, scale with overlap so the fade covers the full overlap region
+    if (kRiserTailFadeBeats > 0.0)
     {
-      const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * fadeTotalBeats));
-      applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
+      if (fadeSamples > 0)
+      {
+        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      }
     }
 
     // Only publish if no newer rebuild has been requested
@@ -475,12 +479,17 @@ private:
 #endif
 
     // --- Stage 4: Tail fade-out ---
-    // Fade covers at least kRiserTailFadeBeats or the full overlap, whichever is longer,
-    // so the riser decays smoothly through the entire overlap region into the hit.
-    const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+    // When enabled, fade covers at least kRiserTailFadeBeats or the full overlap,
+    // whichever is longer, so the riser decays smoothly through the entire overlap
+    // region into the hit. Set kRiserTailFadeBeats to 0.0 to disable.
+    if (kRiserTailFadeBeats > 0.0)
     {
-      const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * fadeTotalBeats));
-      applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
+      if (fadeSamples > 0)
+      {
+        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      }
     }
 
     // Final abort check before publishing
