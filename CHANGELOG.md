@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CMakeLists.txt project version was 1.0.0 instead of 0.1.0 — now synced (rverse-jaj)
 - AU plists had stale iPlug2 template values: type was `aufx` (effect) instead of `aumu` (instrument), subtype was `9c0G` instead of `5SpI` matching config.h `PLUG_UNIQUE_ID` — caused pluginval Class Data mismatch failure (rverse-nwe)
 - Plugin GUI crash (SIGABRT in NanoVG font rendering) caused by missing font resource in deployed VST3/AU bundles — switched macOS non-Xcode deployment from COPY to SYMLINK to avoid iPlug2 resource bundling race condition (pre-existing bug)
+- MIDI CC1 (Stutter Rate) and CC11 (Stutter Depth) now update both the DSP parameter and the GUI knob in real-time — previously `GetParam()->Set()` was called without `SendParameterValueFromAPI()`, so the knobs didn't move; stutter values are now read per-sample after MIDI processing for immediate response (rverse-y5o)
+- Riser-to-hit transition smoothed with 1/32-beat overlap — riser is stretched slightly longer than the beat boundary while the hit still fires exactly on-beat, so the riser's tail fade crossfades naturally into the hit attack instead of cutting off abruptly (rverse-0g6)
 
 ### Added
 - Persist loaded sample path across DAW sessions — save/restore via `SerializeState`/`UnserializeState` with versioned chunk format. Shows "Missing: filename" if file is gone on reload. (rverse-7dr)

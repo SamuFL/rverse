@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -28,6 +29,7 @@ struct RiserData
   std::vector<float> mLeft;    ///< Left channel of final_riser[] (stretched + faded)
   std::vector<float> mRight;   ///< Right channel of final_riser[]
   double mSampleRate = 0.0;    ///< Sample rate of the riser data
+  int mBeatAlignedFrames = 0;  ///< Frame count at the exact beat boundary (before overlap)
 
 #ifndef NDEBUG
   // Debug: intermediate pipeline buffers (populated alongside the main output)
@@ -242,14 +244,20 @@ private:
     }
 
     // --- Synchronous stretch ---
+    // Stretch to targetBeats + overlap so the riser extends past the beat boundary
+    const double totalBeats = riserLengthBeats + kRiserOverlapBeats;
     const double stretchFactor = calcStretchFactor(
-      static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate
+      static_cast<int>(cachedRevL.size()), totalBeats, bpm, sampleRate
     );
 
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(cachedRevL, cachedRevR, stretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
+
+    // Record where the exact beat boundary falls (before the overlap region)
+    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
+    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
 
 #ifndef NDEBUG
     riser->mReverbedL = std::move(cachedRvbL);
@@ -261,7 +269,6 @@ private:
     // Tail fade-out
     if (kRiserTailFadeBeats > 0.0)
     {
-      const double samplesPerBeat = (sampleRate * 60.0) / bpm;
       const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * kRiserTailFadeBeats));
       applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
     }
@@ -424,14 +431,20 @@ private:
     }
 
     // --- Stage 3: Time-Stretch ---
+    // Stretch to targetBeats + overlap so the riser extends past the beat boundary
+    const double totalBeats = riserLengthBeats + kRiserOverlapBeats;
     const double stretchFactor = calcStretchFactor(
-      static_cast<int>(reversedL.size()), riserLengthBeats, bpm, sampleRate
+      static_cast<int>(reversedL.size()), totalBeats, bpm, sampleRate
     );
 
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(reversedL, reversedR, stretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
+
+    // Record where the exact beat boundary falls (before the overlap region)
+    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
+    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
 
 #ifndef NDEBUG
     // Store intermediate buffers for debug playback
@@ -447,7 +460,6 @@ private:
     // Controlled by kRiserTailFadeBeats in Constants.h. Set to 0 to disable.
     if (kRiserTailFadeBeats > 0.0)
     {
-      const double samplesPerBeat = (sampleRate * 60.0) / bpm;
       const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * kRiserTailFadeBeats));
       applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
     }
