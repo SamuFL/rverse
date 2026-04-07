@@ -50,11 +50,12 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           cd build/macos-ninja/out
-          formats=()
+          staging="$(mktemp -d)"
           for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
-            [ -e "$f" ] && formats+=("$f")
+            [ -e "$f" ] && cp -R -L "$f" "$staging/"
           done
-          zip -r -y "$GITHUB_WORKSPACE/RVRSE-${VERSION}-macOS.zip" "${formats[@]}"
+          cd "$staging"
+          zip -r "$GITHUB_WORKSPACE/RVRSE-${VERSION}-macOS.zip" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
@@ -127,8 +128,11 @@ jobs:
         id: notes
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          # Extract the section for this version (between ## [version] and the next ## [)
+          # Try versioned section first (## [0.1.0]), then fall back to [Unreleased]
           NOTES=$(awk "/^## \\[${VERSION}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES=$(awk '/^## \[Unreleased\]/{found=1; next} /^## \[/{if(found) exit} found{print}' CHANGELOG.md)
+          fi
           if [ -z "$NOTES" ]; then
             NOTES="Release ${GITHUB_REF_NAME}
 

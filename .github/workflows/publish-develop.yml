@@ -52,11 +52,12 @@ jobs:
       - name: Package macOS zip
         run: |
           cd build/macos-ninja/out
-          formats=()
+          staging="$(mktemp -d)"
           for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
-            [ -e "$f" ] && formats+=("$f")
+            [ -e "$f" ] && cp -R -L "$f" "$staging/"
           done
-          zip -r -y "$GITHUB_WORKSPACE/RVRSE-dev-macOS.zip" "${formats[@]}"
+          cd "$staging"
+          zip -r "$GITHUB_WORKSPACE/RVRSE-dev-macOS.zip" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
