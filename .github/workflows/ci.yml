@@ -72,7 +72,13 @@ jobs:
         run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.vst3"
 
       - name: Validate AU (pluginval)
-        run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.component"
+        run: |
+          # AU plugins must be registered in a system location for pluginval to find them
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 2
+          pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
 
       - name: Upload artefacts
         if: success()
