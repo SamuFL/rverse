@@ -1,11 +1,12 @@
 # CI — Build all plugin formats and run unit tests on macOS + Windows.
-# Triggered on pushes and PRs targeting develop or main.
+# Triggered on PRs targeting develop or main, and pushes to main.
+# Develop pushes are handled by publish-develop.yml (which also runs tests).
 
 name: CI
 
 on:
   push:
-    branches: [develop, main]
+    branches: [main]
   pull_request:
     branches: [develop, main]
 
