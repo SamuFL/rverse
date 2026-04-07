@@ -28,6 +28,23 @@ iplug_add_plugin(${PROJECT_NAME}
     MINIMAL_PLUGINS APP
 )
 
+# Workaround: iPlug2's CMake only adds main.rc to the APP target on Windows.
+# Plugin MODULE targets (VST3, CLAP) need it too for Win32 resource embedding
+# (fonts, images). See rverse-1qa for the upstream fix.
+if(WIN32)
+  set(_rc_file "${CMAKE_CURRENT_SOURCE_DIR}/resources/main.rc")
+  if(EXISTS "${_rc_file}")
+    set(_rc_flags "/I\"${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts\" /I\"${CMAKE_CURRENT_SOURCE_DIR}/resources/img\" /I\"${CMAKE_CURRENT_SOURCE_DIR}/resources\"")
+    foreach(_fmt vst3 clap)
+      if(TARGET ${PROJECT_NAME}-${_fmt})
+        target_sources(${PROJECT_NAME}-${_fmt} PRIVATE "${_rc_file}")
+        set_source_files_properties("${_rc_file}" TARGET_DIRECTORY ${PROJECT_NAME}-${_fmt}
+          PROPERTIES COMPILE_FLAGS "${_rc_flags}")
+      endif()
+    endforeach()
+  endif()
+endif()
+
 # Spectral stretcher FFT is orders of magnitude slower at -O0.
 # Force -O2 for TimeStretch.cpp even in Debug builds.
 # MSVC Debug: skipped — /O2 conflicts with /RTC1 (runtime checks) and there's no
