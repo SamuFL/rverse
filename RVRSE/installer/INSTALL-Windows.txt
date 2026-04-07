@@ -1,0 +1,21 @@
+RVRSE — Installation Guide (Windows)
+-------------------------------------
+
+Thank you for downloading RVRSE!
+
+Copy the plugin format(s) you use to the standard Windows plugin directories:
+
+  VST3:  C:\Program Files\Common Files\VST3\RVRSE.vst3\
+  CLAP:  C:\Program Files\Common Files\CLAP\RVRSE.clap
+
+The standalone app (RVRSE.exe) can be placed anywhere you like.
+
+Then relaunch your DAW and scan for new plugins.
+
+Links
+-----
+  Homepage:    https://samufl.com
+  Source code: https://github.com/SamuFL/rverse
+  Issues:      https://github.com/SamuFL/rverse/issues
+
+License: MIT — see https://github.com/SamuFL/rverse/blob/main/LICENSE

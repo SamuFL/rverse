@@ -56,6 +56,9 @@ jobs:
           for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
             [ -e "$f" ] && cp -R -L "$f" "$staging/"
           done
+          cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-macOS.txt" "$staging/INSTALL.txt"
+          MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
+          [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" "$staging/"
           cd "$staging"
           zip -r "$GITHUB_WORKSPACE/RVRSE-dev-macOS.zip" .
 
@@ -100,9 +103,12 @@ jobs:
         shell: bash
         run: |
           cd build/windows-vs2022/out
+          cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-Windows.txt" INSTALL.txt
+          MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
+          [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" .
           7z a "$GITHUB_WORKSPACE/RVRSE-dev-Windows.zip" \
-            RVRSE.vst3 RVRSE.clap RVRSE.exe 2>/dev/null || \
-          7z a "$GITHUB_WORKSPACE/RVRSE-dev-Windows.zip" RVRSE.vst3
+            RVRSE.vst3 RVRSE.clap RVRSE.exe INSTALL.txt "RVRSE manual.pdf" 2>/dev/null || \
+          7z a "$GITHUB_WORKSPACE/RVRSE-dev-Windows.zip" RVRSE.vst3 INSTALL.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
