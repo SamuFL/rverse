@@ -343,6 +343,16 @@ To disable tests entirely (e.g. CI release builds):
 cmake -B build -DBUILD_TESTING=OFF
 ```
 
+### Version Management
+
+The canonical version lives in `RVRSE/config.h` (`PLUG_VERSION_STR` and `PLUG_VERSION_HEX`).
+After changing it, run the sync script to propagate to plists, installer, and CMakeLists:
+
+```bash
+python3 scripts/sync-version.py          # apply updates
+python3 scripts/sync-version.py --check  # verify (also runs in CI)
+```
+
 ---
 
 ## Plugin Formats
@@ -468,7 +478,7 @@ the full dependency tree.
 | `rverse-6fl` | P0 | Add Catch2 test framework and tests/ directory | ✅ Done |
 | `rverse-2uq` | P0 | Unit tests for existing DSP modules | ✅ Done (42 tests) |
 | `rverse-zvc` | P2 | Write user manual (LaTeX → PDF) | Blocked by `rverse-ebv` |
-| `rverse-jaj` | P2 | Automate version number sync (plists, installer, config.h) | Open |
+| `rverse-jaj` | P2 | Automate version number sync (plists, installer, config.h) | Done |
 | `rverse-nwe` | P2 | Add Pluginval to CI pipeline | Open |
 | `rverse-k4o` | P3 | Add CONTRIBUTING.md and CODE_OF_CONDUCT.md | Open |
 

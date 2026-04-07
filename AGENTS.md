@@ -233,6 +233,45 @@ Manually validate in a DAW after any change to the DSP pipeline. Recommended DAW
 
 ---
 
+## 7b. Version Management
+
+The **single source of truth** for the plugin version is `RVRSE/config.h`:
+
+```c
+#define PLUG_VERSION_HEX 0x00000100
+#define PLUG_VERSION_STR "0.1.0"
+```
+
+A sync script propagates this version to all satellite files (plists, installer, CMakeLists).
+CI enforces consistency — PRs with version drift will fail the `version-check` job.
+
+### Bumping the version
+
+```bash
+# 1. Edit config.h — update both PLUG_VERSION_STR and PLUG_VERSION_HEX
+# 2. Run the sync script
+python3 scripts/sync-version.py
+
+# 3. Verify (optional — CI also runs this)
+python3 scripts/sync-version.py --check
+
+# 4. Commit all changed files together
+```
+
+### What the script updates
+
+| File(s) | Fields |
+|---|---|
+| `RVRSE/resources/*.plist` (11 files) | `CFBundleShortVersionString`, `CFBundleVersion` |
+| `RVRSE/installer/RVRSE.iss` | `AppVersion`, `VersionInfoVersion` |
+| `RVRSE/CMakeLists.txt` | `project(RVRSE VERSION ...)` |
+
+> **Never manually edit version strings in satellite files.** Always change `config.h`
+> and run the sync script. The CI `version-check` job will block any PR where files
+> are out of sync.
+
+---
+
 ## 8. Git-Flow Branching Strategy
 
 This project uses a standard **git-flow** branching model. Follow it without exception.
