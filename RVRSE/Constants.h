@@ -122,6 +122,8 @@ constexpr double kRiserTailFadeBeats = 0.0625;  ///< 1/16 of a beat
 /// fade begins before the beat boundary and the riser decays through the overlap.
 /// Must be <= kRiserTailFadeBeats for the overlap to sit within the fade region.
 constexpr double kRiserOverlapBeats = 1.0 / 32.0;  ///< 1/32 of a beat
+static_assert(kRiserOverlapBeats <= kRiserTailFadeBeats,
+              "kRiserOverlapBeats must be <= kRiserTailFadeBeats");
 
 // --- Audio ---
 constexpr double kDefaultBPM         = 120.0;
