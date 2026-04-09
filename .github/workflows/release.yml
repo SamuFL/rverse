@@ -46,6 +46,13 @@ jobs:
           cmake --build build/macos-ninja --config Release --target rvrse_tests
           ctest --test-dir build/macos-ninja --output-on-failure
 
+      - name: Ad-hoc codesign bundles
+        run: |
+          cd build/macos-ninja/out
+          for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
+            [ -e "$f" ] && codesign --force --deep -s - "$f"
+          done
+
       - name: Package macOS zip
         run: |
           VERSION="${GITHUB_REF_NAME#v}"

@@ -3,28 +3,38 @@ RVRSE — Installation Guide (macOS)
 
 Thank you for downloading RVRSE!
 
-Copy the plugin format(s) you use to the standard macOS plugin directories:
+1. Copy the plugin format(s) you use to the standard macOS plugin directories:
 
   AU:    ~/Library/Audio/Plug-Ins/Components/RVRSE.component
   VST3:  ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
   CLAP:  ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
   App:   /Applications/RVRSE.app  (standalone, optional)
 
-Then relaunch your DAW and scan for new plugins.
+2. Relaunch your DAW and scan for new plugins.
 
-IMPORTANT — macOS Security
----------------------------
-This build is not code-signed or notarized. On first launch, macOS
-will block it. To allow it:
 
-  1. Open System Settings → Privacy & Security
-  2. Scroll down — you'll see a message about RVRSE being blocked
-  3. Click "Open Anyway"
+IMPORTANT — macOS Security (Gatekeeper)
+----------------------------------------
+RVRSE is ad-hoc signed but not notarized with Apple. macOS may show
+a warning when you first open it ("cannot be opened because the
+developer cannot be verified" or "damaged").
 
-Alternatively, right-click the plugin file → Open before moving it
-to the plugin directory.
+The quickest fix — run this in Terminal BEFORE opening your DAW:
 
-This only needs to be done once per format.
+  xattr -cr ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
+  xattr -cr ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+  xattr -cr ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
+  xattr -cr /Applications/RVRSE.app
+
+(Only run the lines for the formats you installed.)
+
+This removes the quarantine flag that macOS adds to downloaded files.
+You only need to do this once per format.
+
+Alternative: Right-click the plugin → Open, then confirm in the
+security dialog. Or go to System Settings → Privacy & Security and
+click "Open Anyway" after the first blocked attempt.
+
 
 Links
 -----
