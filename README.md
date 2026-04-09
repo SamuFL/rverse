@@ -6,10 +6,10 @@ RVRSE generates a reverse-reverb riser automatically from any loaded hit sample,
 original hit at a tempo-synced beat boundary. One sample in → complete transition out. No manual
 editing, no extra samples needed.
 
-> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline, stutter gate, IGraphics GUI, and all
-> DAW parameters working. CI running on macOS + Windows. Dark-themed native GUI with waveform
-> display, dual control panels, and hit preview. Release packaging still in progress.
-> See [CHANGELOG.md](./CHANGELOG.md) and the Release Preparation Epic (`rverse-0v6`) for details.
+> **Status:** `v1.0.0` released. Core DSP pipeline, stutter gate, IGraphics GUI, and all DAW
+> parameters working. CI builds on macOS (Apple Silicon) + Windows (VS2022) with ad-hoc codesigning.
+> Dark-themed native GUI with waveform display, dual control panels, and hit preview.
+> See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 ---
 
