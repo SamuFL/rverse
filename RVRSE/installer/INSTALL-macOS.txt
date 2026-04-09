@@ -10,16 +10,18 @@ Thank you for downloading RVRSE!
   CLAP:  ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
   App:   /Applications/RVRSE.app  (standalone, optional)
 
-2. Relaunch your DAW and scan for new plugins.
+2. Remove the macOS quarantine flag (see "macOS Security" below).
+
+3. Relaunch your DAW and scan for new plugins.
 
 
-IMPORTANT — macOS Security (Gatekeeper)
-----------------------------------------
-RVRSE is ad-hoc signed but not notarized with Apple. macOS may show
-a warning when you first open it ("cannot be opened because the
-developer cannot be verified" or "damaged").
+macOS Security (Gatekeeper)
+----------------------------
+RVRSE is ad-hoc signed but not notarized with Apple. macOS adds a
+quarantine flag to all downloaded files, which may cause a "damaged"
+or "unidentified developer" warning.
 
-The quickest fix — run this in Terminal BEFORE opening your DAW:
+Run this in Terminal AFTER copying, BEFORE opening your DAW:
 
   xattr -cr ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
   xattr -cr ~/Library/Audio/Plug-Ins/Components/RVRSE.component
@@ -28,8 +30,8 @@ The quickest fix — run this in Terminal BEFORE opening your DAW:
 
 (Only run the lines for the formats you installed.)
 
-This removes the quarantine flag that macOS adds to downloaded files.
-You only need to do this once per format.
+This removes the quarantine flag. You only need to do this once per
+format.
 
 Alternative: Right-click the plugin → Open, then confirm in the
 security dialog. Or go to System Settings → Privacy & Security and
