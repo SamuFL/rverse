@@ -1,0 +1,47 @@
+RVRSE — Installation Guide (macOS)
+-----------------------------------
+
+Thank you for downloading RVRSE!
+
+1. Copy the plugin format(s) you use to the standard macOS plugin directories:
+
+  AU:    ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+  VST3:  ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
+  CLAP:  ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
+  App:   /Applications/RVRSE.app  (standalone, optional)
+
+2. Remove the macOS quarantine flag (see "macOS Security" below).
+
+3. Relaunch your DAW and scan for new plugins.
+
+
+macOS Security (Gatekeeper)
+----------------------------
+RVRSE is ad-hoc signed but not notarized with Apple. macOS adds a
+quarantine flag to all downloaded files, which may cause a "damaged"
+or "unidentified developer" warning.
+
+Run this in Terminal AFTER copying, BEFORE opening your DAW:
+
+  xattr -cr ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
+  xattr -cr ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+  xattr -cr ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
+  xattr -cr /Applications/RVRSE.app
+
+(Only run the lines for the formats you installed.)
+
+This removes the quarantine flag. You only need to do this once per
+format.
+
+Alternative: Right-click the plugin → Open, then confirm in the
+security dialog. Or go to System Settings → Privacy & Security and
+click "Open Anyway" after the first blocked attempt.
+
+
+Links
+-----
+  Homepage:    https://samufl.com
+  Source code: https://github.com/SamuFL/rverse
+  Issues:      https://github.com/SamuFL/rverse/issues
+
+License: MIT — see https://github.com/SamuFL/rverse/blob/main/LICENSE

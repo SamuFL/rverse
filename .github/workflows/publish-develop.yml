@@ -1,0 +1,229 @@
+# Publish Development Build — rolling pre-release from develop branch.
+# Builds Debug, packages per-platform zips, publishes to a "develop-latest"
+# GitHub pre-release that is force-updated on every push.
+
+name: Publish Development Build
+
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: publish-develop
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Version consistency check
+  # ---------------------------------------------------------------------------
+  version-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check version sync
+        run: python3 scripts/sync-version.py --check
+
+  # ---------------------------------------------------------------------------
+  # macOS — Ninja, Debug
+  # ---------------------------------------------------------------------------
+  macos:
+    needs: [version-check]
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
+
+      - name: Configure (Ninja, Debug)
+        run: cmake --preset macos-ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build plugins
+        run: cmake --build build/macos-ninja --config Debug
+
+      - name: Build and run tests
+        run: |
+          cmake --build build/macos-ninja --config Debug --target rvrse_tests
+          ctest --test-dir build/macos-ninja --output-on-failure
+
+      - name: Download pluginval (pinned v1.0.4)
+        run: |
+          curl -fsSL "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip" -o pluginval.zip
+          echo "3c4c533bda0c5059eea3ddaea752d757ee2025041f0f47e6bcb0e87f6082b29f  pluginval.zip" | shasum -a 256 --check
+          unzip -q pluginval.zip
+
+      - name: Validate VST3 (pluginval)
+        run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.vst3"
+
+      - name: Validate AU (pluginval)
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          rm -rf ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+          cp -R -L build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 2
+          pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+
+      - name: Upload pluginval logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-dev-macOS-pluginval-logs
+          path: pluginval-logs/**
+          retention-days: 14
+
+      - name: Package macOS zip
+        run: |
+          cd build/macos-ninja/out
+          staging="$(mktemp -d)"
+          for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
+            [ -e "$f" ] && cp -R -L "$f" "$staging/"
+          done
+          cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-macOS.txt" "$staging/INSTALL.txt"
+          MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
+          [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" "$staging/"
+          for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
+            [ -e "$staging/$f" ] && codesign --force --deep -s - "$staging/$f"
+          done
+          cd "$staging"
+          zip -r "$GITHUB_WORKSPACE/RVRSE-dev-macOS.zip" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-dev-macOS
+          path: RVRSE-dev-macOS.zip
+
+  # ---------------------------------------------------------------------------
+  # Windows — Visual Studio 2022, Debug
+  # ---------------------------------------------------------------------------
+  windows:
+    needs: [version-check]
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        shell: bash
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
+
+      - name: Configure (VS2022)
+        run: cmake --preset windows-vs2022
+
+      - name: Build plugins
+        run: cmake --build build/windows-vs2022 --config Debug
+
+      - name: Build and run tests
+        run: |
+          cmake --build build/windows-vs2022 --config Debug --target rvrse_tests
+          ctest --test-dir build/windows-vs2022 -C Debug --output-on-failure
+
+      - name: Download pluginval (pinned v1.0.4)
+        run: |
+          Invoke-WebRequest "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip" -OutFile pluginval.zip
+          $hash = (Get-FileHash pluginval.zip -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "c08e61ce3b96db41636f8ec7e76f4c7e2c13ebdac7fa1b5a1f52b4f32ec715ab") { throw "pluginval SHA256 mismatch: $hash" }
+          Expand-Archive pluginval.zip -DestinationPath .
+
+      - name: Validate VST3 (pluginval)
+        run: ./pluginval.exe --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/windows-vs2022/out/RVRSE.vst3"
+
+      - name: Upload pluginval logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-dev-Windows-pluginval-logs
+          path: pluginval-logs/**
+          retention-days: 14
+
+      - name: Package Windows zip
+        shell: bash
+        run: |
+          cd build/windows-vs2022/out
+          cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-Windows.txt" INSTALL.txt
+          MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
+          [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" .
+          7z a "$GITHUB_WORKSPACE/RVRSE-dev-Windows.zip" \
+            RVRSE.vst3 RVRSE.clap RVRSE.exe INSTALL.txt "RVRSE manual.pdf" 2>/dev/null || \
+          7z a "$GITHUB_WORKSPACE/RVRSE-dev-Windows.zip" RVRSE.vst3 INSTALL.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-dev-Windows
+          path: RVRSE-dev-Windows.zip
+
+  # ---------------------------------------------------------------------------
+  # Publish — rolling pre-release
+  # ---------------------------------------------------------------------------
+  publish:
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v6
+
+      - name: Publish rolling pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+
+          # Delete existing develop-latest release (if any)
+          gh release delete develop-latest --yes --cleanup-tag 2>/dev/null || true
+
+          # Create new rolling pre-release
+          gh release create develop-latest \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Development Build (latest)" \
+            --notes "Rolling development build from the \`develop\` branch.
+
+          **⚠️ This is a development build — not for production use.**
+
+          Built from commit [\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on $(date -u +%Y-%m-%d).
+
+          Debug builds include additional diagnostics and may have reduced performance.
+
+          ### Installation
+          Download the zip for your platform, extract, and copy the plugin files to:
+          - **macOS AU:** \`~/Library/Audio/Plug-Ins/Components/\`
+          - **macOS VST3:** \`~/Library/Audio/Plug-Ins/VST3/\`
+          - **macOS CLAP:** \`~/Library/Audio/Plug-Ins/CLAP/\`
+          - **Windows VST3:** \`C:\\Program Files\\Common Files\\VST3\\\`
+          - **Windows CLAP:** \`C:\\Program Files\\Common Files\\CLAP\\\`
+
+          > macOS users: the build is unsigned. Right-click → Open the plugin the first time, or approve it in System Settings → Privacy & Security." \
+            RVRSE-dev-macOS/RVRSE-dev-macOS.zip \
+            RVRSE-dev-Windows/RVRSE-dev-Windows.zip

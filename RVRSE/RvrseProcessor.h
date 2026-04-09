@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -21,15 +22,32 @@
 
 namespace rvrse {
 
-/// Result of the offline pipeline — the ready-to-play riser buffer.
+/// Result of the offline pipeline — the ready-to-play riser buffer plus
+/// intermediate debug buffers for diagnostic playback (debug builds only).
 struct RiserData
 {
-  std::vector<float> mLeft;    ///< Left channel of final_riser[]
+  std::vector<float> mLeft;    ///< Left channel of final_riser[] (stretched + faded)
   std::vector<float> mRight;   ///< Right channel of final_riser[]
   double mSampleRate = 0.0;    ///< Sample rate of the riser data
+  int mBeatAlignedFrames = 0;  ///< Frame count at the exact beat boundary (before overlap)
+
+#ifndef NDEBUG
+  // Debug: intermediate pipeline buffers (populated alongside the main output)
+  std::vector<float> mReverbedL;  ///< After reverb, before reverse/stretch
+  std::vector<float> mReverbedR;
+  std::vector<float> mReversedL;  ///< After reverse, before stretch
+  std::vector<float> mReversedR;
+#endif
 
   int NumFrames() const { return static_cast<int>(mLeft.size()); }
   bool IsReady() const { return !mLeft.empty() && mSampleRate > 0.0; }
+
+#ifndef NDEBUG
+  /// @return Number of frames in the reverbed debug buffer
+  int ReverbedFrames() const { return static_cast<int>(mReverbedL.size()); }
+  /// @return Number of frames in the reversed debug buffer
+  int ReversedFrames() const { return static_cast<int>(mReversedL.size()); }
+#endif
 };
 
 /// The offline pipeline orchestrator.
@@ -58,6 +76,10 @@ public:
       // Clear cached intermediate buffers since the source changed
       mCachedReversedL.clear();
       mCachedReversedR.clear();
+#ifndef NDEBUG
+      mCachedReverbedL.clear();
+      mCachedReverbedR.clear();
+#endif
     }
     rebuildAsync(EPipelineStage::Reverb);
   }
@@ -72,30 +94,43 @@ public:
       // Clear cached reversed buffer since reverb output changed
       mCachedReversedL.clear();
       mCachedReversedR.clear();
+#ifndef NDEBUG
+      mCachedReverbedL.clear();
+      mCachedReverbedR.clear();
+#endif
     }
     rebuildAsync(EPipelineStage::Reverb);
   }
 
   /// Set the riser length in beats. Only re-stretches (skips reverb + reverse).
-  void setRiserLength(double beats)
+  /// When offline, performs a synchronous rebuild so bounce/export picks up the
+  /// change immediately. In real-time mode, uses async to avoid blocking audio.
+  void setRiserLength(double beats, bool offline = false)
   {
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       if (std::abs(mRiserLengthBeats - beats) < 1e-9) return;
       mRiserLengthBeats = beats;
     }
-    rebuildAsync(EPipelineStage::Stretch);
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   /// Set the host BPM. Only re-stretches.
-  void setBPM(double bpm)
+  /// Same offline/real-time branching as setRiserLength.
+  void setBPM(double bpm, bool offline = false)
   {
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       if (std::abs(mBPM - bpm) < 1e-9) return;
       mBPM = bpm;
     }
-    rebuildAsync(EPipelineStage::Stretch);
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   /// Set the output sample rate. Triggers full rebuild if changed.
@@ -107,8 +142,26 @@ public:
       mOutputSampleRate = sr;
       mCachedReversedL.clear();
       mCachedReversedR.clear();
+#ifndef NDEBUG
+      mCachedReverbedL.clear();
+      mCachedReverbedR.clear();
+#endif
     }
     rebuildAsync(EPipelineStage::Reverb);
+  }
+
+  /// Set the stretch quality preset. Triggers stretch rebuild if changed.
+  void setStretchQuality(EStretchQuality quality, bool offline = false)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      if (mStretchQuality == quality) return;
+      mStretchQuality = quality;
+    }
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
   }
 
   // --- Audio-thread-safe polling ---
@@ -148,6 +201,99 @@ private:
     }).detach();
   }
 
+  /// Perform a stretch-only rebuild synchronously on the calling thread.
+  /// Falls back to async if cached reversed buffers aren't available yet
+  /// (i.e. the initial reverb+reverse pass hasn't completed).
+  ///
+  /// Only called during offline/bounce rendering where real-time deadlines
+  /// don't apply. Never call this during real-time playback.
+  void rebuildStretchSync()
+  {
+    // Invalidate in-flight builds and capture our generation token
+    const int myGen = mGeneration.fetch_add(1, std::memory_order_release) + 1;
+
+    // Snapshot parameters under lock
+    std::shared_ptr<SampleData> sample;
+    double riserLengthBeats, bpm, sampleRate;
+    EStretchQuality quality;
+    std::vector<float> cachedRevL, cachedRevR;
+#ifndef NDEBUG
+    std::vector<float> cachedRvbL, cachedRvbR;
+#endif
+
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      sample = mSourceSample;
+      riserLengthBeats = mRiserLengthBeats;
+      bpm = mBPM;
+      sampleRate = mOutputSampleRate;
+      quality = mStretchQuality;
+      cachedRevL = mCachedReversedL;
+      cachedRevR = mCachedReversedR;
+#ifndef NDEBUG
+      cachedRvbL = mCachedReverbedL;
+      cachedRvbR = mCachedReverbedR;
+#endif
+    }
+
+    // No cached buffers yet — fall back to async (first load still in progress)
+    if (cachedRevL.empty() || !sample || !sample->IsLoaded())
+    {
+      rebuildAsync(EPipelineStage::Stretch);
+      return;
+    }
+
+    // --- Synchronous stretch ---
+    // Compute stretch factor for the base riser length (on-beat target)
+    const double baseStretchFactor = calcStretchFactor(
+      static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate
+    );
+
+    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
+    // get a longer crossfade to mask the smeared transient tail
+    const double overlapBeats = std::min(
+      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
+      kRiserOverlapBeatsMax
+    );
+    const double totalBeats = riserLengthBeats + overlapBeats;
+    const double stretchFactor = calcStretchFactor(
+      static_cast<int>(cachedRevL.size()), totalBeats, bpm, sampleRate
+    );
+
+    auto riser = std::make_shared<RiserData>();
+    stretchBufferStereo(cachedRevL, cachedRevR, stretchFactor,
+                        riser->mLeft, riser->mRight, sampleRate, quality);
+    riser->mSampleRate = sampleRate;
+
+    // Record where the exact beat boundary falls (before the overlap region)
+    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
+    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
+
+#ifndef NDEBUG
+    riser->mReverbedL = std::move(cachedRvbL);
+    riser->mReverbedR = std::move(cachedRvbR);
+    riser->mReversedL = std::move(cachedRevL);
+    riser->mReversedR = std::move(cachedRevR);
+#endif
+
+    // Tail fade-out — when enabled, scale with overlap so the fade covers the full overlap region
+    if (kRiserTailFadeBeats > 0.0)
+    {
+      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
+      if (fadeSamples > 0)
+      {
+        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      }
+    }
+
+    // Only publish if no newer rebuild has been requested
+    if (mGeneration.load(std::memory_order_acquire) != myGen) return;
+
+    std::atomic_store(&mRiserOutput, riser);
+    mNewRiserReady.store(true, std::memory_order_release);
+  }
+
   /// Execute the pipeline synchronously (called on background thread).
   void runPipeline(EPipelineStage fromStage, int generation)
   {
@@ -157,7 +303,11 @@ private:
     std::shared_ptr<SampleData> sample;
     float lush;
     double riserLengthBeats, bpm, sampleRate;
+    EStretchQuality quality;
     std::vector<float> cachedRevL, cachedRevR;
+#ifndef NDEBUG
+    std::vector<float> cachedRvbL, cachedRvbR;
+#endif
 
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
@@ -166,11 +316,16 @@ private:
       riserLengthBeats = mRiserLengthBeats;
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
+      quality = mStretchQuality;
 
       if (fromStage == EPipelineStage::Stretch)
       {
         cachedRevL = mCachedReversedL;
         cachedRevR = mCachedReversedR;
+#ifndef NDEBUG
+        cachedRvbL = mCachedReverbedL;
+        cachedRvbR = mCachedReverbedR;
+#endif
       }
     }
 
@@ -189,6 +344,9 @@ private:
     }
 
     std::vector<float> reversedL, reversedR;
+#ifndef NDEBUG
+    std::vector<float> reverbedL, reverbedR;
+#endif
 
     if (fromStage == EPipelineStage::Reverb || cachedRevL.empty())
     {
@@ -213,16 +371,31 @@ private:
         processingRate = sample->mSampleRate;
       }
 
-      // --- Stage 1: Reverb ---
-      const size_t numFrames = srcL.size();
-      std::vector<float> lushedL(numFrames);
-      std::vector<float> lushedR(numFrames);
+      // --- Stage 1: Reverb (with tail extension) ---
+      // The reverb needs room to ring out. We append silence to the source
+      // buffer so the comb/allpass delay lines can decay naturally. Without
+      // this, the reverb tail is truncated and the reversed riser has no
+      // "whoosh" build-up — defeating the entire purpose of the effect.
+      const size_t srcFrames = srcL.size();
+      const size_t tailFrames = static_cast<size_t>(processingRate * kReverbTailSeconds);
+      const size_t totalFrames = srcFrames + tailFrames;
+
+      // Pad source with silence for the reverb tail
+      srcL.resize(totalFrames, 0.0f);
+      srcR.resize(totalFrames, 0.0f);
+
+      std::vector<float> lushedL(totalFrames);
+      std::vector<float> lushedR(totalFrames);
 
       applyReverbStereo(
         srcL.data(), srcR.data(),
         lushedL.data(), lushedR.data(),
-        numFrames, processingRate, lush
+        totalFrames, processingRate, lush
       );
+
+      // Trim trailing silence so the stretcher doesn't waste work on dead air.
+      // The trim is conservative — a small margin ensures no audible decay is lost.
+      trimTrailingSilenceStereo(lushedL, lushedR, kSilenceThreshold);
 
       // Abort check
       if (mGeneration.load(std::memory_order_acquire) != generation)
@@ -232,22 +405,36 @@ private:
       }
 
       // --- Stage 2: Reverse ---
+#ifndef NDEBUG
+      // Save pre-reverse (reverbed) buffers for debug playback
+      reverbedL = lushedL;
+      reverbedR = lushedR;
+#endif
+
       reverseBufferStereo(lushedL, lushedR);
       reversedL = std::move(lushedL);
       reversedR = std::move(lushedR);
 
-      // Cache the reversed buffers for future stretch-only rebuilds
+      // Cache the reversed + reverbed buffers for future stretch-only rebuilds
       {
         std::lock_guard<std::mutex> lock(mParamMutex);
         mCachedReversedL = reversedL;
         mCachedReversedR = reversedR;
+#ifndef NDEBUG
+        mCachedReverbedL = reverbedL;
+        mCachedReverbedR = reverbedR;
+#endif
       }
     }
     else
     {
-      // Use cached reversed buffers (stretch-only rebuild)
+      // Use cached buffers (stretch-only rebuild)
       reversedL = std::move(cachedRevL);
       reversedR = std::move(cachedRevR);
+#ifndef NDEBUG
+      reverbedL = std::move(cachedRvbL);
+      reverbedR = std::move(cachedRvbR);
+#endif
     }
 
     // Abort check
@@ -258,24 +445,51 @@ private:
     }
 
     // --- Stage 3: Time-Stretch ---
-    const double stretchFactor = calcStretchFactor(
+    // Compute stretch factor for the base riser length (on-beat target)
+    const double baseStretchFactor = calcStretchFactor(
       static_cast<int>(reversedL.size()), riserLengthBeats, bpm, sampleRate
+    );
+
+    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
+    // get a longer crossfade to mask the smeared transient tail
+    const double overlapBeats = std::min(
+      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
+      kRiserOverlapBeatsMax
+    );
+    const double totalBeats = riserLengthBeats + overlapBeats;
+    const double stretchFactor = calcStretchFactor(
+      static_cast<int>(reversedL.size()), totalBeats, bpm, sampleRate
     );
 
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(reversedL, reversedR, stretchFactor,
-                        riser->mLeft, riser->mRight);
+                        riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
 
+    // Record where the exact beat boundary falls (before the overlap region)
+    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
+    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
+
+#ifndef NDEBUG
+    // Store intermediate buffers for debug playback
+    riser->mReverbedL = std::move(reverbedL);
+    riser->mReverbedR = std::move(reverbedR);
+    riser->mReversedL = std::move(reversedL);
+    riser->mReversedR = std::move(reversedR);
+#endif
+
     // --- Stage 4: Tail fade-out ---
-    // Short fade at the end of the riser so the reversed transient doesn't
-    // produce a hard click when it meets the dry hit.
-    // Controlled by kRiserTailFadeBeats in Constants.h. Set to 0 to disable.
+    // When enabled, fade covers at least kRiserTailFadeBeats or the full overlap,
+    // whichever is longer, so the riser decays smoothly through the entire overlap
+    // region into the hit. Set kRiserTailFadeBeats to 0.0 to disable.
     if (kRiserTailFadeBeats > 0.0)
     {
-      const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-      const int fadeSamples = std::max(1, static_cast<int>(samplesPerBeat * kRiserTailFadeBeats));
-      applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
+      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
+      if (fadeSamples > 0)
+      {
+        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
+      }
     }
 
     // Final abort check before publishing
@@ -295,13 +509,18 @@ private:
   std::mutex mParamMutex;
   std::shared_ptr<SampleData> mSourceSample;
   float mLush = static_cast<float>(kLushDefault / 100.0);
-  double mRiserLengthBeats = kRiserLengthDefault;
+  double mRiserLengthBeats = kRiserLengthValues[kRiserLengthDefault];
   double mBPM = kDefaultBPM;
   double mOutputSampleRate = 44100.0;
+  EStretchQuality mStretchQuality = static_cast<EStretchQuality>(kStretchQualityDefault);
 
   // --- Cached intermediate buffers (protected by mParamMutex) ---
   std::vector<float> mCachedReversedL;
   std::vector<float> mCachedReversedR;
+#ifndef NDEBUG
+  std::vector<float> mCachedReverbedL;
+  std::vector<float> mCachedReverbedR;
+#endif
 
   // --- Output (lock-free handoff to audio thread) ---
   std::shared_ptr<RiserData> mRiserOutput;

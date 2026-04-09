@@ -7,7 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [1.0.0] - 2026-04-09
+
 ### Added
+- macOS: ad-hoc codesign (`codesign --force --deep -s -`) all bundles (VST3, AU, CLAP, standalone) in CI before packaging — prevents Gatekeeper "damaged" error on downloaded builds (rverse-wix)
+- Version sync script (`scripts/sync-version.py`) — reads canonical version from `config.h` and propagates to all plists, Inno Setup installer, and CMakeLists.txt; CI check mode (`--check`) prevents version drift (rverse-jaj)
+- Pluginval validation in CI — VST3 validated on both platforms, AU on macOS; strictness level 5, hard gate on failure (rverse-nwe)
+- Full IGraphics GUI with dark theme (dark green/blue palette, gold/blue accents) — responsive layout with corner resizer (rverse-ebv)
+- Dual waveform display: riser (gold) + hit (blue) with shared amplitude normalization and animated playhead (rverse-ebv)
+- Hit preview waveform in hit panel showing original loaded sample (rverse-ebv)
+- Riser panel: real-time section (Stutter Rate, Stutter Depth, Riser Volume — gold knobs) + offline section (Lush, Riser Length, Fade In — steel knobs, Stretch Quality toggle) (rverse-ebv)
+- Hit panel: volume knob (blue accent), hit waveform preview, logo, donate/support button (rverse-ebv)
+
+### Changed
+- Replaced all AcmeInc placeholder branding with SamuFL identity across plists, installer files, and config (rverse-g67)
+- Updated user-facing URL to https://samufl.com and contact email to info@samufl.com (rverse-g67)
+- Updated config.h and related metadata toward the 0.1.0 release version (rverse-g67)
+- Debug Stage parameter hidden/disabled in release builds via `#ifndef NDEBUG` while its parameter slot remains reserved for index stability — intermediate pipeline buffers no longer allocated in release (rverse-0v6.1)
+- Header zone: plugin title, Load Sample button with native file dialog, sample info display, BPM display (rverse-ebv)
+- Footer zone: master volume slider with label/value, MIDI activity indicator (blue dot), version string (rverse-ebv)
+- Resize support: corner resizer with smart layout scaling — waveform absorbs squeeze, panels maintain minimum heights (rverse-ebv)
+- Stretch Quality parameter (High / Low) — defaults to High for best audio quality; Low mode (~2× faster) available for real-time tweaking or resource-limited systems (rverse-g4j)
+- Riser Length is now a discrete parameter with 7 musical values (1/4, 1/2, 1, 2, 4, 8, 16 beats) instead of continuous 0.25–16 range — snaps to exact beat divisions (rverse-ebv)
+- Replaced OLA time-stretcher with signalsmith-stretch (MIT, spectral, polyphonic-aware) for significantly better audio quality at all stretch ratios — transient smearing at riser end eliminated (rverse-g4j)
+- Stretch-only rebuilds (riser length, BPM changes) run synchronously during offline/bounce rendering so automation is respected immediately; async during real-time playback (rverse-g4j)
+
+### Fixed
+- AUv3 Framework plists (iOS + macOS) had stale version strings (1.0/1.0.0 instead of 0.1.0) — now synced via `sync-version.py` (rverse-jaj)
+- CMakeLists.txt project version was 1.0.0 instead of 0.1.0 — now synced (rverse-jaj)
+- AU plists had stale iPlug2 template values: type was `aufx` (effect) instead of `aumu` (instrument), subtype was `9c0G` instead of `5SpI` matching config.h `PLUG_UNIQUE_ID` — caused pluginval Class Data mismatch failure (rverse-nwe)
+- Plugin GUI crash (SIGABRT in NanoVG font rendering) caused by missing font resource in deployed VST3/AU bundles — switched macOS non-Xcode deployment from COPY to SYMLINK to avoid iPlug2 resource bundling race condition (pre-existing bug)
+- MIDI CC1 (Stutter Rate) and CC11 (Stutter Depth) now update both the DSP parameter and the GUI knob in real-time — previously `GetParam()->Set()` was called without `SendParameterValueFromAPI()`, so the knobs didn't move; stutter values are now read per-sample after MIDI processing for immediate response (rverse-y5o)
+- VST3: MIDI CC knob updates now work correctly — `SendParameterValueFromAPI()` queue is not consumed in VST3 `OnTimer()`; replaced with a custom lock-free `IPlugQueue<ParamTuple>` pushed from the audio thread and drained in `OnIdle()` via `SendParameterValueFromDelegate()`, which works for all plugin formats (rverse-f9r)
+- Riser-to-hit transition smoothed with adaptive overlap — at low stretch ratios the riser extends 1/32 beat past the boundary; at high stretch ratios the overlap scales proportionally (up to 1 beat) so the smeared transient tail crossfades smoothly into the hit attack; the tail fade also scales to cover the full overlap (rverse-0g6, rverse-xwx)
+
+### Added
+- Persist loaded sample path across DAW sessions — save/restore via `SerializeState`/`UnserializeState` with versioned chunk format. Shows "Missing: filename" if file is gone on reload. (rverse-7dr)
+- GitHub Actions CI: macOS (Apple Silicon, Ninja) + Windows (VS2022) — builds all plugin formats and runs 42 unit tests on pushes to develop/main and PRs targeting them (rverse-lxg)
+- Artifact publishing: rolling `develop-latest` pre-release (Debug zips) on develop push, and proper GitHub Release (Release zips) on `v*` tags — macOS + Windows per-platform downloads (rverse-6m5)
+- Expose 5 new DAW-automatable parameters via generic editor: Lush (0–100%), Riser Length (0.25–16 beats), Fade In (0–100%), Riser Volume (-60 to +6 dB), Hit Volume (-60 to +6 dB) (rverse-nqg)
+- Debug Stage parameter (Normal / Reverbed / Reversed / Riser Only) — exposes intermediate pipeline buffers for diagnostic playback without hit (rverse-l9x)
+- Riser fade-in envelope controlled by Fade In parameter — linear ramp over configurable portion of riser length (rverse-nqg)
+- Independent Riser Volume and Hit Volume knobs with dB scaling — both voices fully controllable (rverse-nqg)
+- Lush and Riser Length changes propagated to offline pipeline in real-time — riser rebuilds on parameter change (rverse-nqg)
+- DSP unit tests: 42 tests across 7 files covering BufferUtils, Reverb, TimeStretch, Stutter, SampleLoader, and Constants (rverse-2uq)
+- `trimTrailingSilence` / `trimTrailingSilenceStereo` in BufferUtils.h — removes near-silent tail samples below a configurable threshold (rverse-0d0)
+- `kReverbTailSeconds` (5.0s) and `kSilenceThreshold` (-30 dB) constants in Constants.h (rverse-0d0)
+- Catch2 v3.7.1 test framework with CTest integration — `cmake --build build --target rvrse_tests && ctest --test-dir build` (rverse-6fl)
+- Smoke tests for DSP headers: Constants, BufferUtils, TimeStretch, Stutter (rverse-6fl)
 - Real-time stutter gate in `Stutter.h` — per-sample trapezoidal gate with continuous Hz rate (0–30 Hz) and anti-click ramps (rverse-n84)
 - Stutter Rate (Hz) and Stutter Depth exposed as DAW-automatable parameters (rverse-n84)
 - MIDI CC control: CC1 (mod wheel) → Stutter Rate, CC11 (expression) → Stutter Depth (rverse-6r2)
@@ -19,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `BufferUtils.h` — in-place stereo buffer reversal, linear resampling, tail fade-out utilities (rverse-cmf)
 
 ### Fixed
+- Installer license.rtf replaced with actual MIT license — was iPlug2 placeholder with no legal basis (rverse-jwf)
+- **Critical:** Reverb tail was truncated — output buffer was same size as input, producing no reverb tail. Now pads source with 5 seconds of silence so the Schroeder reverb rings out naturally, then trims trailing silence. This is the core of the reverse-reverb effect. (rverse-0d0)
 - Hit sample now resampled to DAW output rate on load — fixes pitched-down playback with 96kHz+ files (rverse-djb)
 - Offline pipeline resamples source to output rate before processing — riser length now correct regardless of file sample rate (rverse-djb)
 - Riser tail fade-out (1/16 beat) prevents reversed transient from clashing with hit (rverse-djb)

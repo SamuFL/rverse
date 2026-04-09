@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>RVRSE</string>
 	<key>CFBundleGetInfoString</key>
-	<string>RVRSE v0.0.0 Copyright 2025 Acme Inc</string>
+	<string>RVRSE v0.1.0 Copyright 2026 SamuFL</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.SamuFL.app.RVRSE.AUv3</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.0.0</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>0.0.0</string>
+	<string>1.0.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.13.0</string>
 	<key>NSExtension</key>
@@ -34,21 +34,21 @@
 					<key>description</key>
 					<string>RVRSE</string>
 					<key>manufacturer</key>
-					<string>Acme</string>
+					<string>SmFL</string>
 					<key>name</key>
 					<string>SamuFL: RVRSE</string>
 					<key>sandboxSafe</key>
 					<true/>
 					<key>subtype</key>
-					<string>9c0G</string>
+					<string>5SpI</string>
 					<key>tags</key>
 					<array>
 						<string>Effects</string>
 					</array>
 					<key>type</key>
-					<string>aufx</string>
+					<string>aumu</string>
 					<key>version</key>
-					<integer>0</integer>
+					<integer>256</integer>
 				</dict>
 			</array>
 		</dict>

@@ -1,11 +1,11 @@
 #define PLUG_NAME "RVRSE"
 #define PLUG_MFR "SamuFL"
-#define PLUG_VERSION_HEX 0x00000100
-#define PLUG_VERSION_STR "0.1.0"
+#define PLUG_VERSION_HEX 0x00010000
+#define PLUG_VERSION_STR "1.0.0"
 #define PLUG_UNIQUE_ID '5SpI'
 #define PLUG_MFR_ID 'SmFL'
-#define PLUG_URL_STR "https://github.com/SamuFL/rverse"
-#define PLUG_EMAIL_STR "samuel.ferraz-leite@protonmail.com"
+#define PLUG_URL_STR "https://samufl.com"
+#define PLUG_EMAIL_STR "info@samufl.com"
 #define PLUG_COPYRIGHT_STR "Copyright 2026 SamuFL"
 #define PLUG_CLASS_NAME RVRSE
 
@@ -22,15 +22,15 @@
 #define PLUG_DOES_MIDI_IN 1
 #define PLUG_DOES_MIDI_OUT 0
 #define PLUG_DOES_MPE 0
-#define PLUG_DOES_STATE_CHUNKS 0
+#define PLUG_DOES_STATE_CHUNKS 1
 #define PLUG_HAS_UI 1
 #define PLUG_WIDTH 1024
-#define PLUG_HEIGHT 768
+#define PLUG_HEIGHT 620
 #define PLUG_FPS 60
 #define PLUG_SHARED_RESOURCES 0
 #define PLUG_HOST_RESIZE 1
-#define PLUG_MIN_WIDTH 256
-#define PLUG_MIN_HEIGHT 256
+#define PLUG_MIN_WIDTH 800
+#define PLUG_MIN_HEIGHT 620
 #define PLUG_MAX_WIDTH 8192
 #define PLUG_MAX_HEIGHT 8192
 
@@ -61,3 +61,5 @@
 #define APP_SIGNAL_VECTOR_SIZE 64
 
 #define ROBOTO_FN "Roboto-Regular.ttf"
+#define ROBOTO_BOLD_FN "Roboto-Bold.ttf"
+#define LOGO_FN "logo.png"

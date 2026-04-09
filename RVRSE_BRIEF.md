@@ -65,7 +65,7 @@ RVRSE reads the host BPM via iPlug2's `ITimeInfo`. When a MIDI note-on arrives:
 | Parameter | Range | Default | Description |
 |---|---|---|---|
 | Lush | 0 – 100% | 40% | Reverb wet amount + room size (linked). 0 = dry reversed sample. 100 = fully washed-out reverb tail, reversed. |
-| Riser Length | 0.25 – 16 beats | 4 beats | How many beats before the hit the riser begins. Tempo-synced via host BPM. Snaps to musical values (1/4, 1/2, 1, 2, 4, 8, 16). |
+| Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 beats | How many beats before the hit the riser begins. Tempo-synced via host BPM. Discrete musical values only — no in-between positions. |
 
 ### Riser Section — Real-Time Parameters
 > These are computed per-sample in the audio thread. Full MIDI CC support. Changing them is instantaneous with no glitches.
@@ -89,7 +89,6 @@ RVRSE reads the host BPM via iPlug2's `ITimeInfo`. When a MIDI note-on arrives:
 | Parameter | Range | Default | Description |
 |---|---|---|---|
 | Master Volume | -inf – +6 dB | 0 dB | Overall output level. |
-| Dry/Wet | 0 – 100% | 100% | Blends the RVRSE output with the dry input (useful in FX chain mode). |
 
 ---
 
@@ -110,7 +109,7 @@ lushed_buffer[]
       ↓
 reversed_buffer[]
       ↓
-  [ OLA Time-Stretch ]  ←  Riser Length + host BPM
+  [ Spectral Time-Stretch ]  ←  Riser Length + host BPM
       ↓
 final_riser[]  →  ready for real-time playback
 ```
@@ -145,9 +144,10 @@ Implement as a stateless function:
 void applyReverb(const float* in, float* out, size_t numSamples, float lushAmount);
 ```
 
-### Time-Stretching (MVP)
+### Time-Stretching
 
-Use **OLA (Overlap-Add)**. Quality is less critical than correctness for the warmup. Stretch factor:
+Uses **signalsmith-stretch** (MIT, spectral, polyphonic-aware) for high-quality stretching.
+Originally OLA for MVP; upgraded to spectral for production quality. Stretch factor:
 
 ```
 stretchFactor = (riserLengthBeats × samplesPerBeat) / reversed_buffer.size()
@@ -191,7 +191,7 @@ constexpr int CC_RISER_TUNE    = 2;   // Breath controller
 | GUI | IGraphics (iPlug2 native) | Vector graphics, no extra dependencies |
 | Audio file I/O | dr_libs (header-only) | WAV + AIFF, single header, no build complexity |
 | Reverb DSP | Custom Schroeder (self-written) | No external libs needed |
-| Time-stretch | Custom OLA (self-written) | Sufficient quality for warmup scope |
+| Time-stretch | signalsmith-stretch (MIT, header-only) | Spectral, polyphonic-aware, transient-preserving |
 | CI/CD | GitHub Actions | Auto-build on Windows + macOS |
 | License | MIT | Permissive; warmup project should be maximally forkable |
 
@@ -218,7 +218,7 @@ Dark-themed, minimal, performance-focused. Three clear zones:
 │  Stutter Depth[knob] ◉  │                            │
 │  (◉ = MIDI CC active)   │                            │
 ├─────────────────────────┴────────────────────────────┤
-│  Master Vol [knob]   Dry/Wet [knob]   RVRSE v0.1.0   │
+│  Master Vol [knob]                     RVRSE v0.1.0   │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -246,7 +246,7 @@ rvrse/
 │   ├── RvrseProcessor.h / .cpp      ← offline pipeline orchestrator
 │   ├── RvrseVoice.h / .cpp          ← real-time playback voice (riser + hit)
 │   ├── Reverb.h / .cpp              ← Schroeder reverb, stateless
-│   ├── Stretcher.h / .cpp           ← OLA time-stretcher, stateless
+│   ├── TimeStretch.h / .cpp         ← spectral time-stretcher (signalsmith-stretch)
 │   ├── Stutter.h / .cpp             ← real-time stutter gate (audio thread only)
 │   └── WaveformView.h / .cpp        ← IControl subclass for waveform display
 └── resources/

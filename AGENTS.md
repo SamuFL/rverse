@@ -173,8 +173,23 @@ Keeping documentation current is **not optional**. It is part of completing any 
 | `README.md` | Any user-facing behaviour changes, new build steps, new dependencies |
 | `BRIEF.md` | Architecture decisions change or new constraints are discovered |
 | `CHANGELOG.md` | Any commit that changes user-facing behaviour (add an entry under `[Unreleased]`) |
+| `UAT_PLAYBOOK.md` | Any parameter added/changed/removed, any new test scenario needed |
 | `Constants.h` comments | Any constant value or MIDI CC mapping changes |
 | Inline `///` doc comments | Any public function signature changes |
+
+### PR Documentation Checklist
+
+Before opening or updating a pull request, **review every file in the table above** and
+verify it reflects the changes in the PR. This is a blocking requirement — a PR with
+stale documentation is not ready for review.
+
+Specifically:
+1. **Before opening a PR:** Re-read `README.md`, `CHANGELOG.md`, and `UAT_PLAYBOOK.md`.
+   Confirm all new/changed behaviour is documented and all parameter tables are current.
+2. **While working on a PR:** After each commit that changes user-facing behaviour,
+   update `CHANGELOG.md` in the same commit (not as an afterthought).
+3. **Before requesting review:** Do a final pass over all documentation files.
+   Check that parameter names, ranges, defaults, and descriptions match the code.
 
 ### CHANGELOG format
 
@@ -197,21 +212,63 @@ Follow [Keep a Changelog](https://keepachangelog.com/) conventions:
 ## 7. Build & Test
 
 ```bash
-# Configure (first time)
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+# Configure (first time) — use SYMLINK on macOS with Make/Ninja generators
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DIPLUG_DEPLOY_METHOD=SYMLINK
 
 # Build
 cmake --build build --config Debug
 
 # The plugin outputs appear in:
-# build/RVRSE_artefacts/Debug/VST3/
-# build/RVRSE_artefacts/Debug/AU/       (macOS only)
-# build/RVRSE_artefacts/Debug/CLAP/
+# build/out/RVRSE.vst3/
+# build/out/RVRSE.component/   (macOS only)
+# build/out/RVRSE.clap/
+# build/out/RVRSE.app/
+
+# Run unit tests
+cmake --build build --target rvrse_tests && ctest --test-dir build
 ```
 
-There is currently no automated test suite (warmup project scope). Manually validate in a
-DAW after any change to the DSP pipeline. Recommended DAWs: **Cubase**, **Studio One**,
-**Logic** (macOS only).
+Manually validate in a DAW after any change to the DSP pipeline. Recommended DAWs:
+**Cubase**, **Studio One**, **Logic** (macOS only).
+
+---
+
+## 7b. Version Management
+
+The **single source of truth** for the plugin version is `RVRSE/config.h`:
+
+```c
+#define PLUG_VERSION_HEX 0x00000100
+#define PLUG_VERSION_STR "0.1.0"
+```
+
+A sync script propagates this version to all satellite files (plists, installer, CMakeLists).
+CI enforces consistency — PRs with version drift will fail the `version-check` job.
+
+### Bumping the version
+
+```bash
+# 1. Edit config.h — update both PLUG_VERSION_STR and PLUG_VERSION_HEX
+# 2. Run the sync script
+python3 scripts/sync-version.py
+
+# 3. Verify (optional — CI also runs this)
+python3 scripts/sync-version.py --check
+
+# 4. Commit all changed files together
+```
+
+### What the script updates
+
+| File(s) | Fields |
+|---|---|
+| `RVRSE/resources/*.plist` (11 files) | `CFBundleShortVersionString`, `CFBundleVersion` |
+| `RVRSE/installer/RVRSE.iss` | `AppVersion`, `VersionInfoVersion` |
+| `RVRSE/CMakeLists.txt` | `project(RVRSE VERSION ...)` |
+
+> **Never manually edit version strings in satellite files.** Always change `config.h`
+> and run the sync script. The CI `version-check` job will block any PR where files
+> are out of sync.
 
 ---
 

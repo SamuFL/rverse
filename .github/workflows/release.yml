@@ -1,0 +1,166 @@
+# Release — build and publish production artifacts on version tags.
+# Triggered when a tag matching v* is pushed (e.g. v0.1.0).
+# Builds Release mode, packages per-platform zips, and creates a
+# proper GitHub Release with all artifacts attached.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # macOS — Ninja, Release
+  # ---------------------------------------------------------------------------
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
+
+      - name: Configure (Ninja, Release)
+        run: cmake --preset macos-ninja
+
+      - name: Build plugins
+        run: cmake --build build/macos-ninja --config Release
+
+      - name: Build and run tests
+        run: |
+          cmake --build build/macos-ninja --config Release --target rvrse_tests
+          ctest --test-dir build/macos-ninja --output-on-failure
+
+      - name: Package macOS zip
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd build/macos-ninja/out
+          staging="$(mktemp -d)"
+          for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
+            [ -e "$f" ] && cp -R -L "$f" "$staging/"
+          done
+          cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-macOS.txt" "$staging/INSTALL.txt"
+          MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
+          [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" "$staging/"
+          for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
+            [ -e "$staging/$f" ] && codesign --force --deep -s - "$staging/$f"
+          done
+          cd "$staging"
+          zip -r "$GITHUB_WORKSPACE/RVRSE-${VERSION}-macOS.zip" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-macOS
+          path: RVRSE-*.zip
+
+  # ---------------------------------------------------------------------------
+  # Windows — Visual Studio 2022, Release
+  # ---------------------------------------------------------------------------
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Download iPlug2 SDKs
+        working-directory: iPlug2/Dependencies/IPlug
+        shell: bash
+        run: |
+          ./download-vst3-sdk.sh
+          ./download-clap-sdks.sh
+
+      - name: Configure (VS2022)
+        run: cmake --preset windows-vs2022
+
+      - name: Build plugins
+        run: cmake --build build/windows-vs2022 --config Release
+
+      - name: Build and run tests
+        run: |
+          cmake --build build/windows-vs2022 --config Release --target rvrse_tests
+          ctest --test-dir build/windows-vs2022 -C Release --output-on-failure
+
+      - name: Package Windows zip
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd build/windows-vs2022/out
+          cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-Windows.txt" INSTALL.txt
+          MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
+          [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" .
+          7z a "$GITHUB_WORKSPACE/RVRSE-${VERSION}-Windows.zip" \
+            RVRSE.vst3 RVRSE.clap RVRSE.exe INSTALL.txt "RVRSE manual.pdf" 2>/dev/null || \
+          7z a "$GITHUB_WORKSPACE/RVRSE-${VERSION}-Windows.zip" RVRSE.vst3 INSTALL.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-Windows
+          path: RVRSE-*.zip
+
+  # ---------------------------------------------------------------------------
+  # Publish — GitHub Release
+  # ---------------------------------------------------------------------------
+  publish:
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: CHANGELOG.md
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v6
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Try versioned section first (## [0.1.0]), then fall back to [Unreleased]
+          NOTES=$(awk "/^## \\[${VERSION}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES=$(awk '/^## \[Unreleased\]/{found=1; next} /^## \[/{if(found) exit} found{print}' CHANGELOG.md)
+          fi
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${GITHUB_REF_NAME}
+
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+          fi
+          # Write to file to preserve newlines
+          echo "$NOTES" > release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          gh release create "$GITHUB_REF_NAME" \
+            --title "RVRSE ${VERSION}" \
+            --notes-file release-notes.md \
+            RVRSE-macOS/RVRSE-${VERSION}-macOS.zip \
+            RVRSE-Windows/RVRSE-${VERSION}-Windows.zip
+
+          echo "✅ Published release ${GITHUB_REF_NAME}"
+          echo "   https://github.com/${{ github.repository }}/releases/tag/${GITHUB_REF_NAME}"

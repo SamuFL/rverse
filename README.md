@@ -6,9 +6,10 @@ RVRSE generates a reverse-reverb riser automatically from any loaded hit sample,
 original hit at a tempo-synced beat boundary. One sample in → complete transition out. No manual
 editing, no extra samples needed.
 
-> **Status:** Pre-release (`v0.1.0-dev`). Core DSP pipeline and stutter gate working.
-> GUI, parameter exposure, CI, and release packaging still in progress.
-> See [CHANGELOG.md](./CHANGELOG.md) and the Release Preparation Epic (`rverse-0v6`) for details.
+> **Status:** `v1.0.0` released. Core DSP pipeline, stutter gate, IGraphics GUI, and all DAW
+> parameters working. CI builds on macOS (Apple Silicon) + Windows (VS2022) with ad-hoc codesigning.
+> Dark-themed native GUI with waveform display, dual control panels, and hit preview.
+> See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 ---
 
@@ -129,11 +130,13 @@ Every source file belongs to exactly one layer:
 | `SampleLoader.h/.cpp` | **Offline** | Stateless `LoadSample()` — reads WAV/AIFF from disk via dr_wav |
 | `Reverb.h` | **Offline** | Schroeder/Moorer reverb (8 comb filters + 4 allpass filters) |
 | `BufferUtils.h` | **Offline** | `reverseBuffer`, `resampleLinear`, `applyTailFadeOut` |
-| `TimeStretch.h` | **Offline** | OLA time-stretcher with Hann windowing |
+| `TimeStretch.h` | **Offline** | Spectral time-stretcher (signalsmith-stretch, MIT) |
 | `RvrseProcessor.h` | **Offline** | Pipeline orchestrator — chains all offline stages |
 | `Stutter.h` | **Real-Time** | Per-sample trapezoidal gate with continuous Hz rate (audio thread only, MIDI CC responsive) |
 | `RVRSE.h` | **Both** | Main plugin class — owns all state, bridges offline ↔ real-time |
 | `RVRSE.cpp` | **Both** | Constructor (GUI), `LoadSampleFromFile`, `ProcessBlock`, `OnReset` |
+| `WaveformControl.h` | **GUI** | Dual waveform display (riser + hit) and hit preview control |
+| `GUIColors.h` | **GUI** | Brand palette, layout constants, text styles |
 | `dr_libs_impl.cpp` | Build | Single translation unit for `DR_WAV_IMPLEMENTATION` |
 
 ---
@@ -205,9 +208,9 @@ Cache reversed buffers ★             [Optimisation: skip reverb on BPM-only ch
 Reverse the buffer                   [reverseBufferStereo — BufferUtils.h]
     │
     ▼
-Time-stretch via OLA                 [stretchBufferStereo — TimeStretch.h]
+Time-stretch (spectral)               [stretchBufferStereo — TimeStretch.h]
     Target length = riserLengthBeats × (60 / BPM) × sampleRate
-    Hann window, 50% overlap
+    signalsmith-stretch: polyphonic, transient-aware
     │
     ▼
 Tail fade-out                        [applyTailFadeOutStereo — BufferUtils.h]
@@ -242,14 +245,17 @@ Per-sample loop (s = 0 to nFrames):
     │     Note-off: Begin 5ms fade-out, kill hit trigger
     │
     ├── Riser voice
-    │     Read riser[mRiserPos], apply velocity + fade
+    │     Read riser[mRiserPos], apply fade-in envelope
+    │     Apply velocity × riser volume gain
+    │     Apply stutter gate (per-sample, MIDI CC responsive)
     │     Advance position
     │
     ├── Hit trigger check
     │     If mSamplesFromNoteOn >= mHitOffset → fire hit (mHitPos = 0)
     │
     ├── Hit voice
-    │     Read hit[mHitPos], apply velocity + fade
+    │     Read hit[mHitPos], apply velocity × hit volume gain
+    │     Apply note-off fade if active
     │     Advance position
     │
     └── Output: (riserL + hitL) × masterVol
@@ -285,9 +291,13 @@ git submodule update --init --recursive
 ### Build (macOS)
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DIPLUG_DEPLOY_METHOD=SYMLINK
 cmake --build build
 ```
+
+> **Note:** Use `-DIPLUG_DEPLOY_METHOD=SYMLINK` on macOS with non-Xcode generators
+> (Make, Ninja) to avoid a resource deployment race condition. Symlink mode lets
+> the DAW read directly from the build output where resources are bundled correctly.
 
 ### Build (Windows)
 
@@ -301,6 +311,46 @@ cmake --build build --config Debug
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
+```
+
+### Running Tests
+
+RVRSE includes a Catch2 unit test suite covering all DSP modules (42 tests).
+Tests compile standalone — no iPlug2 or DAW required.
+
+```bash
+# Single-config generators (Ninja, Make)
+cmake --build build --target rvrse_tests
+ctest --test-dir build
+
+# Multi-config generators (Visual Studio, Xcode)
+cmake --build build --config Debug --target rvrse_tests
+ctest --test-dir build -C Debug
+
+# Or run the test binary directly (verbose output)
+./build/tests/rvrse_tests             # Ninja/Make
+./build/tests/Debug/rvrse_tests       # Visual Studio
+
+# Run a specific test category
+./build/tests/rvrse_tests "[reverb]"
+./build/tests/rvrse_tests "[stutter]"
+./build/tests/rvrse_tests "[sampleloader]"
+```
+
+To disable tests entirely (e.g. CI release builds):
+
+```bash
+cmake -B build -DBUILD_TESTING=OFF
+```
+
+### Version Management
+
+The canonical version lives in `RVRSE/config.h` (`PLUG_VERSION_STR` and `PLUG_VERSION_HEX`).
+After changing it, run the sync script to propagate to plists, installer, and `RVRSE/CMakeLists.txt`:
+
+```bash
+python3 scripts/sync-version.py          # apply updates
+python3 scripts/sync-version.py --check  # verify (also runs in CI)
 ```
 
 ---
@@ -318,6 +368,20 @@ The build produces four plugin formats:
 
 Build artefacts are in `build/RVRSE/`.
 
+### macOS Gatekeeper
+
+Release builds are ad-hoc signed but not notarized. macOS may block the
+plugin on first use. To fix, run in Terminal **before** launching your DAW:
+
+```bash
+xattr -cr ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
+xattr -cr ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+xattr -cr ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
+```
+
+This only needs to be done once per format. See `INSTALL.txt` in the
+download zip for full details.
+
 ---
 
 ## Usage in a DAW
@@ -328,9 +392,25 @@ Build artefacts are in `build/RVRSE/`.
    at the beat boundary (default: 4 beats at host BPM).
 4. **Release the note** to fade out both voices (5ms anti-click envelope).
 
+### DAW Parameters
+
+All parameters are exposed in the DAW's generic editor and can be automated:
+
+| Parameter | Range | Default | Notes |
+|---|---|---|---|
+| Master Volume | 0–100% | 100% | Overall output level |
+| Lush | 0–100% | 40% | Reverb amount — triggers offline rebuild |
+| Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 | Time-stretch target — triggers offline rebuild |
+| Fade In | 0–100% | 60% | Linear ramp over portion of riser length |
+| Riser Volume | -60 to +6 dB | 0 dB | Independent riser voice gain |
+| Hit Volume | -60 to +6 dB | 0 dB | Independent hit voice gain |
+| Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1) |
+| Stutter Depth | 0–1 | 0.5 | Gate depth (also via MIDI CC11) |
+| Debug Stage | Normal / Reverbed / Reversed / Riser Only | Normal | Diagnostic: audition intermediate pipeline buffers |
+| Stretch Quality | High / Low | High | High = best quality (larger FFT), Low = faster (~2×) for real-time tweaking |
+
 ### Current Limitations
 
-- No GUI knobs yet — parameters like Lush, Riser Length, and Stutter are not yet exposed in the UI (use DAW generic editor or MIDI CC).
 - No preset system.
 - No pitch shift (planned).
 - Single-voice only — overlapping notes cut the previous voice.
@@ -345,11 +425,13 @@ rverse/
 │   ├── RVRSE.h / .cpp        # Main plugin class (GUI + ProcessBlock)
 │   ├── config.h              # iPlug2 plugin configuration
 │   ├── Constants.h           # All numeric constants
+│   ├── GUIColors.h           # Brand palette and layout constants
+│   ├── WaveformControl.h     # Waveform display controls (riser + hit + preview)
 │   ├── SampleData.h          # Sample data struct
 │   ├── SampleLoader.h / .cpp # Audio file loading (dr_wav)
 │   ├── Reverb.h              # Schroeder/Moorer reverb
 │   ├── BufferUtils.h         # Buffer utilities (reverse, resample, fade)
-│   ├── TimeStretch.h         # OLA time-stretcher
+│   ├── TimeStretch.h         # Spectral time-stretcher (signalsmith-stretch)
 │   ├── RvrseProcessor.h      # Offline pipeline orchestrator
 │   ├── Stutter.h             # Real-time stutter gate (audio thread only)
 │   ├── dr_libs_impl.cpp      # dr_wav implementation unit
@@ -358,10 +440,22 @@ rverse/
 ├── iPlug2/                   # iPlug2 framework (git submodule)
 ├── build/                    # CMake build output (not committed)
 ├── CMakeLists.txt            # Top-level CMake configuration
+├── tests/                    # Catch2 unit tests (standalone, no iPlug2)
+│   ├── CMakeLists.txt        # Test target configuration
+│   ├── test_smoke.cpp        # Smoke tests (framework + basic DSP)
+│   ├── test_constants.cpp    # Constants.h relational invariants
+│   ├── test_buffer_utils.cpp # Reverse, resample, fade, trim
+│   ├── test_reverb.cpp       # Schroeder reverb properties
+│   ├── test_time_stretch.cpp # Spectral stretcher factors + edge cases
+│   ├── test_stutter.cpp      # Gate symmetry, convergence, phase
+│   └── test_sample_loader.cpp# WAV loading, deinterleave, error handling
 ├── RVRSE_BRIEF.md            # Full product specification
+├── GUI_DESIGN_BRIEF.md       # GUI design specification
+├── STITCH-DESIGN.md          # Visual design system
 ├── UAT_PLAYBOOK.md           # Manual test scenarios and pass criteria
 ├── CHANGELOG.md              # Release notes (Keep a Changelog format)
 ├── AGENTS.md                 # AI agent instructions and workflow rules
+├── docs/prototypes/          # Archived HTML/PNG design prototypes
 └── LICENSE                   # MIT license
 ```
 
@@ -374,31 +468,33 @@ the full dependency tree.
 
 ### Phase 1 — Critical Fixes
 
-| Issue | Priority | Description |
-|-------|----------|-------------|
-| `rverse-g67` | P2 | Replace all AcmeInc placeholder branding with SamuFL identity |
-| `rverse-jwf` | P1 | Replace installer license.rtf placeholder with actual MIT license |
-| `rverse-lxg` | P0 | Set up GitHub Actions CI (Windows + macOS) |
+| Issue | Priority | Description | Status |
+|-------|----------|-------------|--------|
+| `rverse-g67` | P2 | Replace all AcmeInc placeholder branding with SamuFL identity | Open |
+| `rverse-jwf` | P1 | Replace installer license.rtf placeholder with actual MIT license | ✅ Done (PR #7) |
+| `rverse-lxg` | P0 | Set up GitHub Actions CI (Windows + macOS) | ✅ Done |
 
 ### Phase 2 — Feature Completion
 
-| Issue | Priority | Description | Blocked by |
-|-------|----------|-------------|------------|
-| `rverse-nqg` | P1 | Expose remaining DSP params (Lush, Riser Length, Fade In, Hit Vol, Dry/Wet) | — |
-| `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | `rverse-nqg` |
-| `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | — |
-| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | — |
+| Issue | Priority | Description | Status |
+|-------|----------|-------------|--------|
+| `rverse-nqg` | P1 | Expose DSP params (Lush, Riser Length, Fade In, Riser Volume, Hit Volume) | ✅ Done (PR #5) |
+| `rverse-l9x` | P1 | Debug playback mode — expose intermediate pipeline buffers | ✅ Done (in PR #5) |
+| `rverse-g4j` | P1 | Upgrade time-stretcher to signalsmith-stretch (spectral) | ✅ Done (PR #8) |
+| `rverse-ebv` | P1 | Build full IGraphics GUI (dark theme) | ✅ Done |
+| `rverse-bzs` | P2 | Implement Riser Tune + Hit Tune (pitch shift) | Open |
+| `rverse-7dr` | P1 | Persist loaded sample path across sessions (state save/restore) | ✅ Done (PR #6) |
 
 ### Phase 3 — Documentation & Polish
 
-| Issue | Priority | Description | Blocked by |
-|-------|----------|-------------|------------|
-| `rverse-6fl` | P0 | Add Catch2 test framework and tests/ directory | — |
-| `rverse-2uq` | P0 | Unit tests for existing DSP modules | `rverse-6fl` |
-| `rverse-zvc` | P2 | Write user manual (LaTeX → PDF) | `rverse-ebv` |
-| `rverse-jaj` | P2 | Automate version number sync (plists, installer, config.h) | — |
-| `rverse-nwe` | P2 | Add Pluginval to CI pipeline | `rverse-lxg` |
-| `rverse-k4o` | P3 | Add CONTRIBUTING.md and CODE_OF_CONDUCT.md | — |
+| Issue | Priority | Description | Status |
+|-------|----------|-------------|--------|
+| `rverse-6fl` | P0 | Add Catch2 test framework and tests/ directory | ✅ Done |
+| `rverse-2uq` | P0 | Unit tests for existing DSP modules | ✅ Done (42 tests) |
+| `rverse-zvc` | P2 | Write user manual (LaTeX → PDF) | Blocked by `rverse-ebv` |
+| `rverse-jaj` | P2 | Automate version number sync (plists, installer, config.h) | Done |
+| `rverse-nwe` | P2 | Add Pluginval to CI pipeline | Open |
+| `rverse-k4o` | P3 | Add CONTRIBUTING.md and CODE_OF_CONDUCT.md | Open |
 
 ### Phase 4 — QA & Release
 
