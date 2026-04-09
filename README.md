@@ -368,6 +368,20 @@ The build produces four plugin formats:
 
 Build artefacts are in `build/RVRSE/`.
 
+### macOS Gatekeeper
+
+Release builds are ad-hoc signed but not notarized. macOS may block the
+plugin on first use. To fix, run in Terminal **before** launching your DAW:
+
+```bash
+xattr -cr ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
+xattr -cr ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+xattr -cr ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
+```
+
+This only needs to be done once per format. See `INSTALL.txt` in the
+download zip for full details.
+
 ---
 
 ## Usage in a DAW

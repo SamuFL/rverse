@@ -100,6 +100,9 @@ jobs:
           cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-macOS.txt" "$staging/INSTALL.txt"
           MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
           [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" "$staging/"
+          for f in RVRSE.vst3 RVRSE.component RVRSE.clap RVRSE.app; do
+            [ -e "$staging/$f" ] && codesign --force --deep -s - "$staging/$f"
+          done
           cd "$staging"
           zip -r "$GITHUB_WORKSPACE/RVRSE-dev-macOS.zip" .
 
