@@ -1,7 +1,7 @@
 #define PLUG_NAME "RVRSE"
 #define PLUG_MFR "SamuFL"
-#define PLUG_VERSION_HEX 0x00000100
-#define PLUG_VERSION_STR "0.1.0"
+#define PLUG_VERSION_HEX 0x00010000
+#define PLUG_VERSION_STR "1.0.0"
 #define PLUG_UNIQUE_ID '5SpI'
 #define PLUG_MFR_ID 'SmFL'
 #define PLUG_URL_STR "https://samufl.com"

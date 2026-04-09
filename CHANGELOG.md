@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [1.0.0] - 2026-04-09
+
 ### Added
 - macOS: ad-hoc codesign (`codesign --force --deep -s -`) all bundles (VST3, AU, CLAP, standalone) in CI before packaging — prevents Gatekeeper "damaged" error on downloaded builds (rverse-wix)
 - Version sync script (`scripts/sync-version.py`) — reads canonical version from `config.h` and propagates to all plists, Inno Setup installer, and CMakeLists.txt; CI check mode (`--check`) prevents version drift (rverse-jaj)
