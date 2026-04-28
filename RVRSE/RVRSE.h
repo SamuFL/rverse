@@ -66,6 +66,7 @@ enum ECtrlTags
   kCtrlTagMasterVolValue,
   kCtrlTagWaveformDisplay,
   kCtrlTagHitPreview,
+  kCtrlTagDropOverlay,
   kNumCtrlTags
 };
 
@@ -91,9 +92,10 @@ public:
   void OnReset() override;
 #endif
 
-private:
   /// Load a sample file from disk (called from UI thread, does work on background thread)
   void LoadSampleFromFile(const char* filePath);
+
+private:
 
   /// Persisted sample file path (saved/restored with DAW project)
   std::string mSampleFilePath;

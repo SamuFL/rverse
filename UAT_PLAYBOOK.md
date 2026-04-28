@@ -458,11 +458,92 @@ automatically restored when the project is reopened.
 
 ---
 
+## Test Scenario 9 — Drag-and-Drop Sample Loading
+
+**Goal:** Verify that files can be loaded by dragging them directly onto the plugin
+window, that the gold highlight overlay appears and disappears correctly, and that
+unsupported formats are rejected without disturbing the previously loaded sample.
+
+### Pre-condition
+
+- Plugin open in a host (Standalone is sufficient for most sub-tests)
+- A reference sample already loaded (for tests that verify the previous sample is unchanged)
+
+### Tests
+
+#### 9.1 — Drag a `.wav` file onto the plugin window
+1. Drag any `.wav` file from the OS file manager onto the plugin window and drop it.
+2. **Expected:** Sample loads successfully. Waveform display updates to show the new
+   sample. Sample name area shows the filename and file info (sample rate, channels,
+   duration).
+
+#### 9.2 — Drag a `.aif` file onto the plugin window
+1. Drag any `.aif` (or `.aiff`) file onto the plugin window and drop it.
+2. **Expected:** Same as 9.1 — sample loads, waveform updates, sample name shows file
+   info.
+
+#### 9.3 — Drag an unsupported format (`.mp3`) onto the plugin window
+1. Load a reference `.wav` sample first. Note the sample name displayed.
+2. Drag a `.mp3` file onto the plugin window and drop it.
+3. **Expected:** An error message appears in the sample name area (e.g.
+   `"Unsupported format: filename.mp3"`). The previously loaded `.wav` sample is
+   **unchanged** — the waveform and audio playback are unaffected.
+
+#### 9.4 — Drag two `.wav` files simultaneously
+1. Select two `.wav` files in the OS file manager and drag both onto the plugin window
+   simultaneously.
+2. **Expected:** Only the **first** file in the drop list loads. The second file is
+   ignored. Sample name and waveform reflect the first file only.
+
+#### 9.5 — Hover overlay appears and disappears
+1. Begin dragging a file (any type) from the OS file manager.
+2. Move the cursor over the plugin window **without dropping**.
+3. **Expected:** A gold highlight overlay appears over the entire plugin window while
+   the cursor is inside the window boundary.
+4. Move the cursor **off** the plugin window without dropping.
+5. **Expected:** The gold overlay disappears immediately. No sample is loaded.
+
+#### 9.6 — Drop while a previous load is in progress
+1. Load a large sample to trigger a longer offline processing run.
+2. While the riser is still being generated (pipeline in progress), drag and drop a
+   second `.wav` file onto the plugin window.
+3. **Expected:** The new load starts. The final state of the plugin (sample name,
+   waveform, riser audio) reflects the **most recently dropped file**, not the
+   previously loading one.
+
+#### 9.7 — Sample path persists after DAW project save/reload
+1. Load a sample via drag-and-drop.
+2. Verify the sample plays correctly (trigger a MIDI note).
+3. Save the DAW project. Close the project (or quit the DAW).
+4. Reopen the project.
+5. **Expected:** The drag-and-drop loaded sample is automatically restored — sample
+   name appears in the UI, riser plays on note-on without manually re-loading.
+
+#### 9.8 — Path with spaces loads correctly
+1. Prepare a `.wav` file whose path contains spaces (e.g. `My Samples/kick drum.wav`).
+2. Drag and drop it onto the plugin window.
+3. **Expected:** Sample loads correctly. Sample name displays the filename. Waveform
+   updates. Audio plays back without issues.
+
+### Pass Criteria
+
+- [ ] 9.1 — `.wav` drag-and-drop loads sample, updates waveform and sample name
+- [ ] 9.2 — `.aif` / `.aiff` drag-and-drop loads sample, updates waveform and sample name
+- [ ] 9.3 — `.mp3` drop shows error in sample name area; previous sample is unchanged
+- [ ] 9.4 — Dropping two files simultaneously loads only the first file
+- [ ] 9.5 — Gold overlay appears on hover; disappears when cursor leaves without dropping
+- [ ] 9.6 — Drop during in-progress load: final state reflects the most recently dropped file
+- [ ] 9.7 — Drag-and-drop loaded sample path persists across DAW project save/reload
+- [ ] 9.8 — File path containing spaces loads correctly
+
+---
+
 ## Revision History
 
-| Date       | Change                                                         |
-|------------|----------------------------------------------------------------|
-| 2026-04-05 | Added Scenario 6: sample persistence tests (rverse-7dr)        |
-| 2026-04-05 | Added Scenario 5: debug stage diagnostic playback (rverse-l9x) |
-| 2026-04-05 | Added Scenario 2: full parameter tests for all 8 params (rverse-nqg) |
-| 2026-04-02 | Initial playbook: scenarios 1–3 (load, stutter, clicks)       |
+| Date       | Change                                                                  |
+|------------|-------------------------------------------------------------------------|
+| 2026-04-28 | Added Scenario 9: drag-and-drop sample loading (rverse-aif)             |
+| 2026-04-05 | Added Scenario 6: sample persistence tests (rverse-7dr)                 |
+| 2026-04-05 | Added Scenario 5: debug stage diagnostic playback (rverse-l9x)          |
+| 2026-04-05 | Added Scenario 2: full parameter tests for all 8 params (rverse-nqg)    |
+| 2026-04-02 | Initial playbook: scenarios 1–3 (load, stutter, clicks)                 |
