@@ -69,7 +69,7 @@ TEST_CASE("IsSupportedAudioFile: Windows-style path with spaces", "[dragdrop]")
 // Validates: Requirements 1.2, 2.1, 2.3
 // ---------------------------------------------------------------------------
 
-TEST_CASE("IsSupportedAudioFile: property — all supported extensions return true",
+TEST_CASE("IsSupportedAudioFile: property - all supported extensions return true",
           "[dragdrop][property]")
 {
   // Feature: drag-and-drop, Property 1: supported format routes to load pipeline
@@ -101,7 +101,7 @@ TEST_CASE("IsSupportedAudioFile: property — all supported extensions return tr
 // Validates: Requirements 2.2, 2.4
 // ---------------------------------------------------------------------------
 
-TEST_CASE("IsSupportedAudioFile: property — unsupported extensions return false",
+TEST_CASE("IsSupportedAudioFile: property - unsupported extensions return false",
           "[dragdrop][property]")
 {
   // Feature: drag-and-drop, Property 2: unsupported format preserves sample state
