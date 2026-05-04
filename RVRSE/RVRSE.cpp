@@ -19,8 +19,9 @@
 /// Full-window background control that handles drag-and-drop file loading.
 /// Attached first (bottom of Z-order) so all other controls receive mouse
 /// clicks normally — iPlug2 hit-tests from front to back, so knobs, buttons,
-/// and panels on top always win for clicks. Drops that land anywhere on the
-/// window reach this control because no other control implements OnDrop.
+/// and panels on top always win for clicks. This acts as a fallback drop
+/// target for areas not handled by a frontmost hit-tested control; controls
+/// above it may intercept drops if they implement their own OnDrop handling.
 ///
 /// GUI THREAD ONLY — never called from the audio thread.
 class DropBackgroundControl final : public IControl

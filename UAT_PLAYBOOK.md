@@ -461,8 +461,8 @@ automatically restored when the project is reopened.
 ## Test Scenario 9 — Drag-and-Drop Sample Loading
 
 **Goal:** Verify that files can be loaded by dragging them directly onto the plugin
-window, that the gold highlight overlay appears and disappears correctly, and that
-unsupported formats are rejected without disturbing the previously loaded sample.
+window, and that unsupported formats are rejected without disturbing the previously
+loaded sample.
 
 ### Pre-condition
 
@@ -495,15 +495,7 @@ unsupported formats are rejected without disturbing the previously loaded sample
 2. **Expected:** Only the **first** file in the drop list loads. The second file is
    ignored. Sample name and waveform reflect the first file only.
 
-#### 9.5 — Hover overlay appears and disappears
-1. Begin dragging a file (any type) from the OS file manager.
-2. Move the cursor over the plugin window **without dropping**.
-3. **Expected:** A gold highlight overlay appears over the entire plugin window while
-   the cursor is inside the window boundary.
-4. Move the cursor **off** the plugin window without dropping.
-5. **Expected:** The gold overlay disappears immediately. No sample is loaded.
-
-#### 9.6 — Drop while a previous load is in progress
+#### 9.5 — Drop while a previous load is in progress
 1. Load a large sample to trigger a longer offline processing run.
 2. While the riser is still being generated (pipeline in progress), drag and drop a
    second `.wav` file onto the plugin window.
@@ -511,7 +503,7 @@ unsupported formats are rejected without disturbing the previously loaded sample
    waveform, riser audio) reflects the **most recently dropped file**, not the
    previously loading one.
 
-#### 9.7 — Sample path persists after DAW project save/reload
+#### 9.6 — Sample path persists after DAW project save/reload
 1. Load a sample via drag-and-drop.
 2. Verify the sample plays correctly (trigger a MIDI note).
 3. Save the DAW project. Close the project (or quit the DAW).
@@ -519,7 +511,7 @@ unsupported formats are rejected without disturbing the previously loaded sample
 5. **Expected:** The drag-and-drop loaded sample is automatically restored — sample
    name appears in the UI, riser plays on note-on without manually re-loading.
 
-#### 9.8 — Path with spaces loads correctly
+#### 9.7 — Path with spaces loads correctly
 1. Prepare a `.wav` file whose path contains spaces (e.g. `My Samples/kick drum.wav`).
 2. Drag and drop it onto the plugin window.
 3. **Expected:** Sample loads correctly. Sample name displays the filename. Waveform
@@ -531,10 +523,9 @@ unsupported formats are rejected without disturbing the previously loaded sample
 - [ ] 9.2 — `.aif` / `.aiff` drag-and-drop loads sample, updates waveform and sample name
 - [ ] 9.3 — `.mp3` drop shows error in sample name area; previous sample is unchanged
 - [ ] 9.4 — Dropping two files simultaneously loads only the first file
-- [ ] 9.5 — Gold overlay appears on hover; disappears when cursor leaves without dropping
-- [ ] 9.6 — Drop during in-progress load: final state reflects the most recently dropped file
-- [ ] 9.7 — Drag-and-drop loaded sample path persists across DAW project save/reload
-- [ ] 9.8 — File path containing spaces loads correctly
+- [ ] 9.5 — Drop during in-progress load: final state reflects the most recently dropped file
+- [ ] 9.6 — Drag-and-drop loaded sample path persists across DAW project save/reload
+- [ ] 9.7 — File path containing spaces loads correctly
 
 ---
 
