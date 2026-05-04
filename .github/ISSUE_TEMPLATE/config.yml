@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: RVRSE discussions
+    url: https://github.com/SamuFL/rvrse/discussions
+    about: Questions, ideas, and general discussion

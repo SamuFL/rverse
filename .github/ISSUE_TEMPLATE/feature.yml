@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest a new capability for RVRSE
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case, not the solution
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed approach (optional)
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered (optional)
