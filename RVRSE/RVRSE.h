@@ -95,6 +95,13 @@ public:
   /// Load a sample file from disk (called from UI thread, does work on background thread)
   void LoadSampleFromFile(const char* filePath);
 
+#if IPLUG_EDITOR
+  /// Show an "Unsupported format" error in the sample name display.
+  /// Called from drag-and-drop handlers when a non-WAV/AIFF file is dropped.
+  /// GUI thread only.
+  void ShowUnsupportedFormatError(const char* filePath);
+#endif
+
 private:
 
   /// Persisted sample file path (saved/restored with DAW project)

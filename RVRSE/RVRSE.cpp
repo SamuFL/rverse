@@ -46,17 +46,7 @@ public:
 
     if (!rvrse::IsSupportedAudioFile(str))
     {
-      if (auto* pUI = GetUI())
-      {
-        if (auto* pCtrl = pUI->GetControlWithTag(kCtrlTagSampleName))
-        {
-          WDL_String errStr;
-          errStr.SetFormatted(256, "Unsupported format: %s",
-            rvrse::ExtractFileName(std::string(str)).c_str());
-          pCtrl->As<ITextControl>()->SetStr(errStr.Get());
-          pCtrl->SetDirty(false);
-        }
-      }
+      mPlugin->ShowUnsupportedFormatError(str);
       return;
     }
 
@@ -239,17 +229,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
         if (!str || str[0] == '\0') return;
         if (!rvrse::IsSupportedAudioFile(str))
         {
-          if (auto* pUI = GetUI())
-          {
-            if (auto* pCtrl = pUI->GetControlWithTag(kCtrlTagSampleName))
-            {
-              WDL_String errStr;
-              errStr.SetFormatted(256, "Unsupported format: %s",
-                rvrse::ExtractFileName(std::string(str)).c_str());
-              pCtrl->As<ITextControl>()->SetStr(errStr.Get());
-              pCtrl->SetDirty(false);
-            }
-          }
+          ShowUnsupportedFormatError(str);
           return;
         }
         LoadSampleFromFile(str);
@@ -650,6 +630,21 @@ void RVRSE::OnIdle()
         }
       }
     }
+  }
+}
+#endif
+
+#if IPLUG_EDITOR
+void RVRSE::ShowUnsupportedFormatError(const char* filePath)
+{
+  if (!GetUI()) return;
+  if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
+  {
+    WDL_String errStr;
+    errStr.SetFormatted(256, "Unsupported format: %s",
+      rvrse::ExtractFileName(std::string(filePath)).c_str());
+    pCtrl->As<ITextControl>()->SetStr(errStr.Get());
+    pCtrl->SetDirty(false);
   }
 }
 #endif
