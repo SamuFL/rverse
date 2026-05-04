@@ -92,8 +92,9 @@ public:
   void OnReset() override;
 #endif
 
-  /// Load a sample file from disk (called from UI thread, does work on background thread)
-  void LoadSampleFromFile(const char* filePath);
+  /// Request loading a sample file from the UI thread (e.g. drag-and-drop or button actions).
+  /// This is the only public entry point for initiating a UI-triggered sample load.
+  void RequestSampleLoadFromUI(const char* filePath) { LoadSampleFromFile(filePath); }
 
 #if IPLUG_EDITOR
   /// Show an "Unsupported format" error in the sample name display.
@@ -103,6 +104,10 @@ public:
 #endif
 
 private:
+
+  /// Internal sample load implementation. Must only be called from the UI thread
+  /// or from UnserializeState (host-managed restore path).
+  void LoadSampleFromFile(const char* filePath);
 
   /// Persisted sample file path (saved/restored with DAW project)
   std::string mSampleFilePath;

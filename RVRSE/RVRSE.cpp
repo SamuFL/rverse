@@ -28,7 +28,7 @@ class DropBackgroundControl final : public IControl
 {
 public:
   /// @param bounds   Full plugin window bounds.
-  /// @param plugin   Non-owning pointer to the plugin instance (for LoadSampleFromFile).
+  /// @param plugin   Non-owning pointer to the plugin instance (for RequestSampleLoadFromUI).
   DropBackgroundControl(const IRECT& bounds, RVRSE* plugin)
   : IControl(bounds), mPlugin(plugin)
   {
@@ -50,7 +50,7 @@ public:
       return;
     }
 
-    mPlugin->LoadSampleFromFile(str);
+    mPlugin->RequestSampleLoadFromUI(str);
   }
 
 private:
@@ -232,7 +232,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
           ShowUnsupportedFormatError(str);
           return;
         }
-        LoadSampleFromFile(str);
+        RequestSampleLoadFromUI(str);
       });
     }
     pGraphics->AttachControl(MakeRoundedPanel(riserRect, kColorDarkGrey, 6.f), kCtrlTagRiserPanel);
@@ -268,7 +268,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
         rvrse::kSupportedAudioExts,
         [this, pCaller](const WDL_String& fileName, const WDL_String& path) {
           if (fileName.GetLength() > 0)
-            LoadSampleFromFile(fileName.Get());
+            RequestSampleLoadFromUI(fileName.Get());
         });
     }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
 
