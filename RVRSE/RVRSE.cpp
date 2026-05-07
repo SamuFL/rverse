@@ -266,9 +266,16 @@ RVRSE::RVRSE(const InstanceInfo& info)
       WDL_String path;
       pCaller->GetUI()->PromptForFile(fileName, path, EFileAction::Open,
         rvrse::kSupportedAudioExts,
-        [this, pCaller](const WDL_String& fileName, const WDL_String& path) {
+        [this](const WDL_String& fileName, const WDL_String& path) {
           if (fileName.GetLength() > 0)
-            RequestSampleLoadFromUI(fileName.Get());
+          {
+            std::string selectedPath = fileName.Get();
+
+            if (!std::filesystem::path(selectedPath).is_absolute() && path.GetLength() > 0)
+              selectedPath = std::string(path.Get()) + selectedPath;
+
+            RequestSampleLoadFromUI(selectedPath.c_str());
+          }
         });
     }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
 
@@ -472,20 +479,47 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pCaller->GetUI()->OpenURL("https://samufl.com/#/portal/support");
     }, "DONATE", supportStyle), kCtrlTagSupportButton);
 
+    // Purely decorative/read-only controls should not swallow file drops.
+    for (const int tag : {
+           kCtrlTagTitle,
+           kCtrlTagSampleName,
+           kCtrlTagHeaderPanel,
+           kCtrlTagWaveformPanel,
+           kCtrlTagRiserPanel,
+           kCtrlTagHitPanel,
+           kCtrlTagFooterPanel,
+           kCtrlTagVersionNumber,
+           kCtrlTagMidiIndicator,
+           kCtrlTagBPMDisplay,
+           kCtrlTagRiserSectionLabel,
+           kCtrlTagOfflineSectionLabel,
+           kCtrlTagHitSectionLabel,
+           kCtrlTagMasterVolLabel,
+           kCtrlTagMasterVolValue,
+           kCtrlTagHitPreview,
+           kCtrlTagLogo
+         })
+    {
+      if (auto* pCtrl = pGraphics->GetControlWithTag(tag))
+        pCtrl->SetIgnoreMouse(true);
+    }
+
     // Restore sample name if already loaded
     if (!mSampleFilePath.empty())
     {
       if (auto* pCtrl = pGraphics->GetControlWithTag(kCtrlTagSampleName))
       {
         const auto state = mLoadState.load();
-        if (state == rvrse::ESampleLoadState::Ready && mPlaySample && mPlaySample->IsLoaded())
+        const auto playSample = std::atomic_load(&mPlaySample);
+
+        if (state == rvrse::ESampleLoadState::Ready && playSample && playSample->IsLoaded())
         {
           WDL_String displayStr;
           displayStr.SetFormatted(256, "%s (%d Hz, %s, %.1fs)",
-            mPlaySample->mFileName.c_str(),
-            static_cast<int>(mPlaySample->mSampleRate),
-            mPlaySample->mNumChannels == 1 ? "mono" : "stereo",
-            static_cast<double>(mPlaySample->NumFrames()) / mPlaySample->mSampleRate);
+            playSample->mFileName.c_str(),
+            static_cast<int>(playSample->mSampleRate),
+            playSample->mNumChannels == 1 ? "mono" : "stereo",
+            static_cast<double>(playSample->NumFrames()) / playSample->mSampleRate);
           pCtrl->As<ITextControl>()->SetStr(displayStr.Get());
         }
         else if (state == rvrse::ESampleLoadState::Loading)
@@ -570,6 +604,26 @@ void RVRSE::OnIdle()
     if (mMidiCooldownFrames > 0) mMidiCooldownFrames--;
   }
 
+  // Publish any sample status text prepared by the background loader.
+  if (GetUI())
+  {
+    std::string sampleStatusText;
+    {
+      std::lock_guard<std::mutex> lock(mStatusTextMutex);
+      sampleStatusText = mPendingSampleStatusText;
+    }
+
+    if (!sampleStatusText.empty() && sampleStatusText != mLastSampleStatusText)
+    {
+      if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
+      {
+        pCtrl->As<ITextControl>()->SetStr(sampleStatusText.c_str());
+        pCtrl->SetDirty(false);
+        mLastSampleStatusText = std::move(sampleStatusText);
+      }
+    }
+  }
+
   // Update waveform display
   if (GetUI())
   {
@@ -577,22 +631,29 @@ void RVRSE::OnIdle()
       GetUI()->GetControlWithTag(kCtrlTagWaveformDisplay));
     if (pWaveform)
     {
-      // Feed riser data when pointer changes
-      if (mRiserBuffer && mRiserBuffer->IsReady() && mRiserBuffer != mWaveformLastRiser)
+      const auto riser = std::atomic_load(&mRiserBuffer);
+      auto hit = std::atomic_load(&mPlaySample);
+
+      if (!hit)
       {
-        const auto& riser = mRiserBuffer;
+        std::lock_guard<std::mutex> lock(mSampleMutex);
+        hit = mHitSample;
+      }
+
+      // Feed riser data when pointer changes
+      if (riser && riser->IsReady() && riser != mWaveformLastRiser)
+      {
         const int nFrames = riser->NumFrames();
         mWaveformMonoBuf.resize(nFrames);
         for (int i = 0; i < nFrames; ++i)
           mWaveformMonoBuf[i] = (riser->mLeft[i] + riser->mRight[i]) * 0.5f;
         pWaveform->SetRiserData(mWaveformMonoBuf.data(), nFrames);
-        mWaveformLastRiser = mRiserBuffer;
+        mWaveformLastRiser = riser;
       }
 
       // Feed hit data when pointer changes
-      if (mPlaySample && mPlaySample->IsLoaded() && mPlaySample != mWaveformLastHit)
+      if (hit && hit->IsLoaded() && hit != mWaveformLastHit)
       {
-        const auto& hit = mPlaySample;
         const int nFrames = hit->NumFrames();
         mWaveformMonoBuf.resize(nFrames);
         for (int i = 0; i < nFrames; ++i)
@@ -605,7 +666,7 @@ void RVRSE::OnIdle()
         if (pHitPreview)
           pHitPreview->SetData(mWaveformMonoBuf.data(), nFrames);
 
-        mWaveformLastHit = mPlaySample;
+        mWaveformLastHit = hit;
       }
 
       // Update visual volume and fade-in envelope
@@ -614,9 +675,9 @@ void RVRSE::OnIdle()
       pWaveform->SetFadeInFrac(static_cast<float>(GetParam(kParamFadeIn)->Value()) / 100.f);
 
       // Update playhead position
-      if (mRiserBuffer && mPlaySample)
+      if (riser && hit)
       {
-        const int totalFrames = mRiserBuffer->NumFrames() + mPlaySample->NumFrames();
+        const int totalFrames = riser->NumFrames() + hit->NumFrames();
         if (totalFrames > 0)
         {
           float pos = -1.f;
@@ -625,7 +686,7 @@ void RVRSE::OnIdle()
           if (riserPos >= 0)
             pos = static_cast<float>(riserPos) / static_cast<float>(totalFrames);
           else if (hitPos >= 0)
-            pos = static_cast<float>(mRiserBuffer->NumFrames() + hitPos) / static_cast<float>(totalFrames);
+            pos = static_cast<float>(riser->NumFrames() + hitPos) / static_cast<float>(totalFrames);
           pWaveform->SetPlayheadPos(pos);
         }
       }
@@ -653,12 +714,20 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
 {
   mSampleFilePath = filePath;
   mLoadState.store(rvrse::ESampleLoadState::Loading);
+  {
+    std::lock_guard<std::mutex> lock(mStatusTextMutex);
+    mPendingSampleStatusText = "Loading...";
+    mLastSampleStatusText.clear();
+  }
 
   // Update UI to show loading state
   if (GetUI())
   {
     if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
+    {
       pCtrl->As<ITextControl>()->SetStr("Loading...");
+      pCtrl->SetDirty(false);
+    }
   }
 
   // Do the actual loading on a background thread to avoid blocking the UI
@@ -692,6 +761,7 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
         std::lock_guard<std::mutex> lock(mSampleMutex);
         mHitSample = playSample;
       }
+      std::atomic_store(&mPlaySample, playSample);
 
       // Signal the audio thread that a new sample is ready
       mNewSampleReady.store(true, std::memory_order_release);
@@ -700,37 +770,28 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
       // Feed the ORIGINAL sample into the offline pipeline (it resamples internally)
       mProcessor.setSample(newSample);
 
-      // Update UI on the main thread via SendControlMsgFromDelegate isn't ideal,
-      // so we use GetUI() — this is safe because we check and the UI lambda captures
-      // will run on the next UI tick
-      if (GetUI())
       {
-        if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
-        {
-          WDL_String displayStr;
-          displayStr.SetFormatted(256, "%s (%d Hz, %s, %.1fs)",
-            newSample->mFileName.c_str(),
-            static_cast<int>(newSample->mSampleRate),
-            newSample->mNumChannels == 1 ? "mono" : "stereo",
-            static_cast<double>(newSample->NumFrames()) / newSample->mSampleRate);
-          pCtrl->As<ITextControl>()->SetStr(displayStr.Get());
-          pCtrl->SetDirty(false);
-        }
+        WDL_String displayStr;
+        displayStr.SetFormatted(256, "%s (%d Hz, %s, %.1fs)",
+          newSample->mFileName.c_str(),
+          static_cast<int>(newSample->mSampleRate),
+          newSample->mNumChannels == 1 ? "mono" : "stereo",
+          static_cast<double>(newSample->NumFrames()) / newSample->mSampleRate);
+
+        std::lock_guard<std::mutex> lock(mStatusTextMutex);
+        mPendingSampleStatusText = displayStr.Get();
       }
     }
     else
     {
       mLoadState.store(rvrse::ESampleLoadState::Error);
 
-      if (GetUI())
       {
-        if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
-        {
-          WDL_String errStr;
-          errStr.SetFormatted(256, "Error: %s", result.errorMessage.c_str());
-          pCtrl->As<ITextControl>()->SetStr(errStr.Get());
-          pCtrl->SetDirty(false);
-        }
+        WDL_String errStr;
+        errStr.SetFormatted(256, "Error: %s", result.errorMessage.c_str());
+
+        std::lock_guard<std::mutex> lock(mStatusTextMutex);
+        mPendingSampleStatusText = errStr.Get();
       }
     }
   }).detach();
@@ -862,7 +923,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   {
     {
       std::lock_guard<std::mutex> lock(mSampleMutex);
-      mPlaySample = mHitSample;
+      std::atomic_store(&mPlaySample, mHitSample);
     }
     mNewSampleReady.store(false, std::memory_order_release);
     // Reset all voice state when new sample arrives
@@ -875,12 +936,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // Latch: only swap when no riser is actively playing to avoid mid-note discontinuities.
   if (mProcessor.isNewRiserReady() && mRiserPos < 0)
   {
-    mRiserBuffer = mProcessor.consumeRiser();
+    std::atomic_store(&mRiserBuffer, mProcessor.consumeRiser());
   }
 
   // Get local pointers — no further locking needed
-  const auto& hit = mPlaySample;
-  const auto& riser = mRiserBuffer;
+  const auto hit = std::atomic_load(&mPlaySample);
+  const auto riser = std::atomic_load(&mRiserBuffer);
 
   // Local copies of atomic positions for the per-sample loop (avoids atomic
   // loads on every access; written back after the loop for UI thread visibility)
