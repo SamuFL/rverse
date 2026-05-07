@@ -66,6 +66,7 @@ enum ECtrlTags
   kCtrlTagMasterVolValue,
   kCtrlTagWaveformDisplay,
   kCtrlTagHitPreview,
+  kCtrlTagDropOverlay,
   kNumCtrlTags
 };
 
@@ -91,8 +92,21 @@ public:
   void OnReset() override;
 #endif
 
+  /// Request loading a sample file from the UI thread (e.g. drag-and-drop or button actions).
+  /// This is the only public entry point for initiating a UI-triggered sample load.
+  void RequestSampleLoadFromUI(const char* filePath) { LoadSampleFromFile(filePath); }
+
+#if IPLUG_EDITOR
+  /// Show an "Unsupported format" error in the sample name display.
+  /// Called from drag-and-drop handlers when a non-WAV/AIFF file is dropped.
+  /// GUI thread only.
+  void ShowUnsupportedFormatError(const char* filePath);
+#endif
+
 private:
-  /// Load a sample file from disk (called from UI thread, does work on background thread)
+
+  /// Internal sample load implementation. Must only be called from the UI thread
+  /// or from UnserializeState (host-managed restore path).
   void LoadSampleFromFile(const char* filePath);
 
   /// Persisted sample file path (saved/restored with DAW project)

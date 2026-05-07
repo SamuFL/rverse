@@ -15,6 +15,49 @@
 #include "GUIColors.h"
 #endif
 
+#if IPLUG_EDITOR
+/// Full-window background control that handles drag-and-drop file loading.
+/// Attached first (bottom of Z-order) so all other controls receive mouse
+/// clicks normally — iPlug2 hit-tests from front to back, so knobs, buttons,
+/// and panels on top always win for clicks. This acts as a fallback drop
+/// target for areas not handled by a frontmost hit-tested control; controls
+/// above it may intercept drops if they implement their own OnDrop handling.
+///
+/// GUI THREAD ONLY — never called from the audio thread.
+class DropBackgroundControl final : public IControl
+{
+public:
+  /// @param bounds   Full plugin window bounds.
+  /// @param plugin   Non-owning pointer to the plugin instance (for RequestSampleLoadFromUI).
+  DropBackgroundControl(const IRECT& bounds, RVRSE* plugin)
+  : IControl(bounds), mPlugin(plugin)
+  {
+    SetWantsMidi(false);
+  }
+
+  void Draw(IGraphics& g) override
+  {
+    // Intentionally empty — the real background is drawn by the panel controls above us.
+  }
+
+  void OnDrop(const char* str) override
+  {
+    if (!str || str[0] == '\0') return;
+
+    if (!rvrse::IsSupportedAudioFile(str))
+    {
+      mPlugin->ShowUnsupportedFormatError(str);
+      return;
+    }
+
+    mPlugin->RequestSampleLoadFromUI(str);
+  }
+
+private:
+  RVRSE* mPlugin; ///< Non-owning; lifetime guaranteed by plugin > GUI
+};
+#endif
+
 RVRSE::RVRSE(const InstanceInfo& info)
 : iplug::Plugin(info, MakeConfig(kNumParams, kNumPresets))
 {
@@ -145,6 +188,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagLogo)->SetTargetAndDrawRECTs(logoArea);
       pGraphics->GetControlWithTag(kCtrlTagSupportButton)->SetTargetAndDrawRECTs(
         bottomArea.GetReducedFromLeft(8.f).GetFromLeft(140.f).GetCentredInside(130.f, 26.f));
+      pGraphics->GetControlWithTag(kCtrlTagDropOverlay)->SetTargetAndDrawRECTs(b);
       return;
     }
 
@@ -161,6 +205,11 @@ RVRSE::RVRSE(const InstanceInfo& info)
     // Main background
     pGraphics->AttachPanelBackground(kColorDark);
 
+    // Drop background — attached immediately after the panel background (bottom of Z-order).
+    // iPlug2 hit-tests front-to-back, so all controls above this receive clicks first.
+    // Drops that land anywhere on the window reach this control via OnDrop.
+    pGraphics->AttachControl(new DropBackgroundControl(b, this), kCtrlTagDropOverlay);
+
     // Helper: draw a filled rounded rect panel
     auto MakeRoundedPanel = [](const IRECT& bounds, const IColor& color, float radius) {
       return new ILambdaControl(bounds, [color, radius](ILambdaControl* pCaller, IGraphics& g, IRECT& r) {
@@ -172,6 +221,20 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(new IPanelControl(headerRect, kColorHeaderBg), kCtrlTagHeaderPanel);
     pGraphics->AttachControl(MakeRoundedPanel(waveformRect, kColorWaveformBg, 6.f), kCtrlTagWaveformPanel);
     pGraphics->AttachControl(new rvrse::WaveformControl(waveformRect.GetPadded(-6.f)), kCtrlTagWaveformDisplay);
+
+    // Wire drag-and-drop into the waveform display — most intuitive drop target.
+    if (auto* pWave = static_cast<rvrse::WaveformControl*>(pGraphics->GetControlWithTag(kCtrlTagWaveformDisplay)))
+    {
+      pWave->SetDropCallback([this](const char* str) {
+        if (!str || str[0] == '\0') return;
+        if (!rvrse::IsSupportedAudioFile(str))
+        {
+          ShowUnsupportedFormatError(str);
+          return;
+        }
+        RequestSampleLoadFromUI(str);
+      });
+    }
     pGraphics->AttachControl(MakeRoundedPanel(riserRect, kColorDarkGrey, 6.f), kCtrlTagRiserPanel);
     pGraphics->AttachControl(MakeRoundedPanel(hitRect, kColorDarkGrey, 6.f), kCtrlTagHitPanel);
     pGraphics->AttachControl(new IPanelControl(footerRect, kColorHeaderBg), kCtrlTagFooterPanel);
@@ -205,7 +268,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
         rvrse::kSupportedAudioExts,
         [this, pCaller](const WDL_String& fileName, const WDL_String& path) {
           if (fileName.GetLength() > 0)
-            LoadSampleFromFile(fileName.Get());
+            RequestSampleLoadFromUI(fileName.Get());
         });
     }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
 
@@ -438,6 +501,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
         }
       }
     }
+
   };
 #endif
 }
@@ -566,6 +630,21 @@ void RVRSE::OnIdle()
         }
       }
     }
+  }
+}
+#endif
+
+#if IPLUG_EDITOR
+void RVRSE::ShowUnsupportedFormatError(const char* filePath)
+{
+  if (!GetUI()) return;
+  if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
+  {
+    WDL_String errStr;
+    errStr.SetFormatted(256, "Unsupported format: %s",
+      rvrse::ExtractFileName(std::string(filePath)).c_str());
+    pCtrl->As<ITextControl>()->SetStr(errStr.Get());
+    pCtrl->SetDirty(false);
   }
 }
 #endif

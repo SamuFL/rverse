@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-_No changes yet._
+### Added
+- Drag-and-drop sample loading — drag any WAV or AIFF file directly onto the plugin's header/footer/waveform areas to load it (rverse-aif)
 
 ## [1.0.0] - 2026-04-09
 

@@ -4,6 +4,7 @@
 
 #include "IControl.h"
 #include "GUIColors.h"
+#include <functional>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -92,6 +93,19 @@ public:
     }
   }
 
+  /// Set a callback invoked when a file is dropped onto the waveform display.
+  /// @param fn  Called with the dropped file path. GUI thread only.
+  void SetDropCallback(std::function<void(const char*)> fn)
+  {
+    mDropCallback = std::move(fn);
+  }
+
+  void OnDrop(const char* str) override
+  {
+    if (mDropCallback && str && str[0] != '\0')
+      mDropCallback(str);
+  }
+
   void Draw(IGraphics& g) override
   {
     const IRECT r = mRECT;
@@ -102,9 +116,9 @@ public:
     const int totalFrames = mRiserFrames + mHitFrames;
     if (totalFrames == 0)
     {
-      // Empty state — draw label
-      const IText emptyText(14, gui::kColorTextMuted, "Roboto-Regular", EAlign::Center, EVAlign::Middle);
-      g.DrawText(emptyText, "Load a sample to see the waveform", r);
+      // Empty state — draw hint text
+      const IText emptyText(16, gui::kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle);
+      g.DrawText(emptyText, "Load a sample or drop the sample file here to see the waveform", r);
       return;
     }
 
@@ -303,6 +317,7 @@ private:
   float mRiserGain = 1.f;    ///< Visual volume scaling for riser
   float mHitGain = 1.f;      ///< Visual volume scaling for hit
   float mFadeInFrac = 0.f;   ///< Fade-in as fraction of riser length
+  std::function<void(const char*)> mDropCallback; ///< Called on file drop (GUI thread only)
 };
 
 /// Lightweight hit sample waveform preview for the hit panel.
