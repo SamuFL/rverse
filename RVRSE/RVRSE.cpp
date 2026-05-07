@@ -269,12 +269,13 @@ RVRSE::RVRSE(const InstanceInfo& info)
         [this](const WDL_String& fileName, const WDL_String& path) {
           if (fileName.GetLength() > 0)
           {
-            std::string selectedPath = fileName.Get();
+            std::filesystem::path selectedPath(fileName.Get());
 
-            if (!std::filesystem::path(selectedPath).is_absolute() && path.GetLength() > 0)
-              selectedPath = std::string(path.Get()) + selectedPath;
+            if (!selectedPath.is_absolute() && path.GetLength() > 0)
+              selectedPath = std::filesystem::path(path.Get()) / selectedPath;
 
-            RequestSampleLoadFromUI(selectedPath.c_str());
+            const std::string normalizedPath = selectedPath.lexically_normal().string();
+            RequestSampleLoadFromUI(normalizedPath.c_str());
           }
         });
     }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
@@ -632,9 +633,9 @@ void RVRSE::OnIdle()
     if (pWaveform)
     {
       const auto riser = std::atomic_load(&mRiserBuffer);
-      auto hit = std::atomic_load(&mPlaySample);
+      const auto playbackHit = std::atomic_load(&mPlaySample);
+      std::shared_ptr<rvrse::SampleData> hit;
 
-      if (!hit)
       {
         std::lock_guard<std::mutex> lock(mSampleMutex);
         hit = mHitSample;
@@ -675,9 +676,9 @@ void RVRSE::OnIdle()
       pWaveform->SetFadeInFrac(static_cast<float>(GetParam(kParamFadeIn)->Value()) / 100.f);
 
       // Update playhead position
-      if (riser && hit)
+      if (riser && playbackHit)
       {
-        const int totalFrames = riser->NumFrames() + hit->NumFrames();
+        const int totalFrames = riser->NumFrames() + playbackHit->NumFrames();
         if (totalFrames > 0)
         {
           float pos = -1.f;
@@ -761,7 +762,6 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
         std::lock_guard<std::mutex> lock(mSampleMutex);
         mHitSample = playSample;
       }
-      std::atomic_store(&mPlaySample, playSample);
 
       // Signal the audio thread that a new sample is ready
       mNewSampleReady.store(true, std::memory_order_release);
