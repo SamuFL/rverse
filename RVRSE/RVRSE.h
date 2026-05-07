@@ -165,6 +165,11 @@ private:
   std::shared_ptr<rvrse::SampleData> mWaveformLastHit;  ///< Last hit pointer fed to waveform
   std::vector<float> mWaveformMonoBuf; ///< Temp buffer for stereo→mono mix
 
+  // --- UI-thread label updates from background loader ---
+  std::mutex mStatusTextMutex;
+  std::string mPendingSampleStatusText; ///< Next sample status text for OnIdle to publish
+  std::string mLastSampleStatusText;    ///< Last sample status text shown in the UI
+
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state
 
