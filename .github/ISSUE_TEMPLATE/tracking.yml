@@ -1,0 +1,26 @@
+name: Tracking issue
+description: Coordinate work spanning multiple PRs
+labels: ["type:chore"]
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What's in, what's out
+    validations:
+      required: true
+  - type: textarea
+    id: subtasks
+    attributes:
+      label: Sub-tasks
+      placeholder: |
+        - [ ] #
+        - [ ] #
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
