@@ -25,10 +25,11 @@ editing, no extra samples needed.
 8. [Build Instructions](#build-instructions)
 9. [Plugin Formats](#plugin-formats)
 10. [Usage in a DAW](#usage-in-a-daw)
-11. [Project Structure](#project-structure)
-12. [Roadmap — v1.0 Release](#roadmap--v10-release)
-13. [Contributing](#contributing)
-14. [License](#license)
+11. [MIDI Control](#midi-control)
+12. [Project Structure](#project-structure)
+13. [Roadmap — v1.0 Release](#roadmap--v10-release)
+14. [Contributing](#contributing)
+15. [License](#license)
 
 ---
 
@@ -404,10 +405,22 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 | Fade In | 0–100% | 60% | Linear ramp over portion of riser length |
 | Riser Volume | -60 to +6 dB | 0 dB | Independent riser voice gain |
 | Hit Volume | -60 to +6 dB | 0 dB | Independent hit voice gain |
-| Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1) |
-| Stutter Depth | 0–1 | 0.5 | Gate depth (also via MIDI CC11) |
+| Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1 / mod wheel) |
+| Stutter Depth | 0–1 | 0.5 | Gate depth (also via MIDI CC11 / expression) |
 | Debug Stage | Normal / Reverbed / Reversed / Riser Only | Normal | Diagnostic: audition intermediate pipeline buffers |
 | Stretch Quality | High / Low | High | High = best quality (larger FFT), Low = faster (~2×) for real-time tweaking |
+
+### MIDI Control
+
+RVRSE currently exposes two fixed MIDI CC mappings for the real-time stutter controls:
+
+| CC | Common controller | Controls | Value mapping |
+|---|---|---|---|
+| CC1 | Mod wheel | Stutter Rate | Maps 0–127 to 0–30 Hz |
+| CC11 | Expression | Stutter Depth | Maps 0–127 to 0–100% |
+
+These mappings are currently hardcoded defaults. User-assignable CC routing is not available yet
+and is tracked in [#31](https://github.com/SamuFL/rverse/issues/31).
 
 ### Current Limitations
 
