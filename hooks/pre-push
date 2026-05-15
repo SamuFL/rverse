@@ -4,7 +4,6 @@
 # Rules:
 #   1. Never push directly to 'main' — use release/ or hotfix/ branches
 #   2. Warn (but allow) pushes to 'develop' — prefer feature/ branches
-#   3. Run 'bd doctor' to surface beads hygiene issues (non-blocking)
 
 set -euo pipefail
 
@@ -31,21 +30,7 @@ fi
 if [ "$CURRENT_BRANCH" = "develop" ]; then
     echo ""
     echo "⚠️  Pushing directly to 'develop'. Prefer feature branches:"
-    echo "   git checkout -b feature/<beads-id>-description"
-    echo ""
-fi
-
-# --- Rule 3: Beads doctor check (non-blocking) ---
-if command -v bd &> /dev/null; then
-    echo "🔍 Running beads doctor..."
-    BD_OUTPUT=$(bd doctor 2>&1 || true)
-    if echo "$BD_OUTPUT" | grep -qiE "(warning|error|orphan|issue)"; then
-        echo "$BD_OUTPUT" | head -20
-        echo ""
-        echo "   ℹ️  Beads issues detected (non-blocking). Run 'bd doctor' for details."
-    else
-        echo "   ✅ Beads health check passed."
-    fi
+    echo "   git checkout -b feature/<issue-number>-description"
     echo ""
 fi
 

@@ -400,7 +400,7 @@ quality modes and triggers a re-stretch when changed.
 
 ---
 
-## Test Scenario 6 — Sample Persistence (rverse-7dr)
+## Test Scenario 6 — Sample Persistence
 
 **Goal:** Verify that the loaded sample path is saved with the DAW project and
 automatically restored when the project is reopened.
@@ -454,7 +454,7 @@ automatically restored when the project is reopened.
 
 ## Test Scenario 8 — *(Reserved: Tempo-Synced Stutter)*
 
-> **Not yet implemented.** See beads issue rverse-0gq.
+> **Not yet implemented.** Deferred to a future GitHub issue.
 
 ---
 
@@ -533,8 +533,8 @@ loaded sample.
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
-| 2026-04-28 | Added Scenario 9: drag-and-drop sample loading (rverse-aif)             |
-| 2026-04-05 | Added Scenario 6: sample persistence tests (rverse-7dr)                 |
-| 2026-04-05 | Added Scenario 5: debug stage diagnostic playback (rverse-l9x)          |
-| 2026-04-05 | Added Scenario 2: full parameter tests for all 8 params (rverse-nqg)    |
+| 2026-04-28 | Added Scenario 9: drag-and-drop sample loading                          |
+| 2026-04-05 | Added Scenario 6: sample persistence tests                              |
+| 2026-04-05 | Added Scenario 5: debug stage diagnostic playback                       |
+| 2026-04-05 | Added Scenario 2: full parameter tests for all 8 params                 |
 | 2026-04-02 | Initial playbook: scenarios 1–3 (load, stutter, clicks)                 |

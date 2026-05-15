@@ -30,7 +30,7 @@ iplug_add_plugin(${PROJECT_NAME}
 
 # Workaround: iPlug2's CMake only adds main.rc to the APP target on Windows.
 # Plugin MODULE targets (VST3, CLAP) need it too for Win32 resource embedding
-# (fonts, images). See rverse-1qa for the upstream fix.
+# (fonts, images).
 if(WIN32)
   set(_rc_file "${CMAKE_CURRENT_SOURCE_DIR}/resources/main.rc")
   if(EXISTS "${_rc_file}")

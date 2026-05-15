@@ -12,7 +12,7 @@ This plan consolidates:
 
 - `RVRSE-Feedback.md` — community feedback (5 bugs, 15 FRs, 8 remarks, 5 questions)
 - The published v1.1.0 roadmap blog post (public commitments)
-- Open items from beads (`issues.jsonl`) that remain relevant
+- The archived Beads tracker snapshot for historical context only
 
 Anything not listed here is **out of scope** for v1.1.0 and lives in the v1.2.0 backlog or further out.
 
@@ -65,9 +65,9 @@ Anything not listed here is **out of scope** for v1.1.0 and lives in the v1.2.0 
 
 These don't ship as user-facing features but are non-negotiable for a maintainable v1.1.0:
 
-- **Q-3:** Catch2 test framework + tests/ directory (`rverse-6fl`)
-- **Q-4:** Headless integration tests (`rverse-0n2`) — at least one golden-master smoke test
-- **Q-6:** Migrate active project management from beads to GitHub Issues + Projects + Milestones — **first task, blocking everything else**
+- **Q-3:** Catch2 test framework + tests/ directory
+- **Q-4:** Headless integration tests — at least one golden-master smoke test
+- **Q-6:** Migrate active project management from Beads to GitHub Issues + Projects + Milestones — completed via issue #26
 
 ### 3.3 Out of scope — explicitly deferred to v1.2.0+
 
@@ -113,7 +113,7 @@ Goal: get the project management surface in order before any feature work starts
 - C-1 (Apple Developer Programme signup, code-signing setup, notarization pipeline)
 - B-3 (stutter CC documentation pass — quick win, no code)
 
-**Exit criteria:** GitHub project board populated, beads archived, Apple Developer ID active, signing pipeline working in CI.
+**Exit criteria:** GitHub project board populated, Beads archived, Apple Developer ID active, signing pipeline working in CI.
 
 ### Phase 1 — "User-facing features" (Days 3–9)
 
@@ -145,7 +145,7 @@ Goal: validate, polish, ship.
 - Tag `v1.1.0`, GitHub release with all artefacts
 - Blog post + newsletter announcement
 
-**Exit criteria:** v1.1.0 published, announcement out, beads formally archived in README.
+**Exit criteria:** v1.1.0 published, announcement out, the archived Beads tracker clearly marked as historical in README.
 
 ### 4.1 UAT playbook (replaces Q-5 cross-DAW validation)
 
@@ -202,17 +202,14 @@ If the spike doesn't ship: the v1.1.0 release notes should say "reverb tuning im
 
 ---
 
-## 7. Migration plan: beads → GitHub
+## 7. Migration status: Beads → GitHub
 
-Don't bulk-import. Do this in order:
+The migration is complete:
 
-1. **Create the label set** in the repo
-2. **Create the `v1.1.0` milestone**
-3. **Create issue templates** (`bug`, `feature`, `tracking`)
-4. **Set up Projects v2 board** with `Backlog → Ready → In Progress → In Review → Done` columns; add the milestone as a filter
-5. **Hand-create the v1.1.0 issues** from this document (one issue per Tier 1 and Tier 2 item; one tracking issue per major feature with sub-issue checklists for non-trivial work)
-6. **Mark beads as archived in the repo README** — point at the new GitHub workflow as the canonical source
-7. **Stop writing to beads.** No new beads issues; closed ones stay closed as historical record. Remaining open beads issues that survive into v1.2+ get re-created in GitHub when they become relevant.
+1. GitHub Labels, Milestones, Issue templates, and the Projects v2 board are the active planning surface
+2. The Beads database is archived under `.archive/beads-historical/`
+3. README and contributor workflow docs point at GitHub as the canonical source of truth
+4. New work is tracked only in GitHub; the archived Beads data remains historical reference
 
 ---
 
@@ -229,7 +226,7 @@ A v1.1.0 release is done when:
 7. CHANGELOG.md updated
 8. GitHub release created with VST3, AU, CLAP, and `.pkg` artefacts attached
 9. Blog post + newsletter announcing the release
-10. Beads archived in README; all v1.1.0 work tracked in GitHub Issues against the milestone
+10. The archived Beads tracker is clearly documented in README; all v1.1.0 work is tracked in GitHub Issues against the milestone
 11. `yyahav` credited in release notes
 
 ---

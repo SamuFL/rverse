@@ -26,9 +26,10 @@ editing, no extra samples needed.
 9. [Plugin Formats](#plugin-formats)
 10. [Usage in a DAW](#usage-in-a-daw)
 11. [Project Structure](#project-structure)
-12. [Roadmap — v1.0 Release](#roadmap--v10-release)
-13. [Contributing](#contributing)
-14. [License](#license)
+12. [Roadmap — v1.0 Release (Historical)](#roadmap--v10-release-historical)
+13. [Project Management](#project-management)
+14. [Contributing](#contributing)
+15. [License](#license)
 
 ---
 
@@ -461,10 +462,10 @@ rverse/
 
 ---
 
-## Roadmap — v1.0 Release
+## Roadmap — v1.0 Release (Historical)
 
-Tracked as the **Release Preparation Epic** (`rverse-0v6`). Run `bd children rverse-0v6` for
-the full dependency tree.
+The tables below summarize the historical v1.0 release plan. The `rverse-*` identifiers are
+archived tracker IDs retained for reference from the pre-GitHub-planning era.
 
 ### Phase 1 — Critical Fixes
 
@@ -515,11 +516,22 @@ the full dependency tree.
 
 ---
 
+## Project Management
+
+GitHub is the **single source of truth** for active RVRSE planning and execution:
+
+- [Issues](https://github.com/SamuFL/rverse/issues)
+- [v1.1.0 milestone](https://github.com/SamuFL/rverse/milestone/1)
+- [RVRSE Development project board](https://github.com/users/SamuFL/projects/1)
+
+The previous Beads tracker is preserved for historical reference only at
+[`/.archive/beads-historical/`](./.archive/beads-historical/).
+
 ## Contributing
 
 This is a warmup project for the [OpenSampler](https://github.com/SamuFL) initiative. Development
-is tracked via [Beads](https://github.com/steveyegge/beads) issue tracker — see `AGENTS.md` for
-the full workflow.
+is tracked in GitHub — see the project management links above and `AGENTS.md` for the active
+workflow.
 
 ### Key Rules
 
@@ -527,7 +539,8 @@ the full workflow.
 - **No allocations on the audio thread.** Ever.
 - **No magic numbers.** All constants live in `Constants.h`.
 - **Update CHANGELOG.md** for any user-facing change.
-- **Git-flow branching:** `main` → `develop` → `feature/<beads-id>-description`.
+- **Git-flow branching:** `main` → `develop` → `feature/<issue-number>-<short-description>` (for example, `feature/26-hit-preview`).
+- **Include the related GitHub issue number in every non-exempt commit message** using `#<number>` format (for example, `Add hit preview button (#26)`).
 
 ---
 
