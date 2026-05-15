@@ -539,8 +539,8 @@ workflow.
 - **No allocations on the audio thread.** Ever.
 - **No magic numbers.** All constants live in `Constants.h`.
 - **Update CHANGELOG.md** for any user-facing change.
-- **Git-flow branching:** `main` → `develop` → `feature/<short-description>`.
-- **Reference the related GitHub issue or PR** in commit messages where applicable (for example, `(#26)`).
+- **Git-flow branching:** `main` → `develop` → `feature/<issue-number>-<short-description>` (for example, `feature/26-hit-preview`).
+- **Include the related GitHub issue number in every non-exempt commit message** using `#<number>` format (for example, `Add hit preview button (#26)`).
 
 ---
 
