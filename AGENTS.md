@@ -57,12 +57,15 @@ END OF SESSION  ("land the plane")
 
 ### Commit Message Convention
 
-Always include a GitHub issue or PR reference at the end of commit messages:
+Always include a GitHub issue or PR reference in every normal commit message:
 
 ```
 git commit -m "Archive legacy tracker docs and hooks (#26)"
 git commit -m "Fix sample loading handoff after drag-and-drop merge (#28)"
 ```
+
+Putting the reference at the end of the subject line is the preferred style, but the key
+requirement is that the reference is present in the commit message.
 
 ---
 
