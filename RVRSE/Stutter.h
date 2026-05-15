@@ -8,7 +8,7 @@
 /// and stateless from the caller's perspective.
 ///
 /// The rate is a continuous frequency in Hz (e.g. 1–30 Hz), giving smooth
-/// creative control. A tempo-synced mode is planned for later (rverse-0gq).
+/// creative control. A tempo-synced mode is planned for a future release.
 
 #include "Constants.h"
 #include <algorithm>

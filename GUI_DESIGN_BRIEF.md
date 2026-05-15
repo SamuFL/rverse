@@ -72,8 +72,8 @@ Every parameter listed here MUST have a corresponding control in the GUI. The "C
 
 | Parameter | Section | Type | Range | Notes |
 |---|---|---|---|---|
-| Riser Tune | Riser | Knob | -24 – +24 st | Pitch-shifts the riser. Beads issue `rverse-bzs`. |
-| Hit Tune | Hit | Knob | -24 – +24 st | Pitch-shifts the hit. Beads issue `rverse-bzs`. |
+| Riser Tune | Riser | Knob | -24 – +24 st | Pitch-shifts the riser. Future feature; keep visual space available. |
+| Hit Tune | Hit | Knob | -24 – +24 st | Pitch-shifts the hit. Future feature; keep visual space available. |
 
 ### 3.7 Non-Parameter UI Elements
 
@@ -372,7 +372,7 @@ For inspiration, think:
 
 ## 12. Current State & Visual Reference
 
-The plugin currently has a minimal placeholder UI: title text, a Load Sample button, and a sample name display on a dark gray background. No knobs are exposed in the GUI yet (all parameters work via DAW automation / generic host UI only). The feature branch `feature/rverse-ebv-igraphics-gui` is ready for implementation.
+The plugin currently has a minimal placeholder UI: title text, a Load Sample button, and a sample name display on a dark gray background. No knobs are exposed in the GUI yet (all parameters work via DAW automation / generic host UI only). The IGraphics GUI implementation branch is ready for implementation.
 
 ### Stitch Design Reference (Source of Truth for Visual Layout)
 

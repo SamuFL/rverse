@@ -16,47 +16,29 @@ architecture matter more than speed of delivery.
 
 ---
 
-## 2. Task Tracking — Beads (`bd`)
+## 2. Task Tracking — GitHub
 
-This project uses **[Beads](https://github.com/steveyegge/beads)** (`bd`) for issue tracking.
-Beads is a git-backed, agent-optimised issue tracker. All planning lives there, not in markdown
-files or freeform TODO comments.
+This project uses **GitHub Issues, Milestones, and Projects** for active task tracking.
+Historical Beads data is archived under `.archive/beads-historical/`, but GitHub is the only
+source of truth for current work.
 
-### Setup (once per machine)
-
-```bash
-# Install the bd CLI globally
-curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
-
-# For VS Code + Copilot: install the MCP server
-uv tool install beads-mcp
-# Then add to .vscode/mcp.json:
-# { "servers": { "beads": { "command": "beads-mcp" } } }
-
-# Install git hooks in the repo (auto-syncs issues on commit/pull)
-bd hooks install
-```
-
-### Mandatory Beads Workflow
+### Mandatory GitHub Workflow
 
 Follow this pattern for every working session, without exception:
 
 ```
 START OF SESSION
-  bd prime              # Load context — read this output carefully
-  bd ready --json       # Find unblocked tasks to work on
+  gh issue view <number>                  # Read the issue you are addressing
+  gh issue list --milestone "v1.1.0"      # Check nearby milestone context when relevant
 
-DURING WORK (for each task)
-  bd update <id> --claim              # Claim the task before starting
-  bd create "Sub-task" --type task    # Create child tasks as needed
-  bd dep add <child-id> <parent-id>   # Link dependencies explicitly
+DURING WORK
+  Create follow-up GitHub issues as needed for newly discovered work
+  Keep the working branch and PR aligned with the active GitHub issue
 
 END OF SESSION  ("land the plane")
-  bd close <id> --reason "..." --json # Close completed tasks
-  bd sync                             # Export + commit the issue database
   git pull --rebase
-  git push                            # MANDATORY — do not stop before this
-  git status                          # Must read "up to date with origin/main"
+  git push
+  git status                          # Must read "up to date with origin/<branch>"
 ```
 
 > **CRITICAL:** A session is NOT complete until `git push` succeeds and
@@ -67,27 +49,20 @@ END OF SESSION  ("land the plane")
 
 | Command | Purpose |
 |---|---|
-| `bd prime` | Load full workflow context — run at session start |
-| `bd ready` | List tasks with no open blockers — your work queue |
-| `bd create "Title" -t task -p 1` | Create a task (priority 0=highest, 4=lowest) |
-| `bd update <id> --claim` | Atomically claim a task (sets you as assignee + in_progress) |
-| `bd dep add <child> <parent>` | Mark that child is blocked by parent |
-| `bd dep tree <id>` | Show full dependency tree for an issue |
-| `bd show <id> --json` | View full task details |
-| `bd close <id> --reason "Done"` | Mark a task complete |
-| `bd sync` | Sync JSONL and commit |
-| `bd stats` | Overall project progress |
+| `gh issue view <number>` | Read the issue you are working on |
+| `gh issue list --milestone "v1.1.0"` | See the active milestone queue |
+| `gh issue create` | Create follow-up issues discovered during implementation |
+| `gh pr create --base develop` | Open a PR for review |
+| `gh pr view --comments` | Review PR discussion and feedback |
 
 ### Commit Message Convention
 
-Always include the Beads issue ID at the end of commit messages:
+Always include a GitHub issue or PR reference at the end of commit messages:
 
 ```
-git commit -m "Add Schroeder reverb implementation (bd-a1b2)"
-git commit -m "Wire stutter gate to MIDI CC (bd-c3d4)"
+git commit -m "Archive legacy tracker docs and hooks (#26)"
+git commit -m "Fix sample loading handoff after drag-and-drop merge (#28)"
 ```
-
-This lets `bd doctor` detect orphaned issues (committed but not closed).
 
 ---
 
@@ -198,7 +173,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/) conventions:
 ```markdown
 ## [Unreleased]
 ### Added
-- Stutter gate with real-time MIDI CC control (bd-xxxx)
+- Stutter gate with real-time MIDI CC control (#123)
 ### Changed
 - Lush knob now controls room size and wet gain together
 ### Fixed
@@ -291,11 +266,11 @@ This project uses a standard **git-flow** branching model. Follow it without exc
    ```bash
    git checkout develop
    git pull
-   git checkout -b feature/<beads-id>-short-description
-   # ... do work, commit with beads ID in message ...
+   git checkout -b feature/<issue-number>-short-description
+   # ... do work, commit with the GitHub issue number in the message ...
    git checkout develop
-   git merge feature/<beads-id>-short-description
-   git branch -d feature/<beads-id>-short-description
+   git merge feature/<issue-number>-short-description
+   git branch -d feature/<issue-number>-short-description
    git push
    ```
 3. **Release branches** are created from `develop` when all planned features are merged:
@@ -311,7 +286,7 @@ This project uses a standard **git-flow** branching model. Follow it without exc
    git branch -d release/0.1.0
    git push --all && git push --tags
    ```
-4. **Name feature branches** using the Beads ID: `feature/rverse-uj4-cpp-environment`.
+4. **Name feature branches** using the GitHub issue number when applicable: `feature/26-sunset-beads`.
 
 ---
 
@@ -331,9 +306,9 @@ git config core.hooksPath hooks
 
 | Hook | Behaviour | Bypass |
 |---|---|---|
-| **commit-msg** | Requires a Beads issue ID (`bd-xxxx` or `rverse-xxxx`) in every commit message. Exempts merge commits, beads sync, reverts, and version tags. | `--no-verify` |
+| **commit-msg** | Requires a GitHub issue or PR reference (`#<number>`) in every commit message. Exempts merge commits, reverts, and version tags. | `--no-verify` |
 | **pre-commit** | Blocks commits containing merge conflict markers, files >5 MB, or possible secrets/API keys. Warns (non-blocking) on `std::cout`/`printf` debug statements in C++ files. | `--no-verify` |
-| **pre-push** | **Blocks** direct pushes to `main` (must use release/ or hotfix/ branches). **Warns** on direct pushes to `develop` (prefer feature branches). Runs `bd doctor` as a non-blocking health check. | `--no-verify` |
+| **pre-push** | **Blocks** direct pushes to `main` (must use release/ or hotfix/ branches). **Warns** on direct pushes to `develop` (prefer feature branches). | `--no-verify` |
 
 ### Adding New Hooks
 
@@ -349,8 +324,8 @@ git config core.hooksPath hooks
 
 ## 10. Work Plan
 
-All tasks are tracked in Beads. Run `bd ready 2>&1 | cat` to see what's unblocked.
-Run `bd list 2>&1 | cat` to see all tasks with dependency info.
+All tasks are tracked in GitHub. Use the issue tracker, the active milestone, and the project
+board to understand what is queued, in progress, and complete.
 
 The build sequence follows five phases, each building on the last:
 
@@ -363,8 +338,8 @@ The build sequence follows five phases, each building on the last:
 | **4 — GUI** | Full dark-theme layout, knobs, waveform view | Polish the interface |
 | **5 — Release** | DAW validation (Cubase, Studio One, Logic), v0.1.0 tag | Ship it |
 
-> **Note:** Tasks are fully defined in Beads with descriptions, priorities, and dependency
-> chains. Do not duplicate the task list here — Beads is the single source of truth.
+> **Note:** Tasks are fully defined in GitHub Issues and organized via Milestones and the project
+> board. Do not duplicate the task list here — GitHub is the single source of truth.
 
 ---
 
@@ -375,8 +350,8 @@ A task is **done** when all of the following are true:
 1. The feature works correctly and has been manually tested in a DAW
 2. Relevant documentation has been updated (`README`, `CHANGELOG`, inline docs)
 3. The code compiles cleanly on both Windows and macOS (no warnings treated as errors)
-4. The Beads issue is closed with a meaningful reason
-5. Changes are committed with the issue ID in the commit message
+4. The GitHub issue or PR is updated appropriately
+5. Changes are committed with the relevant `#<number>` reference in the commit message
 6. `git push` has succeeded
 
 ---
@@ -391,11 +366,10 @@ A task is **done** when all of the following are true:
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
+3. **Update issue status** - Update the GitHub issue/PR with the outcome and any follow-up work
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
