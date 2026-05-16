@@ -7,7 +7,8 @@ original hit at a tempo-synced beat boundary. One sample in → complete transit
 editing, no extra samples needed.
 
 > **Status:** `v1.0.0` released. Core DSP pipeline, stutter gate, IGraphics GUI, and all DAW
-> parameters working. CI builds on macOS (Apple Silicon) + Windows (VS2022) with ad-hoc codesigning.
+> parameters working. CI builds on macOS (Apple Silicon) + Windows (VS2022), with release-tag macOS
+> builds packaged as a signed and notarized installer.
 > Dark-themed native GUI with waveform display, dual control panels, and hit preview.
 > See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
@@ -362,26 +363,26 @@ The build produces four plugin formats:
 
 | Format | macOS Install Path | Windows Install Path |
 |---|---|---|
-| **VST3** | `~/Library/Audio/Plug-Ins/VST3/` | `C:\Program Files\Common Files\VST3\` |
-| **AU** | `~/Library/Audio/Plug-Ins/Components/` | *(macOS only)* |
-| **CLAP** | `~/Library/Audio/Plug-Ins/CLAP/` | `C:\Program Files\Common Files\CLAP\` |
-| **Standalone** | `~/Applications/` | Build output directory |
+| **VST3** | `/Library/Audio/Plug-Ins/VST3/` | `C:\Program Files\Common Files\VST3\` |
+| **AU** | `/Library/Audio/Plug-Ins/Components/` | *(macOS only)* |
+| **CLAP** | `/Library/Audio/Plug-Ins/CLAP/` | `C:\Program Files\Common Files\CLAP\` |
+| **Standalone** | `/Applications/` | Build output directory |
 
 Build artefacts are in `build/RVRSE/`.
 
-### macOS Gatekeeper
+### macOS Installation
 
-Release builds are ad-hoc signed but not notarized. macOS may block the
-plugin on first use. To fix, run in Terminal **before** launching your DAW:
+Release downloads for macOS ship as a signed and notarized `.pkg` installer.
+Run the installer and keep the default system-wide install locations unless you
+have a specific reason to customize them:
 
-```bash
-xattr -cr ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
-xattr -cr ~/Library/Audio/Plug-Ins/Components/RVRSE.component
-xattr -cr ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
-```
+- **VST3:** `/Library/Audio/Plug-Ins/VST3/`
+- **AU:** `/Library/Audio/Plug-Ins/Components/`
+- **CLAP:** `/Library/Audio/Plug-Ins/CLAP/`
+- **Standalone:** `/Applications/`
+- **Bundled example samples:** `/Library/Application Support/RVRSE/Examples/`
 
-This only needs to be done once per format. See `INSTALL.txt` in the
-download zip for full details.
+No `xattr` workaround should be needed for official release installers.
 
 ---
 

@@ -3,39 +3,30 @@ RVRSE — Installation Guide (macOS)
 
 Thank you for downloading RVRSE!
 
-1. Copy the plugin format(s) you use to the standard macOS plugin directories:
+1. Open the RVRSE `.pkg` installer.
 
-  AU:    ~/Library/Audio/Plug-Ins/Components/RVRSE.component
-  VST3:  ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
-  CLAP:  ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
-  App:   /Applications/RVRSE.app  (standalone, optional)
+2. Follow the installer prompts. By default, RVRSE installs to:
 
-2. Remove the macOS quarantine flag (see "macOS Security" below).
+  AU:    /Library/Audio/Plug-Ins/Components/RVRSE.component
+  VST3:  /Library/Audio/Plug-Ins/VST3/RVRSE.vst3
+  CLAP:  /Library/Audio/Plug-Ins/CLAP/RVRSE.clap
+  App:   /Applications/RVRSE.app
+  Demo samples: /Library/Application Support/RVRSE/Examples/
 
-3. Relaunch your DAW and scan for new plugins.
+3. Relaunch your DAW and rescan plugins if needed.
 
 
 macOS Security (Gatekeeper)
-----------------------------
-RVRSE is ad-hoc signed but not notarized with Apple. macOS adds a
-quarantine flag to all downloaded files, which may cause a "damaged"
-or "unidentified developer" warning.
+---------------------------
+Official RVRSE release installers are signed with Apple Developer ID,
+notarized by Apple, and stapled before distribution.
 
-Run this in Terminal AFTER copying, BEFORE opening your DAW:
+No `xattr` workaround should be required for the official installer.
 
-  xattr -cr ~/Library/Audio/Plug-Ins/VST3/RVRSE.vst3
-  xattr -cr ~/Library/Audio/Plug-Ins/Components/RVRSE.component
-  xattr -cr ~/Library/Audio/Plug-Ins/CLAP/RVRSE.clap
-  xattr -cr /Applications/RVRSE.app
+If Gatekeeper still warns after a fresh release download, please report
+it at:
 
-(Only run the lines for the formats you installed.)
-
-This removes the quarantine flag. You only need to do this once per
-format.
-
-Alternative: Right-click the plugin → Open, then confirm in the
-security dialog. Or go to System Settings → Privacy & Security and
-click "Open Anyway" after the first blocked attempt.
+  https://github.com/SamuFL/rverse/issues
 
 
 Links
