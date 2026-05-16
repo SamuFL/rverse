@@ -21,7 +21,7 @@ struct SampleLoadResult
 };
 
 /// Load an audio file from disk into a SampleData struct.
-/// Supports WAV (.wav) and AIFF (.aif, .aiff) formats.
+/// Supports uncompressed WAV (.wav) and AIFF (.aif, .aiff) formats.
 ///
 /// @param filePath  Absolute path to the audio file.
 /// @return SampleLoadResult with success/failure and loaded data.
@@ -40,5 +40,9 @@ std::string ExtractFileName(const std::string& filePath);
 /// @param filePath  Path or filename to check
 /// @return true if the extension is .wav, .aif, or .aiff (case-insensitive)
 bool IsSupportedAudioFile(const std::string& filePath);
+
+/// Returns a user-facing load error for unsupported/compressed formats.
+/// Empty string means the file looks loadable and should be passed to LoadSample().
+std::string GetAudioFileLoadError(const std::string& filePath);
 
 } // namespace rvrse

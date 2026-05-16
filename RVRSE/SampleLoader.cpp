@@ -8,8 +8,30 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 
 namespace rvrse {
+
+namespace {
+
+constexpr const char* kSupportedFormatsMessage =
+  "RVRSE supports uncompressed WAV and AIFF only.";
+constexpr const char* kCompressedWavMessage =
+  "RVRSE supports uncompressed WAV and AIFF only. The selected WAV file uses compressed or unsupported encoding.";
+constexpr const char* kUnreadableFormatsMessage =
+  "RVRSE supports uncompressed WAV and AIFF only. The selected file could not be read.";
+
+bool IsSupportedWavFormatTag(drwav_uint16 formatTag)
+{
+  return formatTag == DR_WAVE_FORMAT_PCM || formatTag == DR_WAVE_FORMAT_IEEE_FLOAT;
+}
+
+bool HasSupportedExtension(const std::string& filePath)
+{
+  return IsSupportedAudioFile(filePath);
+}
+
+} // namespace
 
 SampleLoadResult LoadSample(const std::string& filePath)
 {
@@ -21,9 +43,10 @@ SampleLoadResult LoadSample(const std::string& filePath)
     return result;
   }
 
-  if (!IsSupportedAudioFile(filePath))
+  const std::string loadError = GetAudioFileLoadError(filePath);
+  if (!loadError.empty())
   {
-    result.errorMessage = "Unsupported file format (need .wav, .aif, or .aiff)";
+    result.errorMessage = loadError;
     return result;
   }
 
@@ -71,7 +94,7 @@ SampleLoadResult LoadSample(const std::string& filePath)
 
   if (framesRead == 0)
   {
-    result.errorMessage = "Failed to read PCM data from file";
+    result.errorMessage = kUnreadableFormatsMessage;
     return result;
   }
 
@@ -142,6 +165,37 @@ bool IsSupportedAudioFile(const std::string& filePath)
     [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
   return (ext == ".wav" || ext == ".aif" || ext == ".aiff");
+}
+
+std::string GetAudioFileLoadError(const std::string& filePath)
+{
+  if (filePath.empty())
+    return "Empty file path";
+
+  if (!HasSupportedExtension(filePath))
+    return kSupportedFormatsMessage;
+
+  if (!std::filesystem::is_regular_file(filePath))
+    return "";
+
+  drwav wav;
+  if (!drwav_init_file(&wav, filePath.c_str(), nullptr))
+    return kUnreadableFormatsMessage;
+
+  std::string result;
+  if (wav.container == drwav_container_aiff)
+  {
+    if (wav.translatedFormatTag != DR_WAVE_FORMAT_PCM)
+      result = kSupportedFormatsMessage;
+  }
+  else
+  {
+    if (!IsSupportedWavFormatTag(wav.translatedFormatTag))
+      result = kCompressedWavMessage;
+  }
+
+  drwav_uninit(&wav);
+  return result;
 }
 
 } // namespace rvrse

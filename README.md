@@ -50,7 +50,7 @@ The built plugins appear in `build/RVRSE/` — see [Plugin Formats](#plugin-form
 
 ## How It Works
 
-1. **Load** a one-shot hit sample (WAV or AIFF) via the LOAD SAMPLE button.
+1. **Load** a one-shot hit sample (uncompressed WAV or AIFF) via the LOAD SAMPLE button.
 2. **Play** a MIDI note — the riser starts immediately and the hit fires at the beat boundary.
 3. The riser is your hit sample processed through reverb → reversed → time-stretched to match
    the configured riser length (default: 4 beats at host BPM).
@@ -389,7 +389,7 @@ No `xattr` workaround should be needed for official release installers.
 ## Usage in a DAW
 
 1. **Insert RVRSE** as a virtual instrument on an instrument/MIDI track.
-2. Click **LOAD SAMPLE** and select a WAV or AIFF hit sample (up to 30 seconds, mono or stereo).
+2. Click **LOAD SAMPLE** and select an uncompressed WAV or AIFF hit sample (up to 30 seconds, mono or stereo).
 3. **Play a MIDI note** — the reverse-reverb riser plays immediately, and the dry hit fires
    at the beat boundary (default: 4 beats at host BPM).
 4. **Release the note** to fade out both voices (5ms anti-click envelope).
