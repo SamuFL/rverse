@@ -559,11 +559,12 @@ void RVRSE::ClearLoadedSampleState()
   mHitPos.store(-1, std::memory_order_relaxed);
 }
 
-void RVRSE::QueueSampleLoadError(const char* errorMessage)
+void RVRSE::QueueSampleLoadError(const char* errorMessage, bool clearLoadedState)
 {
   std::lock_guard<std::mutex> lock(mStatusTextMutex);
   mPendingSampleStatusText = "No sample loaded";
   mPendingSampleAlertText = errorMessage ? errorMessage : "Unsupported format";
+  mPendingSampleStateClear = clearLoadedState;
 }
 
 #if IPLUG_EDITOR
@@ -635,12 +636,18 @@ void RVRSE::OnIdle()
   {
     std::string sampleStatusText;
     std::string sampleAlertText;
+    bool clearSampleState = false;
     {
       std::lock_guard<std::mutex> lock(mStatusTextMutex);
       sampleStatusText = mPendingSampleStatusText;
       sampleAlertText = std::move(mPendingSampleAlertText);
       mPendingSampleAlertText.clear();
+      clearSampleState = mPendingSampleStateClear;
+      mPendingSampleStateClear = false;
     }
+
+    if (clearSampleState)
+      ClearLoadedSampleState();
 
     if (!sampleStatusText.empty() && sampleStatusText != mLastSampleStatusText)
     {
@@ -826,8 +833,7 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
     }
     else
     {
-      ClearLoadedSampleState();
-      QueueSampleLoadError(result.errorMessage.c_str());
+      QueueSampleLoadError(result.errorMessage.c_str(), true);
     }
   }).detach();
 }

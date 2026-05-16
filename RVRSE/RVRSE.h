@@ -104,7 +104,7 @@ public:
 
 private:
   void ClearLoadedSampleState();
-  void QueueSampleLoadError(const char* errorMessage);
+  void QueueSampleLoadError(const char* errorMessage, bool clearLoadedState = false);
 
   /// Internal sample load implementation. Must only be called from the UI thread
   /// or from UnserializeState (host-managed restore path).
@@ -171,6 +171,7 @@ private:
   std::string mPendingSampleStatusText; ///< Next sample status text for OnIdle to publish
   std::string mLastSampleStatusText;    ///< Last sample status text shown in the UI
   std::string mPendingSampleAlertText;  ///< Next sample-load error alert for OnIdle to show
+  bool mPendingSampleStateClear = false; ///< Whether OnIdle should clear loaded sample state before publishing UI
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state

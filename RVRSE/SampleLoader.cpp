@@ -26,9 +26,20 @@ bool IsSupportedWavFormatTag(drwav_uint16 formatTag)
   return formatTag == DR_WAVE_FORMAT_PCM || formatTag == DR_WAVE_FORMAT_IEEE_FLOAT;
 }
 
-bool HasSupportedExtension(const std::string& filePath)
+std::string GetAudioFileLoadError(const drwav& wav)
 {
-  return IsSupportedAudioFile(filePath);
+  if (wav.container == drwav_container_aiff)
+  {
+    if (wav.translatedFormatTag != DR_WAVE_FORMAT_PCM)
+      return kSupportedFormatsMessage;
+  }
+  else
+  {
+    if (!IsSupportedWavFormatTag(wav.translatedFormatTag))
+      return kCompressedWavMessage;
+  }
+
+  return "";
 }
 
 } // namespace
@@ -43,10 +54,9 @@ SampleLoadResult LoadSample(const std::string& filePath)
     return result;
   }
 
-  const std::string loadError = GetAudioFileLoadError(filePath);
-  if (!loadError.empty())
+  if (!IsSupportedAudioFile(filePath))
   {
-    result.errorMessage = loadError;
+    result.errorMessage = kSupportedFormatsMessage;
     return result;
   }
 
@@ -55,6 +65,14 @@ SampleLoadResult LoadSample(const std::string& filePath)
   if (!drwav_init_file(&wav, filePath.c_str(), nullptr))
   {
     result.errorMessage = "Failed to open audio file: " + filePath;
+    return result;
+  }
+
+  const std::string loadError = GetAudioFileLoadError(wav);
+  if (!loadError.empty())
+  {
+    drwav_uninit(&wav);
+    result.errorMessage = loadError;
     return result;
   }
 
@@ -172,7 +190,7 @@ std::string GetAudioFileLoadError(const std::string& filePath)
   if (filePath.empty())
     return "Empty file path";
 
-  if (!HasSupportedExtension(filePath))
+  if (!IsSupportedAudioFile(filePath))
     return kSupportedFormatsMessage;
 
   if (!std::filesystem::is_regular_file(filePath))
@@ -182,18 +200,7 @@ std::string GetAudioFileLoadError(const std::string& filePath)
   if (!drwav_init_file(&wav, filePath.c_str(), nullptr))
     return kUnreadableFormatsMessage;
 
-  std::string result;
-  if (wav.container == drwav_container_aiff)
-  {
-    if (wav.translatedFormatTag != DR_WAVE_FORMAT_PCM)
-      result = kSupportedFormatsMessage;
-  }
-  else
-  {
-    if (!IsSupportedWavFormatTag(wav.translatedFormatTag))
-      result = kCompressedWavMessage;
-  }
-
+  const std::string result = GetAudioFileLoadError(wav);
   drwav_uninit(&wav);
   return result;
 }
