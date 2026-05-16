@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Drag-and-drop sample loading — drag any WAV or AIFF file directly onto the plugin's header/footer/waveform areas to load it (rverse-aif)
+- macOS maintainer tooling for release signing/notarization: `scripts/sign-and-notarize.sh`, `scripts/build-macos-installer.sh`, and a minimal installer entitlements plist
+
+### Changed
+- macOS release distribution now targets a signed, notarized, stapled `.pkg` installer instead of the manual zip + `xattr` workflow
+- README and macOS install instructions now document the `.pkg` installer flow and remove the quarantine workaround
 
 ### Fixed
 - Sample loading via the file dialog now reliably updates the waveform, hit playback, and sample status UI after the drag-and-drop merge changes (rverse-aif)
+- Standalone macOS app metadata no longer requests microphone usage text for the installer/signing path
 
 ## [1.0.0] - 2026-04-09
 
