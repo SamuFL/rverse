@@ -46,7 +46,7 @@ public:
 
     if (!rvrse::IsSupportedAudioFile(str))
     {
-      mPlugin->ShowUnsupportedFormatError(str);
+      mPlugin->ShowUnsupportedFormatError(rvrse::GetAudioFileLoadError(str).c_str());
       return;
     }
 
@@ -229,7 +229,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
         if (!str || str[0] == '\0') return;
         if (!rvrse::IsSupportedAudioFile(str))
         {
-          ShowUnsupportedFormatError(str);
+          ShowUnsupportedFormatError(rvrse::GetAudioFileLoadError(str).c_str());
           return;
         }
         RequestSampleLoadFromUI(str);
@@ -541,6 +541,32 @@ RVRSE::RVRSE(const InstanceInfo& info)
 #endif
 }
 
+void RVRSE::ClearLoadedSampleState()
+{
+  mSampleFilePath.clear();
+
+  {
+    std::lock_guard<std::mutex> lock(mSampleMutex);
+    mHitSample.reset();
+  }
+
+  std::atomic_store(&mPlaySample, std::shared_ptr<rvrse::SampleData> {});
+  std::atomic_store(&mRiserBuffer, std::shared_ptr<rvrse::RiserData> {});
+  mProcessor.setSample(nullptr);
+  mNewSampleReady.store(false, std::memory_order_release);
+  mLoadState.store(rvrse::ESampleLoadState::Empty);
+  mRiserPos.store(-1, std::memory_order_relaxed);
+  mHitPos.store(-1, std::memory_order_relaxed);
+}
+
+void RVRSE::QueueSampleLoadError(const char* errorMessage, bool clearLoadedState)
+{
+  std::lock_guard<std::mutex> lock(mStatusTextMutex);
+  mPendingSampleStatusText = "No sample loaded";
+  mPendingSampleAlertText = errorMessage ? errorMessage : "Unsupported format";
+  mPendingSampleStateClear = clearLoadedState;
+}
+
 #if IPLUG_EDITOR
 void RVRSE::OnIdle()
 {
@@ -609,10 +635,19 @@ void RVRSE::OnIdle()
   if (GetUI())
   {
     std::string sampleStatusText;
+    std::string sampleAlertText;
+    bool clearSampleState = false;
     {
       std::lock_guard<std::mutex> lock(mStatusTextMutex);
       sampleStatusText = mPendingSampleStatusText;
+      sampleAlertText = std::move(mPendingSampleAlertText);
+      mPendingSampleAlertText.clear();
+      clearSampleState = mPendingSampleStateClear;
+      mPendingSampleStateClear = false;
     }
+
+    if (clearSampleState)
+      ClearLoadedSampleState();
 
     if (!sampleStatusText.empty() && sampleStatusText != mLastSampleStatusText)
     {
@@ -623,6 +658,9 @@ void RVRSE::OnIdle()
         mLastSampleStatusText = std::move(sampleStatusText);
       }
     }
+
+    if (!sampleAlertText.empty())
+      GetUI()->ShowMessageBox(sampleAlertText.c_str(), "Sample Load Error", kMB_OK);
   }
 
   // Update waveform display
@@ -630,6 +668,8 @@ void RVRSE::OnIdle()
   {
     auto* pWaveform = dynamic_cast<rvrse::WaveformControl*>(
       GetUI()->GetControlWithTag(kCtrlTagWaveformDisplay));
+    auto* pHitPreview = dynamic_cast<rvrse::HitPreviewControl*>(
+      GetUI()->GetControlWithTag(kCtrlTagHitPreview));
     if (pWaveform)
     {
       const auto riser = std::atomic_load(&mRiserBuffer);
@@ -651,6 +691,11 @@ void RVRSE::OnIdle()
         pWaveform->SetRiserData(mWaveformMonoBuf.data(), nFrames);
         mWaveformLastRiser = riser;
       }
+      else if (!riser && mWaveformLastRiser)
+      {
+        pWaveform->SetRiserData(nullptr, 0);
+        mWaveformLastRiser.reset();
+      }
 
       // Feed hit data when pointer changes
       if (hit && hit->IsLoaded() && hit != mWaveformLastHit)
@@ -662,12 +707,17 @@ void RVRSE::OnIdle()
         pWaveform->SetHitData(mWaveformMonoBuf.data(), nFrames);
 
         // Also feed the hit preview control
-        auto* pHitPreview = dynamic_cast<rvrse::HitPreviewControl*>(
-          GetUI()->GetControlWithTag(kCtrlTagHitPreview));
         if (pHitPreview)
           pHitPreview->SetData(mWaveformMonoBuf.data(), nFrames);
 
         mWaveformLastHit = hit;
+      }
+      else if (!hit && mWaveformLastHit)
+      {
+        pWaveform->SetHitData(nullptr, 0);
+        if (pHitPreview)
+          pHitPreview->SetData(nullptr, 0);
+        mWaveformLastHit.reset();
       }
 
       // Update visual volume and fade-in envelope
@@ -691,23 +741,22 @@ void RVRSE::OnIdle()
           pWaveform->SetPlayheadPos(pos);
         }
       }
+      else
+      {
+        pWaveform->SetPlayheadPos(-1.f);
+      }
     }
   }
 }
 #endif
 
 #if IPLUG_EDITOR
-void RVRSE::ShowUnsupportedFormatError(const char* filePath)
+void RVRSE::ShowUnsupportedFormatError(const char* errorMessage)
 {
   if (!GetUI()) return;
-  if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
-  {
-    WDL_String errStr;
-    errStr.SetFormatted(256, "Unsupported format: %s",
-      rvrse::ExtractFileName(std::string(filePath)).c_str());
-    pCtrl->As<ITextControl>()->SetStr(errStr.Get());
-    pCtrl->SetDirty(false);
-  }
+
+  ClearLoadedSampleState();
+  QueueSampleLoadError(errorMessage);
 }
 #endif
 
@@ -784,15 +833,7 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
     }
     else
     {
-      mLoadState.store(rvrse::ESampleLoadState::Error);
-
-      {
-        WDL_String errStr;
-        errStr.SetFormatted(256, "Error: %s", result.errorMessage.c_str());
-
-        std::lock_guard<std::mutex> lock(mStatusTextMutex);
-        mPendingSampleStatusText = errStr.Get();
-      }
+      QueueSampleLoadError(result.errorMessage.c_str(), true);
     }
   }).detach();
 }
@@ -830,15 +871,9 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
       }
       else
       {
+        ClearLoadedSampleState();
         mSampleFilePath = restoredPath;
         mLoadState.store(rvrse::ESampleLoadState::Error);
-
-        // Clear stale audio data so playback matches the "Missing" state
-        {
-          std::lock_guard<std::mutex> lock(mSampleMutex);
-          mHitSample.reset();
-        }
-        mNewSampleReady.store(false, std::memory_order_release);
 
         if (GetUI())
         {
@@ -856,8 +891,7 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
     else
     {
       // Empty path — host reset state/preset, clear everything
-      mSampleFilePath.clear();
-      mLoadState.store(rvrse::ESampleLoadState::Empty);
+      ClearLoadedSampleState();
     }
   }
 

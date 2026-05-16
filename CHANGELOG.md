@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Sample loading via the file dialog now reliably updates the waveform, hit playback, and sample status UI after the drag-and-drop merge changes (rverse-aif)
+- Sample loading now reports clearer errors for unsupported compressed formats, including compressed/non-PCM `.wav` files that previously failed with a generic PCM-read error
 - Standalone macOS app metadata no longer requests microphone usage text for the installer/signing path
 
 ## [1.0.0] - 2026-04-09

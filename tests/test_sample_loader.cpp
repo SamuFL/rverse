@@ -13,7 +13,9 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -77,6 +79,183 @@ private:
   std::filesystem::path mPath;
 };
 
+class TempBinaryFile
+{
+public:
+  TempBinaryFile(const std::string& filename, const std::vector<uint8_t>& bytes)
+    : mPath(std::filesystem::temp_directory_path() / filename)
+  {
+    std::ofstream out(mPath, std::ios::binary);
+    if (!out)
+      throw std::runtime_error("TempBinaryFile: failed to create " + mPath.string());
+
+    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (!out)
+      throw std::runtime_error("TempBinaryFile: failed to write " + mPath.string());
+  }
+
+  ~TempBinaryFile() noexcept
+  {
+    std::error_code ec;
+    std::filesystem::remove(mPath, ec);
+  }
+
+  std::string path() const { return mPath.string(); }
+
+private:
+  std::filesystem::path mPath;
+};
+
+class TempAiff
+{
+public:
+  TempAiff(const std::string& filename, const std::vector<float>& samples,
+           unsigned int sampleRate, unsigned int channels)
+    : mPath(std::filesystem::temp_directory_path() / filename)
+  {
+    std::vector<uint8_t> bytes;
+    const uint32_t frameCount = static_cast<uint32_t>(samples.size() / channels);
+    const uint32_t sampleBytes = static_cast<uint32_t>(samples.size() * sizeof(int16_t));
+
+    auto appendFourCC = [&bytes](const char* fourcc) {
+      bytes.insert(bytes.end(), fourcc, fourcc + 4);
+    };
+    auto appendU16BE = [&bytes](uint16_t value) {
+      bytes.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+      bytes.push_back(static_cast<uint8_t>(value & 0xFF));
+    };
+    auto appendU32BE = [&bytes](uint32_t value) {
+      bytes.push_back(static_cast<uint8_t>((value >> 24) & 0xFF));
+      bytes.push_back(static_cast<uint8_t>((value >> 16) & 0xFF));
+      bytes.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+      bytes.push_back(static_cast<uint8_t>(value & 0xFF));
+    };
+    auto appendExtended80BE = [&bytes, &appendU16BE](double value) {
+      if (value == 0.0)
+      {
+        bytes.insert(bytes.end(), 10, 0);
+        return;
+      }
+
+      const bool negative = value < 0.0;
+      long double magnitude = std::fabs(value);
+      int exponent = 0;
+      long double fraction = std::frexpl(magnitude, &exponent);
+      fraction *= 2.0L;
+      exponent -= 1;
+
+      const uint16_t storedExponent = static_cast<uint16_t>(exponent + 16383);
+      const long double scaled = std::ldexpl(fraction, 63);
+      const uint64_t mantissa = static_cast<uint64_t>(scaled + 0.5L);
+      const uint16_t signAndExponent =
+        static_cast<uint16_t>((negative ? 0x8000 : 0x0000) | storedExponent);
+
+      appendU16BE(signAndExponent);
+      for (int shift = 56; shift >= 0; shift -= 8)
+        bytes.push_back(static_cast<uint8_t>((mantissa >> shift) & 0xFF));
+    };
+
+    appendFourCC("FORM");
+    appendU32BE(0); // placeholder
+    appendFourCC("AIFF");
+
+    appendFourCC("COMM");
+    appendU32BE(18);
+    appendU16BE(static_cast<uint16_t>(channels));
+    appendU32BE(frameCount);
+    appendU16BE(16);
+    appendExtended80BE(static_cast<double>(sampleRate));
+
+    appendFourCC("SSND");
+    appendU32BE(8 + sampleBytes);
+    appendU32BE(0);
+    appendU32BE(0);
+
+    for (float sample : samples)
+    {
+      const float clamped = std::clamp(sample, -1.0f, 1.0f);
+      const auto pcm = static_cast<int16_t>(clamped * 32767.0f);
+      appendU16BE(static_cast<uint16_t>(pcm));
+    }
+
+    const uint32_t formSize = static_cast<uint32_t>(bytes.size() - 8);
+    bytes[4] = static_cast<uint8_t>((formSize >> 24) & 0xFF);
+    bytes[5] = static_cast<uint8_t>((formSize >> 16) & 0xFF);
+    bytes[6] = static_cast<uint8_t>((formSize >> 8) & 0xFF);
+    bytes[7] = static_cast<uint8_t>(formSize & 0xFF);
+
+    std::ofstream out(mPath, std::ios::binary);
+    if (!out)
+      throw std::runtime_error("TempAiff: failed to create " + mPath.string());
+
+    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (!out)
+      throw std::runtime_error("TempAiff: failed to write " + mPath.string());
+  }
+
+  ~TempAiff() noexcept
+  {
+    std::error_code ec;
+    std::filesystem::remove(mPath, ec);
+  }
+
+  std::string path() const { return mPath.string(); }
+
+private:
+  std::filesystem::path mPath;
+};
+
+void appendU16LE(std::vector<uint8_t>& bytes, uint16_t value)
+{
+  bytes.push_back(static_cast<uint8_t>(value & 0xFF));
+  bytes.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+}
+
+void appendU32LE(std::vector<uint8_t>& bytes, uint32_t value)
+{
+  bytes.push_back(static_cast<uint8_t>(value & 0xFF));
+  bytes.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+  bytes.push_back(static_cast<uint8_t>((value >> 16) & 0xFF));
+  bytes.push_back(static_cast<uint8_t>((value >> 24) & 0xFF));
+}
+
+std::vector<uint8_t> makeCompressedWavFixture()
+{
+  std::vector<uint8_t> bytes;
+  auto appendFourCC = [&bytes](const char* fourcc) {
+    bytes.insert(bytes.end(), fourcc, fourcc + 4);
+  };
+
+  appendFourCC("RIFF");
+  appendU32LE(bytes, 0); // placeholder for RIFF size
+  appendFourCC("WAVE");
+
+  appendFourCC("fmt ");
+  appendU32LE(bytes, 18);
+  appendU16LE(bytes, 0x674F); // 'Og' / Vorbis-in-WAV style compressed tag
+  appendU16LE(bytes, 1);
+  appendU32LE(bytes, 44100);
+  appendU32LE(bytes, 16000);
+  appendU16LE(bytes, 1);
+  appendU16LE(bytes, 16);
+  appendU16LE(bytes, 0);
+
+  appendFourCC("fact");
+  appendU32LE(bytes, 4);
+  appendU32LE(bytes, 1);
+
+  appendFourCC("data");
+  appendU32LE(bytes, 4);
+  appendFourCC("OggS");
+
+  const uint32_t riffSize = static_cast<uint32_t>(bytes.size() - 8);
+  bytes[4] = static_cast<uint8_t>(riffSize & 0xFF);
+  bytes[5] = static_cast<uint8_t>((riffSize >> 8) & 0xFF);
+  bytes[6] = static_cast<uint8_t>((riffSize >> 16) & 0xFF);
+  bytes[7] = static_cast<uint8_t>((riffSize >> 24) & 0xFF);
+  return bytes;
+}
+
 } // anonymous namespace
 
 // ---------------------------------------------------------------------------
@@ -107,7 +286,7 @@ TEST_CASE("SampleLoader: unsupported extension returns error", "[sampleloader]")
   auto path = std::filesystem::temp_directory_path() / "rvrse_test.mp3";
   auto result = LoadSample(path.string());
   REQUIRE_FALSE(result.success);
-  REQUIRE(result.errorMessage.find("Unsupported") != std::string::npos);
+  REQUIRE(result.errorMessage == "RVRSE supports uncompressed WAV and AIFF only.");
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +321,21 @@ TEST_CASE("SampleLoader: ExtractFileName", "[sampleloader]")
   REQUIRE(ExtractFileName("C:\\Windows\\sample.aif") == "sample.aif");
   REQUIRE(ExtractFileName("no_path.wav") == "no_path.wav");
   REQUIRE(ExtractFileName("") == "");
+}
+
+TEST_CASE("SampleLoader: GetAudioFileLoadError returns generic message for unsupported extension", "[sampleloader]")
+{
+  REQUIRE(GetAudioFileLoadError("sample.mp3") == "RVRSE supports uncompressed WAV and AIFF only.");
+}
+
+TEST_CASE("SampleLoader: compressed WAV returns explicit error", "[sampleloader]")
+{
+  TempBinaryFile wav(uniqueTempName("rvrse_compressed", ".wav"), makeCompressedWavFixture());
+  auto result = LoadSample(wav.path());
+
+  REQUIRE_FALSE(result.success);
+  REQUIRE(result.errorMessage ==
+          "RVRSE supports uncompressed WAV and AIFF only. The selected WAV file uses compressed or unsupported encoding.");
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +395,21 @@ TEST_CASE("SampleLoader: load stereo WAV deinterleaves correctly", "[sampleloade
     REQUIRE(result.data.mLeft[i]  == Approx(static_cast<float>(i + 1)));
     REQUIRE(result.data.mRight[i] == Approx(static_cast<float>((i + 1) * 10)));
   }
+}
+
+TEST_CASE("SampleLoader: load AIFF succeeds", "[sampleloader]")
+{
+  const unsigned int sr = 44100;
+  const unsigned int numFrames = sr / 20;
+  auto samples = rvrse::test::generateSine(numFrames, 220.0, static_cast<double>(sr), 0.5f);
+
+  TempAiff aiff(uniqueTempName("rvrse_mono", ".aiff"), samples, sr, 1);
+  auto result = LoadSample(aiff.path());
+
+  REQUIRE(result.success);
+  REQUIRE(result.data.mNumChannels == 1);
+  REQUIRE(result.data.mSampleRate == Approx(44100.0));
+  REQUIRE(result.data.NumFrames() == static_cast<int>(numFrames));
 }
 
 // ---------------------------------------------------------------------------

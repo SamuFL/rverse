@@ -97,13 +97,14 @@ public:
   void RequestSampleLoadFromUI(const char* filePath) { LoadSampleFromFile(filePath); }
 
 #if IPLUG_EDITOR
-  /// Show an "Unsupported format" error in the sample name display.
-  /// Called from drag-and-drop handlers when a non-WAV/AIFF file is dropped.
+  /// Queue a modal sample-load error alert from a drag-and-drop rejection.
   /// GUI thread only.
-  void ShowUnsupportedFormatError(const char* filePath);
+  void ShowUnsupportedFormatError(const char* errorMessage);
 #endif
 
 private:
+  void ClearLoadedSampleState();
+  void QueueSampleLoadError(const char* errorMessage, bool clearLoadedState = false);
 
   /// Internal sample load implementation. Must only be called from the UI thread
   /// or from UnserializeState (host-managed restore path).
@@ -169,6 +170,8 @@ private:
   std::mutex mStatusTextMutex;
   std::string mPendingSampleStatusText; ///< Next sample status text for OnIdle to publish
   std::string mLastSampleStatusText;    ///< Last sample status text shown in the UI
+  std::string mPendingSampleAlertText;  ///< Next sample-load error alert for OnIdle to show
+  bool mPendingSampleStateClear = false; ///< Whether OnIdle should clear loaded sample state before publishing UI
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state
