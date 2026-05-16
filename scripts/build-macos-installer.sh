@@ -15,8 +15,8 @@ Options:
                              Default: <build-dir>/dist/RVRSE-<version>-macOS.pkg
   --installer-identity NAME  Developer ID Installer identity to sign the final .pkg.
   --keychain PATH            Keychain to search for the installer identity.
-  --examples-dir PATH        Optional directory to install to
-                             /Library/Application Support/RVRSE/Examples
+  --examples-dir PATH        Optional source directory whose contents will be
+                             bundled into /Library/Application Support/RVRSE/Examples
   -h, --help                 Show this help.
 
 Environment fallbacks:
@@ -31,6 +31,13 @@ die() {
   exit 1
 }
 
+require_option_value() {
+  local option_name="$1"
+  local option_value="${2-}"
+  [[ -n "${option_value}" ]] || die "missing value for ${option_name}"
+  printf '%s\n' "${option_value}"
+}
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_dir="${repo_root}/build/macos-make"
 output_path=""
@@ -41,23 +48,23 @@ examples_dir="${RVRSE_INSTALLER_EXAMPLES_DIR:-${repo_root}/RVRSE/installer/examp
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --build-dir)
-      build_dir="$2"
+      build_dir="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --output)
-      output_path="$2"
+      output_path="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --installer-identity)
-      installer_identity="$2"
+      installer_identity="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --keychain)
-      signing_keychain="$2"
+      signing_keychain="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --examples-dir)
-      examples_dir="$2"
+      examples_dir="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     -h|--help)

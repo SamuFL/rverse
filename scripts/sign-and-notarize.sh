@@ -38,6 +38,13 @@ die() {
   exit 1
 }
 
+require_option_value() {
+  local option_name="$1"
+  local option_value="${2-}"
+  [[ -n "${option_value}" ]] || die "missing value for ${option_name}"
+  printf '%s\n' "${option_value}"
+}
+
 warn_gatekeeper_assessment() {
   local assessment_type="$1"
   local target="$2"
@@ -77,39 +84,39 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --build-preset)
-      build_preset="$2"
+      build_preset="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --build-dir)
-      build_dir="$2"
+      build_dir="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --application-identity)
-      application_identity="$2"
+      application_identity="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --installer-identity)
-      installer_identity="$2"
+      installer_identity="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --keychain)
-      signing_keychain="$2"
+      signing_keychain="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --apple-id)
-      apple_id="$2"
+      apple_id="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --team-id)
-      team_id="$2"
+      team_id="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --password)
-      password="$2"
+      password="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --output)
-      output_path="$2"
+      output_path="$(require_option_value "$1" "${2-}")"
       shift 2
       ;;
     --skip-notarize)
@@ -226,12 +233,15 @@ fi
 submit_log="${dist_dir}/notarytool-submit.json"
 detail_log="${dist_dir}/notarytool-log.json"
 
+set +e
 xcrun notarytool submit "${output_path}" \
   --apple-id "${apple_id}" \
   --password "${password}" \
   --team-id "${team_id}" \
   --wait \
   --output-format json | tee "${submit_log}"
+submit_status=${PIPESTATUS[0]}
+set -e
 
 submission_id="$(
   python3 - "${submit_log}" <<'PY'
@@ -239,17 +249,37 @@ import json
 import pathlib
 import sys
 
-data = json.loads(pathlib.Path(sys.argv[1]).read_text())
-print(data.get("id", ""))
+try:
+    data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+except Exception:
+    print("")
+else:
+    print(data.get("id", ""))
 PY
 )"
 
-[[ -n "${submission_id}" ]] || die "notarytool did not return a submission id"
+if [[ -n "${submission_id}" ]]; then
+  set +e
+  xcrun notarytool log "${submission_id}" "${detail_log}" \
+    --apple-id "${apple_id}" \
+    --password "${password}" \
+    --team-id "${team_id}"
+  log_status=$?
+  set -e
 
-xcrun notarytool log "${submission_id}" "${detail_log}" \
-  --apple-id "${apple_id}" \
-  --password "${password}" \
-  --team-id "${team_id}"
+  if [[ ${log_status} -ne 0 ]]; then
+    echo "warning: failed to fetch notarization detail log for submission ${submission_id}" >&2
+  fi
+fi
+
+if [[ ${submit_status} -ne 0 ]]; then
+  if [[ -n "${submission_id}" ]]; then
+    die "notarization failed; see ${submit_log} and ${detail_log}"
+  fi
+  die "notarization failed before a submission id was returned; see ${submit_log}"
+fi
+
+[[ -n "${submission_id}" ]] || die "notarytool did not return a submission id"
 
 xcrun stapler staple -v "${output_path}"
 xcrun stapler validate -v "${output_path}"
