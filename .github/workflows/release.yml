@@ -1,13 +1,18 @@
-# Release — build and publish production artifacts on version tags.
-# Triggered when a tag matching v* is pushed (e.g. v0.1.0).
-# Builds Release mode, produces a notarized macOS installer and Windows zip,
-# and creates a proper GitHub Release with all artifacts attached.
+# Release — build production artifacts on version tags or via manual dispatch.
+# Tag pushes publish a GitHub Release. Manual dispatch builds the same signed
+# artifacts for smoke-testing without minting a public release.
 
 name: Release
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override version label for manual runs (defaults to manual-<run number>)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -90,7 +95,14 @@ jobs:
 
       - name: Build signed macOS installer
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            if [ -z "$VERSION" ]; then
+              VERSION="manual-${GITHUB_RUN_NUMBER}"
+            fi
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
           scripts/sign-and-notarize.sh \
             --build-dir build/macos-ninja \
             --output "build/macos-ninja/dist/RVRSE-${VERSION}-macOS.pkg"
@@ -143,7 +155,14 @@ jobs:
       - name: Package Windows zip
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            if [ -z "$VERSION" ]; then
+              VERSION="manual-${GITHUB_RUN_NUMBER}"
+            fi
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
           cd build/windows-vs2022/out
           cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-Windows.txt" INSTALL.txt
           MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
@@ -162,6 +181,7 @@ jobs:
   # Publish — GitHub Release
   # ---------------------------------------------------------------------------
   publish:
+    if: github.event_name == 'push'
     needs: [macos, windows]
     runs-on: ubuntu-latest
 
