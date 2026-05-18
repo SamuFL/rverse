@@ -65,6 +65,8 @@ enum ECtrlTags
   kCtrlTagMasterVolLabel,
   kCtrlTagMasterVolValue,
   kCtrlTagWaveformDisplay,
+  kCtrlTagPreviewPlay,
+  kCtrlTagPreviewStop,
   kCtrlTagHitPreview,
   kCtrlTagDropOverlay,
   kNumCtrlTags
@@ -103,6 +105,19 @@ public:
 #endif
 
 private:
+  struct PreviewCommand
+  {
+    enum class EType
+    {
+      Play = 0,
+      Stop
+    };
+
+    EType type = EType::Play;
+    int noteNumber = rvrse::kPreviewTriggerMidiNote;
+    int velocity = rvrse::kPreviewTriggerVelocity;
+  };
+
   void ClearLoadedSampleState();
   void QueueSampleLoadError(const char* errorMessage, bool clearLoadedState = false);
 
@@ -131,6 +146,7 @@ private:
   // --- Playback state (audio thread only, no locks needed) ---
 
   IMidiQueue mMidiQueue;       ///< Sample-accurate MIDI message queue
+  IPlugQueue<PreviewCommand> mPreviewCommandQueue { 16 }; ///< UI preview transport → audio thread
   float mVelocityGain = 1.0f;  ///< Velocity-scaled gain for current note (0.0–1.0)
 
   // --- Hit voice ---
@@ -183,4 +199,13 @@ private:
   std::atomic<int> mMidiActivityCounter { 0 }; ///< Incremented by audio thread on any MIDI event
   int mMidiLastSeenCounter = 0;                ///< UI thread's last seen counter value
   int mMidiCooldownFrames = 0;                 ///< OnIdle frames remaining before dimming
+
+#if IPLUG_DSP
+  void TriggerPlayback(int& riserPos, int& hitPos,
+                       const std::shared_ptr<rvrse::RiserData>& riser,
+                       const std::shared_ptr<rvrse::SampleData>& hit,
+                       int debugStage,
+                       int velocity);
+  void StopPlayback(int& riserPos, int& hitPos);
+#endif
 };
