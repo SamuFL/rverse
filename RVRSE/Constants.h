@@ -14,6 +14,8 @@ constexpr double kTwoPi = 2.0 * kPi;
 constexpr int CC_STUTTER_RATE  = 1;   ///< Mod wheel → Stutter Rate
 constexpr int CC_STUTTER_DEPTH = 11;  ///< Expression pedal → Stutter Depth
 constexpr int CC_RISER_TUNE    = 2;   ///< Breath controller → Riser Tune
+constexpr int PREVIEW_TRIGGER_NOTE = 60;      ///< UI preview transport triggers middle C
+constexpr int PREVIEW_TRIGGER_VELOCITY = 100; ///< UI preview transport uses a fixed audition velocity
 
 // --- Riser Length discrete values (in beats) ---
 /// Riser length is a discrete parameter with musically meaningful values.

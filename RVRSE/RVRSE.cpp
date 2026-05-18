@@ -56,6 +56,64 @@ public:
 private:
   RVRSE* mPlugin; ///< Non-owning; lifetime guaranteed by plugin > GUI
 };
+
+class TransportButtonControl final : public IButtonControlBase
+{
+public:
+  enum class EIcon
+  {
+    Play = 0,
+    Stop
+  };
+
+  TransportButtonControl(const IRECT& bounds, EIcon icon, const IColor& accent, IActionFunction aF)
+  : IButtonControlBase(bounds, aF)
+  , mIcon(icon)
+  , mAccent(accent)
+  {
+    SetWantsMidi(false);
+  }
+
+  void Draw(IGraphics& g) override
+  {
+    const bool active = GetValue() > 0.5;
+    const bool disabled = IsDisabled();
+    const float contrast = disabled ? -GRAYED_ALPHA : 0.f;
+    const IRECT buttonRect = mRECT.GetPadded(-1.f);
+
+    IColor fill = active ? mAccent.WithOpacity(0.9f) : rvrse::gui::kColorDarkGrey.WithOpacity(0.45f);
+    if (!active && mMouseIsOver && !disabled)
+      fill = mAccent.WithOpacity(0.18f);
+
+    const IColor frameColor = mAccent.WithOpacity(active ? 1.f : 0.7f).WithContrast(contrast);
+    const IColor iconColor = (active ? rvrse::gui::kColorDark : mAccent).WithContrast(contrast);
+
+    g.FillRoundRect(fill.WithContrast(contrast), buttonRect, 5.f);
+    g.DrawRoundRect(frameColor, buttonRect, 5.f, nullptr, 1.25f);
+
+    const float iconSide = std::max(8.f, buttonRect.H() - 5.f);
+    const IRECT iconRect = buttonRect.GetCentredInside(iconSide, iconSide);
+    if (mIcon == EIcon::Play)
+    {
+      const float x1 = iconRect.L + iconRect.W() * 0.22f;
+      const float y1 = iconRect.T + iconRect.H() * 0.14f;
+      const float x2 = iconRect.L + iconRect.W() * 0.22f;
+      const float y2 = iconRect.B - iconRect.H() * 0.14f;
+      const float x3 = iconRect.R - iconRect.W() * 0.1f;
+      const float y3 = iconRect.MH();
+      g.FillTriangle(iconColor, x1, y1, x2, y2, x3, y3);
+    }
+    else
+    {
+      const float stopSide = iconRect.W() * 0.62f;
+      g.FillRect(iconColor, iconRect.GetCentredInside(stopSide, stopSide));
+    }
+  }
+
+private:
+  EIcon mIcon;
+  IColor mAccent;
+};
 #endif
 
 RVRSE::RVRSE(const InstanceInfo& info)
@@ -120,13 +178,33 @@ RVRSE::RVRSE(const InstanceInfo& info)
     const float panelMid    = b.L + gap + (w - 2.f * gap) * kRiserPanelPct;
     const IRECT riserRect   = IRECT(b.L + gap, panelTop, panelMid - gap * 0.5f, panelBottom);
     const IRECT hitRect     = IRECT(panelMid + gap * 0.5f, panelTop, b.R - gap, panelBottom);
+    const auto waveformDisplayBounds = [](const IRECT& rect) {
+      return rect.GetPadded(-6.f);
+    };
+    const auto waveformTransportBounds = [](const IRECT& rect) {
+      return rect.GetPadded(-6.f).GetFromBottom(38.f).GetVShifted(8.f);
+    };
+    const auto waveformTransportBackgroundBounds = [](const IRECT& rect) {
+      return rect.GetCentredInside(175.f, 25.f);
+    };
+    const auto transportButtonBounds = [](const IRECT& rect, int idx) {
+      constexpr float kButtonWidth = 70.f;
+      constexpr float kButtonHeight = 20.f;
+      constexpr float kButtonGap = 10.f;
+      const IRECT cluster = rect.GetCentredInside(kButtonWidth * 2.f + kButtonGap, kButtonHeight);
+      return (idx == 0) ? cluster.GetFromLeft(kButtonWidth) : cluster.GetFromRight(kButtonWidth);
+    };
 
     // ── Resize path — reposition existing controls ─────────────────────
     if (pGraphics->NControls()) {
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(b);
       pGraphics->GetControlWithTag(kCtrlTagHeaderPanel)->SetTargetAndDrawRECTs(headerRect);
       pGraphics->GetControlWithTag(kCtrlTagWaveformPanel)->SetTargetAndDrawRECTs(waveformRect);
-      pGraphics->GetControlWithTag(kCtrlTagWaveformDisplay)->SetTargetAndDrawRECTs(waveformRect.GetPadded(-6.f));
+      pGraphics->GetControlWithTag(kCtrlTagWaveformDisplay)->SetTargetAndDrawRECTs(waveformDisplayBounds(waveformRect));
+      const IRECT transportArea = waveformTransportBounds(waveformRect);
+      pGraphics->GetControlWithTag(kCtrlTagPreviewTransportBg)->SetTargetAndDrawRECTs(waveformTransportBackgroundBounds(transportArea));
+      pGraphics->GetControlWithTag(kCtrlTagPreviewPlay)->SetTargetAndDrawRECTs(transportButtonBounds(transportArea, 0));
+      pGraphics->GetControlWithTag(kCtrlTagPreviewStop)->SetTargetAndDrawRECTs(transportButtonBounds(transportArea, 1));
       pGraphics->GetControlWithTag(kCtrlTagRiserPanel)->SetTargetAndDrawRECTs(riserRect);
       pGraphics->GetControlWithTag(kCtrlTagHitPanel)->SetTargetAndDrawRECTs(hitRect);
       pGraphics->GetControlWithTag(kCtrlTagFooterPanel)->SetTargetAndDrawRECTs(footerRect);
@@ -220,7 +298,29 @@ RVRSE::RVRSE(const InstanceInfo& info)
     // Zone panels — rounded rects for waveform, riser, hit panels
     pGraphics->AttachControl(new IPanelControl(headerRect, kColorHeaderBg), kCtrlTagHeaderPanel);
     pGraphics->AttachControl(MakeRoundedPanel(waveformRect, kColorWaveformBg, 6.f), kCtrlTagWaveformPanel);
-    pGraphics->AttachControl(new rvrse::WaveformControl(waveformRect.GetPadded(-6.f)), kCtrlTagWaveformDisplay);
+    pGraphics->AttachControl(new rvrse::WaveformControl(waveformDisplayBounds(waveformRect)), kCtrlTagWaveformDisplay);
+    const IRECT transportArea = waveformTransportBounds(waveformRect);
+    pGraphics->AttachControl(new ILambdaControl(
+      waveformTransportBackgroundBounds(transportArea),
+      [](ILambdaControl* pCaller, IGraphics& g, IRECT& r) {
+        g.FillRoundRect(kColorDark.WithOpacity(0.82f), r, 7.f);
+        g.DrawRoundRect(kColorSeparator.WithOpacity(0.9f), r, 7.f, nullptr, 1.f);
+      }, DEFAULT_ANIMATION_DURATION, false, false), kCtrlTagPreviewTransportBg);
+    pGraphics->GetControlWithTag(kCtrlTagPreviewTransportBg)->SetIgnoreMouse(true);
+    pGraphics->AttachControl(new TransportButtonControl(
+      transportButtonBounds(transportArea, 0), TransportButtonControl::EIcon::Play, kColorGold,
+      [this](IControl* pCaller) {
+        mPreviewCommandQueue.Push({PreviewCommand::EType::Play, rvrse::PREVIEW_TRIGGER_NOTE, rvrse::PREVIEW_TRIGGER_VELOCITY});
+        DefaultClickActionFunc(pCaller);
+      }), kCtrlTagPreviewPlay);
+    pGraphics->AttachControl(new TransportButtonControl(
+      transportButtonBounds(transportArea, 1), TransportButtonControl::EIcon::Stop, kColorBlue,
+      [this](IControl* pCaller) {
+        mPreviewCommandQueue.Push({PreviewCommand::EType::Stop, rvrse::PREVIEW_TRIGGER_NOTE, 0});
+        DefaultClickActionFunc(pCaller);
+      }), kCtrlTagPreviewStop);
+    pGraphics->GetControlWithTag(kCtrlTagPreviewPlay)->SetDisabled(true);
+    pGraphics->GetControlWithTag(kCtrlTagPreviewStop)->SetDisabled(true);
 
     // Wire drag-and-drop into the waveform display — most intuitive drop target.
     if (auto* pWave = static_cast<rvrse::WaveformControl*>(pGraphics->GetControlWithTag(kCtrlTagWaveformDisplay)))
@@ -663,6 +763,44 @@ void RVRSE::OnIdle()
       GetUI()->ShowMessageBox(sampleAlertText.c_str(), "Sample Load Error", kMB_OK);
   }
 
+  if (GetUI())
+  {
+    const auto playbackHit = std::atomic_load(&mPlaySample);
+    const auto riser = std::atomic_load(&mRiserBuffer);
+    const bool hasPlayableSample = mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
+                                   playbackHit && playbackHit->IsLoaded();
+    const bool hasReadyRiser = riser && riser->IsReady();
+    const bool playbackActive = mRiserPos.load(std::memory_order_relaxed) >= 0 ||
+                                mHitPos.load(std::memory_order_relaxed) >= 0;
+
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagPreviewPlay))
+    {
+      const bool shouldDisable = !hasPlayableSample || !hasReadyRiser;
+      if (pCtrl->IsDisabled() != shouldDisable)
+        pCtrl->SetDisabled(shouldDisable);
+
+      const double activeValue = playbackActive ? 1.0 : 0.0;
+      if (std::abs(pCtrl->GetValue() - activeValue) > 1e-6)
+      {
+        pCtrl->SetValue(activeValue);
+        pCtrl->SetDirty(false);
+      }
+    }
+
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagPreviewStop))
+    {
+      const bool shouldDisable = !playbackActive;
+      if (pCtrl->IsDisabled() != shouldDisable)
+        pCtrl->SetDisabled(shouldDisable);
+
+      if (std::abs(pCtrl->GetValue()) > 1e-6)
+      {
+        pCtrl->SetValue(0.0);
+        pCtrl->SetDirty(false);
+      }
+    }
+  }
+
   // Update waveform display
   if (GetUI())
   {
@@ -899,6 +1037,56 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
 }
 
 #if IPLUG_DSP
+void RVRSE::TriggerPlayback(int& riserPos,
+                            int& hitPos,
+                            const std::shared_ptr<rvrse::RiserData>& riser,
+                            const std::shared_ptr<rvrse::SampleData>& hit,
+                            int debugStage,
+                            int velocity)
+{
+  mVelocityGain = std::clamp(static_cast<float>(velocity) / 127.0f, 0.0f, 1.0f);
+  mRiserFadeRemaining = 0;
+  mHitFadeRemaining = 0;
+  rvrse::stutterReset(mStutterState);
+
+  if (riser && riser->IsReady())
+  {
+    riserPos = 0;
+    hitPos = -1;
+
+#ifndef NDEBUG
+    if (debugStage == rvrse::kDebugNormal)
+    {
+      mSamplesFromNoteOn = 0;
+      mHitOffset = riser->mBeatAlignedFrames;
+    }
+    else
+    {
+      mSamplesFromNoteOn = -1;
+    }
+#else
+    mSamplesFromNoteOn = 0;
+    mHitOffset = riser->mBeatAlignedFrames;
+#endif
+  }
+  else if (hit && hit->IsLoaded())
+  {
+    riserPos = -1;
+    mSamplesFromNoteOn = -1;
+    hitPos = 0;
+  }
+}
+
+void RVRSE::StopPlayback(int& riserPos, int& hitPos)
+{
+  if (riserPos >= 0)
+    mRiserFadeRemaining = mFadeOutLength;
+  if (hitPos >= 0)
+    mHitFadeRemaining = mFadeOutLength;
+
+  mSamplesFromNoteOn = -1;
+}
+
 void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 {
   const int nChans = NOutChansConnected();
@@ -915,6 +1103,8 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 #ifndef NDEBUG
   const auto debugStage = static_cast<rvrse::EDebugStage>(
     static_cast<int>(GetParam(kParamDebugStage)->Value()));
+#else
+  constexpr auto debugStage = rvrse::kDebugNormal;
 #endif
   const auto stretchQuality = static_cast<rvrse::EStretchQuality>(
     static_cast<int>(GetParam(kParamStretchQuality)->Value()));
@@ -982,6 +1172,15 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   int riserPos = mRiserPos.load(std::memory_order_relaxed);
   int hitPos   = mHitPos.load(std::memory_order_relaxed);
 
+  PreviewCommand previewCommand;
+  while (mPreviewCommandQueue.Pop(previewCommand))
+  {
+    if (previewCommand.type == PreviewCommand::EType::Play)
+      TriggerPlayback(riserPos, hitPos, riser, hit, static_cast<int>(debugStage), previewCommand.velocity);
+    else
+      StopPlayback(riserPos, hitPos);
+  }
+
   for (int s = 0; s < nFrames; s++)
   {
     // Process MIDI events at this sample offset
@@ -991,52 +1190,12 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
       if (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() > 0)
       {
-        // Note-on: start the riser from the beginning
-        mVelocityGain = static_cast<float>(msg.Velocity()) / 127.0f;
-        mRiserFadeRemaining = 0;
-        mHitFadeRemaining = 0;
-        rvrse::stutterReset(mStutterState);
-
-        if (riser && riser->IsReady())
-        {
-          riserPos = 0;
-          hitPos = -1;
-
-          // In debug modes, play the selected buffer; only trigger hit in Normal mode
-#ifndef NDEBUG
-          if (debugStage == rvrse::kDebugNormal)
-          {
-            mSamplesFromNoteOn = 0;
-            mHitOffset = riser->mBeatAlignedFrames;
-          }
-          else
-          {
-            mSamplesFromNoteOn = -1; // No hit in debug modes
-          }
-#else
-          mSamplesFromNoteOn = 0;
-          mHitOffset = riser->mBeatAlignedFrames;
-#endif
-        }
-        else if (hit && hit->IsLoaded())
-        {
-          // No riser available yet — fall back to direct hit playback
-          riserPos = -1;
-          mSamplesFromNoteOn = -1;
-          hitPos = 0;
-        }
+        TriggerPlayback(riserPos, hitPos, riser, hit, static_cast<int>(debugStage), msg.Velocity());
       }
       else if (msg.StatusMsg() == IMidiMsg::kNoteOff ||
                (msg.StatusMsg() == IMidiMsg::kNoteOn && msg.Velocity() == 0))
       {
-        // Note-off: begin fade-out on both voices and kill the hit trigger
-        if (riserPos >= 0)
-          mRiserFadeRemaining = mFadeOutLength;
-        if (hitPos >= 0)
-          mHitFadeRemaining = mFadeOutLength;
-
-        // Stop the hit trigger counter so the hit can't re-trigger after fade-out
-        mSamplesFromNoteOn = -1;
+        StopPlayback(riserPos, hitPos);
       }
 
       else if (msg.StatusMsg() == IMidiMsg::kControlChange)

@@ -55,10 +55,11 @@ audible, artefact-free reverse-reverb riser for each.
 1. Open RVRSE in each test host (Studio One VST3, Cubase VST3, Standalone).
 2. For each test sample:
    a. Load the sample via the file dialog.
-   b. Trigger a MIDI note and listen to the riser → hit playback.
-   c. Verify the riser duration matches the expected beat length (default: 4 beats).
-   d. Verify no clicks, pops, or silence gaps at the riser → hit boundary.
-   e. Verify the hit fires at the correct beat boundary (quantised to the grid).
+   b. Trigger playback via the waveform-panel **Play** button and listen to the riser → hit playback.
+   c. Trigger playback via a MIDI note and confirm the same riser → hit path still works.
+   d. Verify the riser duration matches the expected beat length (default: 4 beats).
+   e. Verify no clicks, pops, or silence gaps at the riser → hit boundary.
+   f. Verify the hit fires at the correct beat boundary (quantised to the grid).
 
 ### Test Samples
 
@@ -529,10 +530,65 @@ loaded sample.
 
 ---
 
+## Test Scenario 10 — UI Preview Transport
+
+**Goal:** Verify that the waveform-panel Play/Stop transport makes the plugin playable
+without MIDI while preserving the existing MIDI-triggered behavior.
+
+### Pre-condition
+
+- Plugin open in Standalone and in at least one DAW host
+- A reference sample loaded and the initial riser generation complete
+
+### Tests
+
+#### 10.1 — Empty-state discoverability
+1. Open a fresh plugin instance with no sample loaded.
+2. **Expected:** Play and Stop controls are visible below the waveform, but disabled.
+
+#### 10.2 — Standalone playback without MIDI
+1. Load a sample in the Standalone app.
+2. Click **Play**.
+3. **Expected:** The riser starts immediately and the hit fires at the beat boundary with no MIDI device configured.
+4. Verify the waveform playhead animates during playback.
+
+#### 10.3 — Stop is click-free
+1. Start playback with **Play**.
+2. While the riser or hit is sounding, click **Stop**.
+3. **Expected:** Playback fades out cleanly with no click/pop artefact.
+
+#### 10.4 — Retrigger behavior
+1. Click **Play**.
+2. Before playback ends, click **Play** again.
+3. **Expected:** Playback restarts from the beginning, matching the current second-note retrigger behavior.
+
+#### 10.5 — MIDI and UI transport coexist
+1. Start playback with **Play**.
+2. While playback is running, send a MIDI note-on event.
+3. **Expected:** The shared monophonic playback path retriggers cleanly. MIDI still behaves normally with the transport present.
+
+#### 10.6 — DAW-hosted preview without routed MIDI
+1. Insert RVRSE in a DAW without routing a MIDI clip/controller to it.
+2. Load a sample.
+3. Click **Play**.
+4. **Expected:** Playback works from the UI transport alone in the hosted plugin.
+
+### Pass Criteria
+
+- [ ] 10.1 — Play/Stop are visible but disabled before a sample is loaded
+- [ ] 10.2 — Standalone playback works with the Play button and no MIDI input
+- [ ] 10.3 — Stop interrupts playback without clicks or pops
+- [ ] 10.4 — Play retriggers from the beginning during active playback
+- [ ] 10.5 — MIDI triggering still works alongside the UI transport
+- [ ] 10.6 — DAW-hosted playback works from the UI transport without MIDI routing
+
+---
+
 ## Revision History
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
+| 2026-05-18 | Added Scenario 10: UI preview transport                                 |
 | 2026-04-28 | Added Scenario 9: drag-and-drop sample loading                          |
 | 2026-04-05 | Added Scenario 6: sample persistence tests                              |
 | 2026-04-05 | Added Scenario 5: debug stage diagnostic playback                       |
