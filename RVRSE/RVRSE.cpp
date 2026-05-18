@@ -360,7 +360,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
       return headerActionClusterBounds(rect).GetFromRight(34.f).GetCentredInside(30.f, 30.f);
     };
     const auto exportStatusBounds = [&](const IRECT& rect) {
-      return rect.GetFromBottom(headerH * 0.36f).GetCentredInside(240.f, 14.f).GetVShifted(-1.f);
+      return rect.GetFromBottom(headerH * 0.36f).GetCentredInside(240.f, 14.f).GetHShifted(140.f).GetVShifted(-13.f);
     };
 
     // ── Resize path — reposition existing controls ─────────────────────
@@ -558,7 +558,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->GetControlWithTag(kCtrlTagExportButton)->SetDisabled(true);
 
     pGraphics->AttachControl(new ITextControl(exportStatusBounds(headerRect), "",
-      IText(12, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagExportStatus);
+      IText(14, kColorWhite, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagExportStatus);
 
     // Sample name: top-right area
     const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
@@ -983,7 +983,7 @@ void RVRSE::StartExportFromUI()
 
         exportOpState->mCompleted.store(true, std::memory_order_release);
         exportUiState->mInProgress.store(false, std::memory_order_release);
-        ::QueueExportStatus(exportUiState, "Exported WAV", kExportStatusVisibleFrames);
+        ::QueueExportStatus(exportUiState, "Export saved", kExportStatusVisibleFrames);
       }).detach();
     });
 #endif
