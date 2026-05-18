@@ -108,7 +108,7 @@ public:
   void ShowUnsupportedFormatError(const char* errorMessage);
 #endif
 
-private:
+public:
   struct PreviewCommand
   {
     enum class EType
@@ -121,6 +121,17 @@ private:
     int noteNumber = rvrse::PREVIEW_TRIGGER_NOTE;
     int velocity = rvrse::PREVIEW_TRIGGER_VELOCITY;
   };
+
+  struct ExportUiState
+  {
+    std::mutex mMutex;
+    std::string mPendingStatusText;
+    std::string mPendingAlertText;
+    int mPendingStatusFrames = -2; ///< -1 = persistent, -2 = none queued
+    std::atomic<bool> mInProgress { false };
+  };
+
+private:
 
   void ClearLoadedSampleState();
   void QueueSampleLoadError(const char* errorMessage, bool clearLoadedState = false);
@@ -198,14 +209,9 @@ private:
   bool mPendingSampleStateClear = false; ///< Whether OnIdle should clear loaded sample state before publishing UI
 
   // --- Export state / UI feedback ---
-  std::mutex mExportStatusMutex;
-  std::string mPendingExportStatusText; ///< Next export status text for OnIdle to publish
   std::string mActiveExportStatusText;  ///< Export status text currently shown in the header
-  std::string mPendingExportAlertText;  ///< Next export error alert for OnIdle to show
-  int mPendingExportStatusFrames = -2;  ///< Lifetime for the next queued export status (-1 = persistent, -2 = none queued)
   int mExportStatusFramesRemaining = 0; ///< OnIdle countdown for transient export status (-1 = persistent)
-  std::atomic<bool> mExportInProgress { false };
-  std::atomic<uint32_t> mExportOperationSerial { 0 };
+  std::shared_ptr<ExportUiState> mExportUiState { std::make_shared<ExportUiState>() };
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state

@@ -27,6 +27,11 @@ constexpr const char* kExportAudioExts = "wav";
 constexpr int kExportStatusVisibleFrames = 120;
 constexpr auto kExportProgressDelay = std::chrono::milliseconds(500);
 
+struct ExportOperationState
+{
+  std::atomic<bool> mCompleted { false };
+};
+
 std::string GetDefaultExportDirectory()
 {
   WDL_String userHome;
@@ -106,6 +111,28 @@ void PackFloatTo24BitPcm(const std::vector<float>& interleaved, std::vector<uint
     pcmBytes[byteIndex + 1] = static_cast<uint8_t>((packed >> 8) & 0xFF);
     pcmBytes[byteIndex + 2] = static_cast<uint8_t>((packed >> 16) & 0xFF);
   }
+}
+
+void QueueExportStatus(const std::shared_ptr<RVRSE::ExportUiState>& uiState,
+                       const char* statusText,
+                       int visibleFrames)
+{
+  if (!uiState)
+    return;
+
+  std::lock_guard<std::mutex> lock(uiState->mMutex);
+  uiState->mPendingStatusText = statusText ? statusText : "";
+  uiState->mPendingStatusFrames = visibleFrames;
+}
+
+void QueueExportError(const std::shared_ptr<RVRSE::ExportUiState>& uiState,
+                      const char* errorMessage)
+{
+  if (!uiState)
+    return;
+
+  std::lock_guard<std::mutex> lock(uiState->mMutex);
+  uiState->mPendingAlertText = errorMessage ? errorMessage : "Export failed.";
 }
 
 } // namespace
@@ -815,21 +842,18 @@ bool RVRSE::HasReadyPreviewExportData() const
 
 void RVRSE::QueueExportStatus(const char* statusText, int visibleFrames)
 {
-  std::lock_guard<std::mutex> lock(mExportStatusMutex);
-  mPendingExportStatusText = statusText ? statusText : "";
-  mPendingExportStatusFrames = visibleFrames;
+  ::QueueExportStatus(mExportUiState, statusText, visibleFrames);
 }
 
 void RVRSE::QueueExportError(const char* errorMessage)
 {
-  std::lock_guard<std::mutex> lock(mExportStatusMutex);
-  mPendingExportAlertText = errorMessage ? errorMessage : "Export failed.";
+  ::QueueExportError(mExportUiState, errorMessage);
 }
 
 void RVRSE::StartExportFromUI()
 {
 #if IPLUG_EDITOR
-  if (!GetUI() || mExportInProgress.load(std::memory_order_acquire))
+  if (!GetUI() || !mExportUiState || mExportUiState->mInProgress.load(std::memory_order_acquire))
     return;
 
   WDL_String fileName(BuildDefaultExportFileName(mSampleFilePath).c_str());
@@ -863,26 +887,27 @@ void RVRSE::StartExportFromUI()
       renderConfig.mVelocityGain = 1.0f;
 
       const std::string normalizedExportPath = NormalizeExportFilePath(exportPath.string());
-      const uint32_t exportSerial = mExportOperationSerial.fetch_add(1, std::memory_order_acq_rel) + 1;
-      mExportInProgress.store(true, std::memory_order_release);
-      QueueExportStatus("", 0);
+      auto exportUiState = mExportUiState;
+      auto exportOpState = std::make_shared<ExportOperationState>();
+      exportUiState->mInProgress.store(true, std::memory_order_release);
+      ::QueueExportStatus(exportUiState, "", 0);
 
-      std::thread([this, exportSerial]() {
+      std::thread([exportUiState, exportOpState]() {
         std::this_thread::sleep_for(kExportProgressDelay);
-        if (mExportInProgress.load(std::memory_order_acquire) &&
-            mExportOperationSerial.load(std::memory_order_acquire) == exportSerial)
+        if (!exportOpState->mCompleted.load(std::memory_order_acquire))
         {
-          QueueExportStatus("Exporting...", -1);
+          ::QueueExportStatus(exportUiState, "Exporting...", -1);
         }
       }).detach();
 
-      std::thread([this, exportSerial, exportPath = normalizedExportPath, hit, riser, renderConfig]() {
+      std::thread([exportUiState, exportOpState, exportPath = normalizedExportPath, hit, riser, renderConfig]() {
         rvrse::ExportRenderData renderedAudio;
         if (!rvrse::RenderNormalExport(*riser, *hit, renderConfig, renderedAudio))
         {
-          mExportInProgress.store(false, std::memory_order_release);
-          QueueExportStatus("", 0);
-          QueueExportError("Export failed: could not assemble the current riser + hit render.");
+          exportOpState->mCompleted.store(true, std::memory_order_release);
+          exportUiState->mInProgress.store(false, std::memory_order_release);
+          ::QueueExportStatus(exportUiState, "", 0);
+          ::QueueExportError(exportUiState, "Export failed: could not assemble the current riser + hit render.");
           return;
         }
 
@@ -912,11 +937,19 @@ void RVRSE::StartExportFromUI()
 
         if (initSucceeded)
         {
+          errno = 0;
           const size_t bytesWritten = drwav_write_raw(&wav, pcmBytes.size(), pcmBytes.data());
-          success = (bytesWritten == pcmBytes.size());
-          if (!success)
-            writeError = errno;
-          drwav_uninit(&wav);
+          const int writeCallError = errno;
+          errno = 0;
+          const drwav_result closeResult = drwav_uninit(&wav);
+          const int closeError = errno;
+
+          success = (bytesWritten == pcmBytes.size()) && (closeResult == DRWAV_SUCCESS);
+
+          if (bytesWritten != pcmBytes.size())
+            writeError = (writeCallError != 0) ? writeCallError : closeError;
+          else if (closeResult != DRWAV_SUCCESS)
+            writeError = closeError;
         }
         else
         {
@@ -927,15 +960,16 @@ void RVRSE::StartExportFromUI()
         {
           std::error_code removeError;
           std::filesystem::remove(targetPath, removeError);
-          mExportInProgress.store(false, std::memory_order_release);
-          QueueExportStatus("", 0);
-          QueueExportError(DescribeExportWriteError(targetPath, writeError).c_str());
+          exportOpState->mCompleted.store(true, std::memory_order_release);
+          exportUiState->mInProgress.store(false, std::memory_order_release);
+          ::QueueExportStatus(exportUiState, "", 0);
+          ::QueueExportError(exportUiState, DescribeExportWriteError(targetPath, writeError).c_str());
           return;
         }
 
-        mExportInProgress.store(false, std::memory_order_release);
-        if (mExportOperationSerial.load(std::memory_order_acquire) == exportSerial)
-          QueueExportStatus("Exported WAV", kExportStatusVisibleFrames);
+        exportOpState->mCompleted.store(true, std::memory_order_release);
+        exportUiState->mInProgress.store(false, std::memory_order_release);
+        ::QueueExportStatus(exportUiState, "Exported WAV", kExportStatusVisibleFrames);
       }).detach();
     });
 #endif
@@ -1043,13 +1077,13 @@ void RVRSE::OnIdle()
     std::string exportAlertText;
     int exportStatusFrames = -2;
     {
-      std::lock_guard<std::mutex> lock(mExportStatusMutex);
-      exportStatusText = mPendingExportStatusText;
-      exportAlertText = std::move(mPendingExportAlertText);
-      mPendingExportAlertText.clear();
-      exportStatusFrames = mPendingExportStatusFrames;
-      mPendingExportStatusText.clear();
-      mPendingExportStatusFrames = -2;
+      std::lock_guard<std::mutex> lock(mExportUiState->mMutex);
+      exportStatusText = std::move(mExportUiState->mPendingStatusText);
+      exportAlertText = std::move(mExportUiState->mPendingAlertText);
+      exportStatusFrames = mExportUiState->mPendingStatusFrames;
+      mExportUiState->mPendingStatusText.clear();
+      mExportUiState->mPendingAlertText.clear();
+      mExportUiState->mPendingStatusFrames = -2;
     }
 
     if (exportStatusFrames != -2)
@@ -1114,7 +1148,7 @@ void RVRSE::OnIdle()
 
     if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagExportButton))
     {
-      const bool exportInProgress = mExportInProgress.load(std::memory_order_relaxed);
+      const bool exportInProgress = mExportUiState->mInProgress.load(std::memory_order_relaxed);
       const bool shouldDisable = !hasReadyPreviewExport || exportInProgress;
       if (pCtrl->IsDisabled() != shouldDisable)
         pCtrl->SetDisabled(shouldDisable);
