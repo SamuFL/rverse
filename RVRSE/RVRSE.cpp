@@ -307,13 +307,13 @@ RVRSE::RVRSE(const InstanceInfo& info)
       return (idx == 0) ? cluster.GetFromLeft(kButtonWidth) : cluster.GetFromRight(kButtonWidth);
     };
     const auto headerActionClusterBounds = [](const IRECT& rect) {
-      return rect.GetCentredInside(208.f, 34.f).GetVShifted(1.f);
+      return rect.GetCentredInside(200.f, 34.f).GetVShifted(1.f);
     };
     const auto loadButtonBounds = [&](const IRECT& rect) {
       return headerActionClusterBounds(rect).GetFromLeft(160.f);
     };
     const auto exportButtonBounds = [&](const IRECT& rect) {
-      return headerActionClusterBounds(rect).GetFromRight(34.f);
+      return headerActionClusterBounds(rect).GetFromRight(34.f).GetCentredInside(30.f, 30.f);
     };
     const auto exportStatusBounds = [&](const IRECT& rect) {
       return rect.GetFromBottom(headerH * 0.36f).GetCentredInside(240.f, 14.f).GetVShifted(-1.f);
