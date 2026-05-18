@@ -85,11 +85,11 @@ public:
     if (!active && mMouseIsOver && !disabled)
       fill = mAccent.WithOpacity(0.18f);
 
-    const IColor frame = mAccent.WithOpacity(active ? 1.f : 0.7f).WithContrast(contrast);
-    const IColor icon = (active ? rvrse::gui::kColorDark : mAccent).WithContrast(contrast);
+    const IColor frameColor = mAccent.WithOpacity(active ? 1.f : 0.7f).WithContrast(contrast);
+    const IColor iconColor = (active ? rvrse::gui::kColorDark : mAccent).WithContrast(contrast);
 
     g.FillRoundRect(fill.WithContrast(contrast), buttonRect, 5.f);
-    g.DrawRoundRect(frame, buttonRect, 5.f, nullptr, 1.25f);
+    g.DrawRoundRect(frameColor, buttonRect, 5.f, nullptr, 1.25f);
 
     const float iconSide = std::max(8.f, buttonRect.H() - 5.f);
     const IRECT iconRect = buttonRect.GetCentredInside(iconSide, iconSide);
@@ -101,12 +101,12 @@ public:
       const float y2 = iconRect.B - iconRect.H() * 0.14f;
       const float x3 = iconRect.R - iconRect.W() * 0.1f;
       const float y3 = iconRect.MH();
-      g.FillTriangle(icon, x1, y1, x2, y2, x3, y3);
+      g.FillTriangle(iconColor, x1, y1, x2, y2, x3, y3);
     }
     else
     {
       const float stopSide = iconRect.W() * 0.62f;
-      g.FillRect(icon, iconRect.GetCentredInside(stopSide, stopSide));
+      g.FillRect(iconColor, iconRect.GetCentredInside(stopSide, stopSide));
     }
   }
 
@@ -310,13 +310,13 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(new TransportButtonControl(
       transportButtonBounds(transportArea, 0), TransportButtonControl::EIcon::Play, kColorGold,
       [this](IControl* pCaller) {
-        mPreviewCommandQueue.Push({PreviewCommand::EType::Play, rvrse::kPreviewTriggerMidiNote, rvrse::kPreviewTriggerVelocity});
+        mPreviewCommandQueue.Push({PreviewCommand::EType::Play, rvrse::PREVIEW_TRIGGER_NOTE, rvrse::PREVIEW_TRIGGER_VELOCITY});
         DefaultClickActionFunc(pCaller);
       }), kCtrlTagPreviewPlay);
     pGraphics->AttachControl(new TransportButtonControl(
       transportButtonBounds(transportArea, 1), TransportButtonControl::EIcon::Stop, kColorBlue,
       [this](IControl* pCaller) {
-        mPreviewCommandQueue.Push({PreviewCommand::EType::Stop, rvrse::kPreviewTriggerMidiNote, 0});
+        mPreviewCommandQueue.Push({PreviewCommand::EType::Stop, rvrse::PREVIEW_TRIGGER_NOTE, 0});
         DefaultClickActionFunc(pCaller);
       }), kCtrlTagPreviewStop);
     pGraphics->GetControlWithTag(kCtrlTagPreviewPlay)->SetDisabled(true);
@@ -766,14 +766,16 @@ void RVRSE::OnIdle()
   if (GetUI())
   {
     const auto playbackHit = std::atomic_load(&mPlaySample);
+    const auto riser = std::atomic_load(&mRiserBuffer);
     const bool hasPlayableSample = mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
                                    playbackHit && playbackHit->IsLoaded();
+    const bool hasReadyRiser = riser && riser->IsReady();
     const bool playbackActive = mRiserPos.load(std::memory_order_relaxed) >= 0 ||
                                 mHitPos.load(std::memory_order_relaxed) >= 0;
 
     if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagPreviewPlay))
     {
-      const bool shouldDisable = !hasPlayableSample;
+      const bool shouldDisable = !hasPlayableSample || !hasReadyRiser;
       if (pCtrl->IsDisabled() != shouldDisable)
         pCtrl->SetDisabled(shouldDisable);
 

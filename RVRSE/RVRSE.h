@@ -115,8 +115,8 @@ private:
     };
 
     EType type = EType::Play;
-    int noteNumber = rvrse::kPreviewTriggerMidiNote;
-    int velocity = rvrse::kPreviewTriggerVelocity;
+    int noteNumber = rvrse::PREVIEW_TRIGGER_NOTE;
+    int velocity = rvrse::PREVIEW_TRIGGER_VELOCITY;
   };
 
   void ClearLoadedSampleState();
