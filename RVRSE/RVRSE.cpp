@@ -91,20 +91,22 @@ public:
     g.FillRoundRect(fill.WithContrast(contrast), buttonRect, 5.f);
     g.DrawRoundRect(frame, buttonRect, 5.f, nullptr, 1.25f);
 
-    const IRECT iconRect = buttonRect.GetPadded(-9.f);
+    const float iconSide = std::max(8.f, buttonRect.H() - 10.f);
+    const IRECT iconRect = buttonRect.GetCentredInside(iconSide, iconSide);
     if (mIcon == EIcon::Play)
     {
-      const float x1 = iconRect.L + iconRect.W() * 0.18f;
-      const float y1 = iconRect.T + iconRect.H() * 0.1f;
-      const float x2 = iconRect.L + iconRect.W() * 0.18f;
-      const float y2 = iconRect.B - iconRect.H() * 0.1f;
-      const float x3 = iconRect.R - iconRect.W() * 0.05f;
+      const float x1 = iconRect.L + iconRect.W() * 0.22f;
+      const float y1 = iconRect.T + iconRect.H() * 0.14f;
+      const float x2 = iconRect.L + iconRect.W() * 0.22f;
+      const float y2 = iconRect.B - iconRect.H() * 0.14f;
+      const float x3 = iconRect.R - iconRect.W() * 0.1f;
       const float y3 = iconRect.MH();
       g.FillTriangle(icon, x1, y1, x2, y2, x3, y3);
     }
     else
     {
-      g.FillRect(icon, iconRect.GetCentredInside(iconRect.W() * 0.68f, iconRect.H() * 0.68f));
+      const float stopSide = iconRect.W() * 0.62f;
+      g.FillRect(icon, iconRect.GetCentredInside(stopSide, stopSide));
     }
   }
 
@@ -180,10 +182,10 @@ RVRSE::RVRSE(const InstanceInfo& info)
       return rect.GetPadded(-6.f);
     };
     const auto waveformTransportBounds = [](const IRECT& rect) {
-      return rect.GetPadded(-6.f).GetFromBottom(42.f).GetVShifted(-6.f);
+      return rect.GetPadded(-6.f).GetFromBottom(38.f).GetVShifted(-5.f);
     };
     const auto waveformTransportBackgroundBounds = [](const IRECT& rect) {
-      return rect.GetCentredInside(136.f, 34.f);
+      return rect.GetCentredInside(132.f, 30.f);
     };
     const auto transportButtonBounds = [](const IRECT& rect, int idx) {
       constexpr float kButtonWidth = 48.f;
