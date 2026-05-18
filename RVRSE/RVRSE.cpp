@@ -135,6 +135,23 @@ void QueueExportError(const std::shared_ptr<RVRSE::ExportUiState>& uiState,
   uiState->mPendingAlertText = errorMessage ? errorMessage : "Export failed.";
 }
 
+void TryQueueExportProgress(const std::shared_ptr<RVRSE::ExportUiState>& uiState,
+                            const std::shared_ptr<ExportOperationState>& opState)
+{
+  if (!uiState || !opState)
+    return;
+
+  std::lock_guard<std::mutex> lock(uiState->mMutex);
+  if (opState->mCompleted.load(std::memory_order_acquire) ||
+      !uiState->mInProgress.load(std::memory_order_acquire))
+  {
+    return;
+  }
+
+  uiState->mPendingStatusText = "Exporting...";
+  uiState->mPendingStatusFrames = -1;
+}
+
 } // namespace
 
 #if IPLUG_EDITOR
@@ -894,10 +911,7 @@ void RVRSE::StartExportFromUI()
 
       std::thread([exportUiState, exportOpState]() {
         std::this_thread::sleep_for(kExportProgressDelay);
-        if (!exportOpState->mCompleted.load(std::memory_order_acquire))
-        {
-          ::QueueExportStatus(exportUiState, "Exporting...", -1);
-        }
+        TryQueueExportProgress(exportUiState, exportOpState);
       }).detach();
 
       std::thread([exportUiState, exportOpState, exportPath = normalizedExportPath, hit, riser, renderConfig]() {
