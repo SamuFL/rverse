@@ -864,25 +864,19 @@ void RVRSE::OnIdle()
       pWaveform->SetFadeInFrac(static_cast<float>(GetParam(kParamFadeIn)->Value()) / 100.f);
 
       // Update playhead position
-      if (riser || playbackHit)
+      if (riser && playbackHit)
       {
-        const int riserFrames = riser ? riser->NumFrames() : 0;
-        const int hitFrames = playbackHit ? playbackHit->NumFrames() : 0;
-        const int totalFrames = riserFrames + hitFrames;
+        const int totalFrames = riser->NumFrames() + playbackHit->NumFrames();
         if (totalFrames > 0)
         {
           float pos = -1.f;
           const int riserPos = mRiserPos.load(std::memory_order_relaxed);
           const int hitPos = mHitPos.load(std::memory_order_relaxed);
-          if (riserPos >= 0 && riser)
+          if (riserPos >= 0)
             pos = static_cast<float>(riserPos) / static_cast<float>(totalFrames);
-          else if (hitPos >= 0 && playbackHit)
-            pos = static_cast<float>(riserFrames + hitPos) / static_cast<float>(totalFrames);
+          else if (hitPos >= 0)
+            pos = static_cast<float>(riser->NumFrames() + hitPos) / static_cast<float>(totalFrames);
           pWaveform->SetPlayheadPos(pos);
-        }
-        else
-        {
-          pWaveform->SetPlayheadPos(-1.f);
         }
       }
       else
