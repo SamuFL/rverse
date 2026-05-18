@@ -902,7 +902,15 @@ void RVRSE::StartExportFromUI()
         bool success = false;
         int writeError = 0;
 
-        if (drwav_init_file_write_sequential_pcm_frames(&wav, exportPath.c_str(), &format, renderedAudio.mNumFrames, nullptr))
+        bool initSucceeded = false;
+#if defined(_WIN32)
+        const std::wstring wideExportPath = targetPath.wstring();
+        initSucceeded = drwav_init_file_write_sequential_pcm_frames_w(&wav, wideExportPath.c_str(), &format, renderedAudio.mNumFrames, nullptr);
+#else
+        initSucceeded = drwav_init_file_write_sequential_pcm_frames(&wav, exportPath.c_str(), &format, renderedAudio.mNumFrames, nullptr);
+#endif
+
+        if (initSucceeded)
         {
           const size_t bytesWritten = drwav_write_raw(&wav, pcmBytes.size(), pcmBytes.data());
           success = (bytesWritten == pcmBytes.size());
