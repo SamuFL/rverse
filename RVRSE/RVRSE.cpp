@@ -558,7 +558,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->GetControlWithTag(kCtrlTagExportButton)->SetDisabled(true);
 
     pGraphics->AttachControl(new ITextControl(exportStatusBounds(headerRect), "",
-      IText(15, kColorWhite, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagExportStatus);
+      IText(14, kColorWhite, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagExportStatus);
 
     // Sample name: top-right area
     const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
