@@ -91,7 +91,7 @@ public:
     g.FillRoundRect(fill.WithContrast(contrast), buttonRect, 5.f);
     g.DrawRoundRect(frame, buttonRect, 5.f, nullptr, 1.25f);
 
-    const float iconSide = std::max(8.f, buttonRect.H() - 10.f);
+    const float iconSide = std::max(8.f, buttonRect.H() - 5.f);
     const IRECT iconRect = buttonRect.GetCentredInside(iconSide, iconSide);
     if (mIcon == EIcon::Play)
     {
@@ -182,14 +182,14 @@ RVRSE::RVRSE(const InstanceInfo& info)
       return rect.GetPadded(-6.f);
     };
     const auto waveformTransportBounds = [](const IRECT& rect) {
-      return rect.GetPadded(-6.f).GetFromBottom(38.f).GetVShifted(-5.f);
+      return rect.GetPadded(-6.f).GetFromBottom(38.f).GetVShifted(8.f);
     };
     const auto waveformTransportBackgroundBounds = [](const IRECT& rect) {
-      return rect.GetCentredInside(132.f, 30.f);
+      return rect.GetCentredInside(175.f, 25.f);
     };
     const auto transportButtonBounds = [](const IRECT& rect, int idx) {
-      constexpr float kButtonWidth = 48.f;
-      constexpr float kButtonHeight = 24.f;
+      constexpr float kButtonWidth = 70.f;
+      constexpr float kButtonHeight = 20.f;
       constexpr float kButtonGap = 10.f;
       const IRECT cluster = rect.GetCentredInside(kButtonWidth * 2.f + kButtonGap, kButtonHeight);
       return (idx == 0) ? cluster.GetFromLeft(kButtonWidth) : cluster.GetFromRight(kButtonWidth);
