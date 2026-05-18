@@ -65,6 +65,7 @@ enum ECtrlTags
   kCtrlTagMasterVolLabel,
   kCtrlTagMasterVolValue,
   kCtrlTagWaveformDisplay,
+  kCtrlTagPreviewTransportBg,
   kCtrlTagPreviewPlay,
   kCtrlTagPreviewStop,
   kCtrlTagHitPreview,

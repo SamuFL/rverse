@@ -177,16 +177,20 @@ RVRSE::RVRSE(const InstanceInfo& info)
     const IRECT riserRect   = IRECT(b.L + gap, panelTop, panelMid - gap * 0.5f, panelBottom);
     const IRECT hitRect     = IRECT(panelMid + gap * 0.5f, panelTop, b.R - gap, panelBottom);
     const auto waveformDisplayBounds = [](const IRECT& rect) {
-      return rect.GetPadded(-6.f).GetReducedFromBottom(38.f);
+      return rect.GetPadded(-6.f);
     };
     const auto waveformTransportBounds = [](const IRECT& rect) {
-      return rect.GetPadded(-6.f).GetFromBottom(34.f);
+      return rect.GetPadded(-6.f).GetFromBottom(42.f).GetVShifted(-6.f);
+    };
+    const auto waveformTransportBackgroundBounds = [](const IRECT& rect) {
+      return rect.GetCentredInside(136.f, 34.f);
     };
     const auto transportButtonBounds = [](const IRECT& rect, int idx) {
-      constexpr float kButtonSize = 30.f;
+      constexpr float kButtonWidth = 48.f;
+      constexpr float kButtonHeight = 24.f;
       constexpr float kButtonGap = 10.f;
-      const IRECT cluster = rect.GetCentredInside(kButtonSize * 2.f + kButtonGap, kButtonSize);
-      return (idx == 0) ? cluster.GetFromLeft(kButtonSize) : cluster.GetFromRight(kButtonSize);
+      const IRECT cluster = rect.GetCentredInside(kButtonWidth * 2.f + kButtonGap, kButtonHeight);
+      return (idx == 0) ? cluster.GetFromLeft(kButtonWidth) : cluster.GetFromRight(kButtonWidth);
     };
 
     // ── Resize path — reposition existing controls ─────────────────────
@@ -196,6 +200,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagWaveformPanel)->SetTargetAndDrawRECTs(waveformRect);
       pGraphics->GetControlWithTag(kCtrlTagWaveformDisplay)->SetTargetAndDrawRECTs(waveformDisplayBounds(waveformRect));
       const IRECT transportArea = waveformTransportBounds(waveformRect);
+      pGraphics->GetControlWithTag(kCtrlTagPreviewTransportBg)->SetTargetAndDrawRECTs(waveformTransportBackgroundBounds(transportArea));
       pGraphics->GetControlWithTag(kCtrlTagPreviewPlay)->SetTargetAndDrawRECTs(transportButtonBounds(transportArea, 0));
       pGraphics->GetControlWithTag(kCtrlTagPreviewStop)->SetTargetAndDrawRECTs(transportButtonBounds(transportArea, 1));
       pGraphics->GetControlWithTag(kCtrlTagRiserPanel)->SetTargetAndDrawRECTs(riserRect);
@@ -293,6 +298,13 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(MakeRoundedPanel(waveformRect, kColorWaveformBg, 6.f), kCtrlTagWaveformPanel);
     pGraphics->AttachControl(new rvrse::WaveformControl(waveformDisplayBounds(waveformRect)), kCtrlTagWaveformDisplay);
     const IRECT transportArea = waveformTransportBounds(waveformRect);
+    pGraphics->AttachControl(new ILambdaControl(
+      waveformTransportBackgroundBounds(transportArea),
+      [](ILambdaControl* pCaller, IGraphics& g, IRECT& r) {
+        g.FillRoundRect(kColorDark.WithOpacity(0.82f), r, 7.f);
+        g.DrawRoundRect(kColorSeparator.WithOpacity(0.9f), r, 7.f, nullptr, 1.f);
+      }, DEFAULT_ANIMATION_DURATION, false, false), kCtrlTagPreviewTransportBg);
+    pGraphics->GetControlWithTag(kCtrlTagPreviewTransportBg)->SetIgnoreMouse(true);
     pGraphics->AttachControl(new TransportButtonControl(
       transportButtonBounds(transportArea, 0), TransportButtonControl::EIcon::Play, kColorGold,
       [this](IControl* pCaller) {
