@@ -584,6 +584,65 @@ without MIDI while preserving the existing MIDI-triggered behavior.
 
 ---
 
+## Test Scenario 11 — Header WAV Export
+
+**Goal:** Verify that the header Export action writes the current normal riser+hit render to disk with the agreed save-dialog defaults and feedback behavior.
+
+### Pre-condition
+
+- Plugin open in Standalone and in at least one DAW host
+- A reference sample loaded and the current offline riser generation complete
+
+### Tests
+
+#### 11.1 — Empty-state gating
+1. Open a fresh plugin instance with no sample loaded.
+2. **Expected:** The header Export button is visible but disabled.
+
+#### 11.2 — Save dialog defaults
+1. Load a sample named `snare.wav`.
+2. Click **Export**.
+3. **Expected:** The platform-native save dialog opens in the user's **Documents** folder.
+4. **Expected:** The suggested file name is `snare_rvrse.wav`.
+5. Cancel the dialog.
+6. **Expected:** No file is written.
+
+#### 11.3 — Successful render
+1. Click **Export** again and save to a writable location.
+2. Open the resulting WAV in an editor/DAW.
+3. **Expected:** The file is stereo, 24-bit PCM, and starts with the riser before the dry hit lands at the beat boundary.
+4. **Expected:** Mono source material renders as dual-mono; stereo source material preserves stereo.
+
+#### 11.4 — Render semantics
+1. Set **Master Volume** low (for example 20%).
+2. Set **Riser Volume** and **Hit Volume** to obvious non-default values.
+3. Export and compare the file against live playback.
+4. **Expected:** The exported WAV reflects Fade In, Riser Volume, and Hit Volume.
+5. **Expected:** Master Volume is **not** baked into the file.
+6. **Expected:** Export writes the normal user-facing riser+hit output rather than a debug-stage output.
+
+#### 11.5 — Export while playing
+1. Start playback with **Play**.
+2. While playback is active, click **Export** and save the file.
+3. **Expected:** Playback continues normally while the export completes.
+
+#### 11.6 — Error feedback
+1. Open the save dialog, choose a location that is not writable (or make the destination unavailable before confirming), and confirm the export.
+2. **Expected:** Export shows a clear modal error message.
+3. Save to a writable location again.
+4. **Expected:** Success is shown briefly in the plugin UI instead of a modal success dialog.
+
+### Pass Criteria
+
+- [ ] 11.1 — Export is visible but disabled before sample + riser are both ready
+- [ ] 11.2 — Save dialog defaults to Documents and suggests `<sampleStem>_rvrse.wav`
+- [ ] 11.3 — Successful export writes a valid stereo 24-bit WAV
+- [ ] 11.4 — Export uses normal riser+hit semantics and ignores Master Volume
+- [ ] 11.5 — Export remains available during playback
+- [ ] 11.6 — Write failures surface a clear modal error and success is shown in-plugin
+
+---
+
 ## Revision History
 
 | Date       | Change                                                                  |

@@ -1,12 +1,18 @@
 #include "RVRSE.h"
+#include "ExportRender.h"
 #include "IPlug_include_in_plug_src.h"
+#include "IPlugPaths.h"
 #include "BufferUtils.h"
 #include "Constants.h"
 #include "SampleLoader.h"
 #include "WaveformControl.h"
+#include "dr_wav.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <thread>
 
@@ -14,6 +20,95 @@
 #include "IControls.h"
 #include "GUIColors.h"
 #endif
+
+namespace {
+
+constexpr const char* kExportAudioExts = "wav";
+constexpr int kExportStatusVisibleFrames = 120;
+constexpr auto kExportProgressDelay = std::chrono::milliseconds(500);
+
+std::string GetDefaultExportDirectory()
+{
+  WDL_String userHome;
+  UserHomePath(userHome);
+
+  if (userHome.GetLength() == 0)
+    return {};
+
+  std::filesystem::path documents(userHome.Get());
+  documents /= "Documents";
+
+  std::error_code ec;
+  if (std::filesystem::exists(documents, ec) && std::filesystem::is_directory(documents, ec))
+    return documents.lexically_normal().string();
+
+  return std::filesystem::path(userHome.Get()).lexically_normal().string();
+}
+
+std::string BuildDefaultExportFileName(const std::string& sampleFilePath)
+{
+  if (sampleFilePath.empty())
+    return "rvrse.wav";
+
+  const std::filesystem::path samplePath(sampleFilePath);
+  const std::string stem = samplePath.stem().string();
+  return (stem.empty() ? std::string("rvrse") : stem) + "_rvrse.wav";
+}
+
+std::string NormalizeExportFilePath(const std::string& rawPath)
+{
+  if (rawPath.empty())
+    return {};
+
+  std::filesystem::path normalized(rawPath);
+  if (normalized.extension() != ".wav" && normalized.extension() != ".WAV")
+    normalized.replace_extension(".wav");
+
+  return normalized.lexically_normal().string();
+}
+
+std::string DescribeExportWriteError(const std::filesystem::path& exportPath, int errorNumber)
+{
+  std::error_code ec;
+  const auto parent = exportPath.parent_path();
+
+  if (parent.empty() || !std::filesystem::exists(parent, ec) || !std::filesystem::is_directory(parent, ec))
+    return "Export failed: the selected save location no longer exists.";
+
+  switch (errorNumber)
+  {
+    case EACCES:
+    case EPERM:
+      return "Export failed: permission denied for the selected save location.";
+#ifdef ENOSPC
+    case ENOSPC:
+      return "Export failed: the destination disk is full.";
+#endif
+    case ENOENT:
+      return "Export failed: the selected save location no longer exists.";
+    default:
+      return "Export failed: unable to write the WAV file.";
+  }
+}
+
+void PackFloatTo24BitPcm(const std::vector<float>& interleaved, std::vector<uint8_t>& pcmBytes)
+{
+  pcmBytes.resize(interleaved.size() * 3);
+
+  for (size_t sampleIdx = 0; sampleIdx < interleaved.size(); ++sampleIdx)
+  {
+    const float clamped = std::clamp(interleaved[sampleIdx], -1.0f, 1.0f);
+    const int32_t sample24 = std::clamp(static_cast<int32_t>(std::lround(clamped * 8388607.0f)),
+                                        -8388608, 8388607);
+    const uint32_t packed = static_cast<uint32_t>(sample24 & 0x00FFFFFF);
+    const size_t byteIndex = sampleIdx * 3;
+    pcmBytes[byteIndex] = static_cast<uint8_t>(packed & 0xFF);
+    pcmBytes[byteIndex + 1] = static_cast<uint8_t>((packed >> 8) & 0xFF);
+    pcmBytes[byteIndex + 2] = static_cast<uint8_t>((packed >> 16) & 0xFF);
+  }
+}
+
+} // namespace
 
 #if IPLUG_EDITOR
 /// Full-window background control that handles drag-and-drop file loading.
@@ -57,16 +152,17 @@ private:
   RVRSE* mPlugin; ///< Non-owning; lifetime guaranteed by plugin > GUI
 };
 
-class TransportButtonControl final : public IButtonControlBase
+class IconButtonControl final : public IButtonControlBase
 {
 public:
   enum class EIcon
   {
     Play = 0,
-    Stop
+    Stop,
+    Export
   };
 
-  TransportButtonControl(const IRECT& bounds, EIcon icon, const IColor& accent, IActionFunction aF)
+  IconButtonControl(const IRECT& bounds, EIcon icon, const IColor& accent, IActionFunction aF)
   : IButtonControlBase(bounds, aF)
   , mIcon(icon)
   , mAccent(accent)
@@ -103,10 +199,26 @@ public:
       const float y3 = iconRect.MH();
       g.FillTriangle(iconColor, x1, y1, x2, y2, x3, y3);
     }
-    else
+    else if (mIcon == EIcon::Stop)
     {
       const float stopSide = iconRect.W() * 0.62f;
       g.FillRect(iconColor, iconRect.GetCentredInside(stopSide, stopSide));
+    }
+    else
+    {
+      const float lineY = iconRect.B - iconRect.H() * 0.2f;
+      const float lineLeft = iconRect.L + iconRect.W() * 0.18f;
+      const float lineRight = iconRect.R - iconRect.W() * 0.18f;
+      const float stemX = iconRect.MW();
+      const float stemTop = iconRect.T + iconRect.H() * 0.14f;
+      const float stemBottom = lineY - iconRect.H() * 0.12f;
+      const float wingSpan = iconRect.W() * 0.18f;
+      const float wingTop = stemBottom - iconRect.H() * 0.16f;
+
+      g.DrawLine(iconColor, lineLeft, lineY, lineRight, lineY, nullptr, 1.5f);
+      g.DrawLine(iconColor, stemX, stemTop, stemX, stemBottom, nullptr, 1.5f);
+      g.DrawLine(iconColor, stemX - wingSpan, wingTop, stemX, stemBottom, nullptr, 1.5f);
+      g.DrawLine(iconColor, stemX + wingSpan, wingTop, stemX, stemBottom, nullptr, 1.5f);
     }
   }
 
@@ -194,6 +306,18 @@ RVRSE::RVRSE(const InstanceInfo& info)
       const IRECT cluster = rect.GetCentredInside(kButtonWidth * 2.f + kButtonGap, kButtonHeight);
       return (idx == 0) ? cluster.GetFromLeft(kButtonWidth) : cluster.GetFromRight(kButtonWidth);
     };
+    const auto headerActionClusterBounds = [](const IRECT& rect) {
+      return rect.GetCentredInside(208.f, 34.f).GetVShifted(1.f);
+    };
+    const auto loadButtonBounds = [&](const IRECT& rect) {
+      return headerActionClusterBounds(rect).GetFromLeft(160.f);
+    };
+    const auto exportButtonBounds = [&](const IRECT& rect) {
+      return headerActionClusterBounds(rect).GetFromRight(34.f);
+    };
+    const auto exportStatusBounds = [&](const IRECT& rect) {
+      return rect.GetFromBottom(headerH * 0.36f).GetCentredInside(240.f, 14.f).GetVShifted(-1.f);
+    };
 
     // ── Resize path — reposition existing controls ─────────────────────
     if (pGraphics->NControls()) {
@@ -212,8 +336,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
       // Reposition header contents
       const IRECT titleBounds = headerRect.GetPadded(-8.f).GetFromLeft(300.f).GetFromTop(headerH * 0.65f);
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
-      const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 34.f);
-      pGraphics->GetControlWithTag(kCtrlTagLoadButton)->SetTargetAndDrawRECTs(loadBtnBounds);
+      pGraphics->GetControlWithTag(kCtrlTagLoadButton)->SetTargetAndDrawRECTs(loadButtonBounds(headerRect));
+      pGraphics->GetControlWithTag(kCtrlTagExportButton)->SetTargetAndDrawRECTs(exportButtonBounds(headerRect));
+      pGraphics->GetControlWithTag(kCtrlTagExportStatus)->SetTargetAndDrawRECTs(exportStatusBounds(headerRect));
       const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
       pGraphics->GetControlWithTag(kCtrlTagSampleName)->SetTargetAndDrawRECTs(sampleBounds);
       const IRECT bpmBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromBottom(headerH * 0.4f);
@@ -307,14 +432,14 @@ RVRSE::RVRSE(const InstanceInfo& info)
         g.DrawRoundRect(kColorSeparator.WithOpacity(0.9f), r, 7.f, nullptr, 1.f);
       }, DEFAULT_ANIMATION_DURATION, false, false), kCtrlTagPreviewTransportBg);
     pGraphics->GetControlWithTag(kCtrlTagPreviewTransportBg)->SetIgnoreMouse(true);
-    pGraphics->AttachControl(new TransportButtonControl(
-      transportButtonBounds(transportArea, 0), TransportButtonControl::EIcon::Play, kColorGold,
+    pGraphics->AttachControl(new IconButtonControl(
+      transportButtonBounds(transportArea, 0), IconButtonControl::EIcon::Play, kColorGold,
       [this](IControl* pCaller) {
         mPreviewCommandQueue.Push({PreviewCommand::EType::Play, rvrse::PREVIEW_TRIGGER_NOTE, rvrse::PREVIEW_TRIGGER_VELOCITY});
         DefaultClickActionFunc(pCaller);
       }), kCtrlTagPreviewPlay);
-    pGraphics->AttachControl(new TransportButtonControl(
-      transportButtonBounds(transportArea, 1), TransportButtonControl::EIcon::Stop, kColorBlue,
+    pGraphics->AttachControl(new IconButtonControl(
+      transportButtonBounds(transportArea, 1), IconButtonControl::EIcon::Stop, kColorBlue,
       [this](IControl* pCaller) {
         mPreviewCommandQueue.Push({PreviewCommand::EType::Stop, rvrse::PREVIEW_TRIGGER_NOTE, 0});
         DefaultClickActionFunc(pCaller);
@@ -345,8 +470,8 @@ RVRSE::RVRSE(const InstanceInfo& info)
     pGraphics->AttachControl(new ITextControl(titleBounds, "RVRSE",
       IText(44, kColorGold, "Roboto-Bold", EAlign::Near, EVAlign::Middle)), kCtrlTagTitle);
 
-    // Load Sample button: centered
-    const IRECT loadBtnBounds = headerRect.GetCentredInside(160.f, 32.f).GetVShifted(1.f);
+    // Header action cluster: centered Load + Export controls
+    const IRECT loadBtnBounds = loadButtonBounds(headerRect);
     const IVStyle loadBtnStyle = DEFAULT_STYLE
       .WithColor(kFG, kColorDarkGrey)
       .WithColor(kBG, IColor(0, 0, 0, 0))
@@ -379,6 +504,17 @@ RVRSE::RVRSE(const InstanceInfo& info)
           }
         });
     }, "LOAD SAMPLE", loadBtnStyle), kCtrlTagLoadButton);
+
+    pGraphics->AttachControl(new IconButtonControl(
+      exportButtonBounds(headerRect), IconButtonControl::EIcon::Export, kColorBlue,
+      [this](IControl* pCaller) {
+        StartExportFromUI();
+        DefaultClickActionFunc(pCaller);
+      }), kCtrlTagExportButton);
+    pGraphics->GetControlWithTag(kCtrlTagExportButton)->SetDisabled(true);
+
+    pGraphics->AttachControl(new ITextControl(exportStatusBounds(headerRect), "",
+      IText(12, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle)), kCtrlTagExportStatus);
 
     // Sample name: top-right area
     const IRECT sampleBounds = headerRect.GetPadded(-8.f).GetFromRight(300.f).GetFromTop(headerH * 0.6f);
@@ -595,6 +731,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
            kCtrlTagRiserSectionLabel,
            kCtrlTagOfflineSectionLabel,
            kCtrlTagHitSectionLabel,
+           kCtrlTagExportStatus,
            kCtrlTagMasterVolLabel,
            kCtrlTagMasterVolValue,
            kCtrlTagHitPreview,
@@ -665,6 +802,135 @@ void RVRSE::QueueSampleLoadError(const char* errorMessage, bool clearLoadedState
   mPendingSampleStatusText = "No sample loaded";
   mPendingSampleAlertText = errorMessage ? errorMessage : "Unsupported format";
   mPendingSampleStateClear = clearLoadedState;
+}
+
+bool RVRSE::HasReadyPreviewExportData() const
+{
+  const auto playbackHit = std::atomic_load(&mPlaySample);
+  const auto riser = std::atomic_load(&mRiserBuffer);
+  return mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
+         playbackHit && playbackHit->IsLoaded() &&
+         riser && riser->IsReady();
+}
+
+void RVRSE::QueueExportStatus(const char* statusText, int visibleFrames)
+{
+  std::lock_guard<std::mutex> lock(mExportStatusMutex);
+  mPendingExportStatusText = statusText ? statusText : "";
+  mPendingExportStatusFrames = visibleFrames;
+}
+
+void RVRSE::QueueExportError(const char* errorMessage)
+{
+  std::lock_guard<std::mutex> lock(mExportStatusMutex);
+  mPendingExportAlertText = errorMessage ? errorMessage : "Export failed.";
+}
+
+void RVRSE::StartExportFromUI()
+{
+#if IPLUG_EDITOR
+  if (!GetUI() || mExportInProgress.load(std::memory_order_acquire))
+    return;
+
+  WDL_String fileName(BuildDefaultExportFileName(mSampleFilePath).c_str());
+  WDL_String path(GetDefaultExportDirectory().c_str());
+
+  GetUI()->PromptForFile(fileName, path, EFileAction::Save, kExportAudioExts,
+    [this](const WDL_String& fileName, const WDL_String& path) {
+      if (fileName.GetLength() == 0)
+        return;
+
+      std::filesystem::path exportPath(fileName.Get());
+      if (!exportPath.is_absolute() && path.GetLength() > 0)
+        exportPath = std::filesystem::path(path.Get()) / exportPath;
+
+      const auto hit = std::atomic_load(&mPlaySample);
+      const auto riser = std::atomic_load(&mRiserBuffer);
+      const bool canExport = mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
+                             hit && hit->IsLoaded() &&
+                             riser && riser->IsReady();
+
+      if (!canExport)
+      {
+        QueueExportError("Export failed: the riser preview is not ready yet.");
+        return;
+      }
+
+      rvrse::ExportRenderConfig renderConfig;
+      renderConfig.mFadeInPct = static_cast<float>(GetParam(kParamFadeIn)->Value() / 100.0);
+      renderConfig.mRiserGain = std::pow(10.0f, static_cast<float>(GetParam(kParamRiserVolume)->Value()) / 20.0f);
+      renderConfig.mHitGain = std::pow(10.0f, static_cast<float>(GetParam(kParamHitVolume)->Value()) / 20.0f);
+      renderConfig.mVelocityGain = 1.0f;
+
+      const std::string normalizedExportPath = NormalizeExportFilePath(exportPath.string());
+      const uint32_t exportSerial = mExportOperationSerial.fetch_add(1, std::memory_order_acq_rel) + 1;
+      mExportInProgress.store(true, std::memory_order_release);
+      QueueExportStatus("", 0);
+
+      std::thread([this, exportSerial]() {
+        std::this_thread::sleep_for(kExportProgressDelay);
+        if (mExportInProgress.load(std::memory_order_acquire) &&
+            mExportOperationSerial.load(std::memory_order_acquire) == exportSerial)
+        {
+          QueueExportStatus("Exporting...", -1);
+        }
+      }).detach();
+
+      std::thread([this, exportSerial, exportPath = normalizedExportPath, hit, riser, renderConfig]() {
+        rvrse::ExportRenderData renderedAudio;
+        if (!rvrse::RenderNormalExport(*riser, *hit, renderConfig, renderedAudio))
+        {
+          mExportInProgress.store(false, std::memory_order_release);
+          QueueExportStatus("", 0);
+          QueueExportError("Export failed: could not assemble the current riser + hit render.");
+          return;
+        }
+
+        std::vector<uint8_t> pcmBytes;
+        PackFloatTo24BitPcm(renderedAudio.mInterleaved, pcmBytes);
+
+        const std::filesystem::path targetPath(exportPath);
+        drwav_data_format format {};
+        format.container = drwav_container_riff;
+        format.format = DR_WAVE_FORMAT_PCM;
+        format.channels = 2;
+        format.sampleRate = renderedAudio.mSampleRate;
+        format.bitsPerSample = 24;
+
+        errno = 0;
+        drwav wav {};
+        bool success = false;
+        int writeError = 0;
+
+        if (drwav_init_file_write_sequential_pcm_frames(&wav, exportPath.c_str(), &format, renderedAudio.mNumFrames, nullptr))
+        {
+          const size_t bytesWritten = drwav_write_raw(&wav, pcmBytes.size(), pcmBytes.data());
+          success = (bytesWritten == pcmBytes.size());
+          if (!success)
+            writeError = errno;
+          drwav_uninit(&wav);
+        }
+        else
+        {
+          writeError = errno;
+        }
+
+        if (!success)
+        {
+          std::error_code removeError;
+          std::filesystem::remove(targetPath, removeError);
+          mExportInProgress.store(false, std::memory_order_release);
+          QueueExportStatus("", 0);
+          QueueExportError(DescribeExportWriteError(targetPath, writeError).c_str());
+          return;
+        }
+
+        mExportInProgress.store(false, std::memory_order_release);
+        if (mExportOperationSerial.load(std::memory_order_acquire) == exportSerial)
+          QueueExportStatus("Exported WAV", kExportStatusVisibleFrames);
+      }).detach();
+    });
+#endif
 }
 
 #if IPLUG_EDITOR
@@ -765,17 +1031,55 @@ void RVRSE::OnIdle()
 
   if (GetUI())
   {
-    const auto playbackHit = std::atomic_load(&mPlaySample);
-    const auto riser = std::atomic_load(&mRiserBuffer);
-    const bool hasPlayableSample = mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
-                                   playbackHit && playbackHit->IsLoaded();
-    const bool hasReadyRiser = riser && riser->IsReady();
+    std::string exportStatusText;
+    std::string exportAlertText;
+    int exportStatusFrames = -2;
+    {
+      std::lock_guard<std::mutex> lock(mExportStatusMutex);
+      exportStatusText = mPendingExportStatusText;
+      exportAlertText = std::move(mPendingExportAlertText);
+      mPendingExportAlertText.clear();
+      exportStatusFrames = mPendingExportStatusFrames;
+      mPendingExportStatusText.clear();
+      mPendingExportStatusFrames = -2;
+    }
+
+    if (exportStatusFrames != -2)
+    {
+      mActiveExportStatusText = std::move(exportStatusText);
+      mExportStatusFramesRemaining = exportStatusFrames;
+    }
+
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagExportStatus))
+    {
+      const char* exportStatus = mActiveExportStatusText.c_str();
+      if (strcmp(pCtrl->As<ITextControl>()->GetStr(), exportStatus) != 0)
+      {
+        pCtrl->As<ITextControl>()->SetStr(exportStatus);
+        pCtrl->SetDirty(false);
+      }
+    }
+
+    if (mExportStatusFramesRemaining > 0)
+    {
+      --mExportStatusFramesRemaining;
+      if (mExportStatusFramesRemaining == 0)
+        mActiveExportStatusText.clear();
+    }
+
+    if (!exportAlertText.empty())
+      GetUI()->ShowMessageBox(exportAlertText.c_str(), "Export Error", kMB_OK);
+  }
+
+  if (GetUI())
+  {
     const bool playbackActive = mRiserPos.load(std::memory_order_relaxed) >= 0 ||
                                 mHitPos.load(std::memory_order_relaxed) >= 0;
+    const bool hasReadyPreviewExport = HasReadyPreviewExportData();
 
     if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagPreviewPlay))
     {
-      const bool shouldDisable = !hasPlayableSample || !hasReadyRiser;
+      const bool shouldDisable = !hasReadyPreviewExport;
       if (pCtrl->IsDisabled() != shouldDisable)
         pCtrl->SetDisabled(shouldDisable);
 
@@ -796,6 +1100,21 @@ void RVRSE::OnIdle()
       if (std::abs(pCtrl->GetValue()) > 1e-6)
       {
         pCtrl->SetValue(0.0);
+        pCtrl->SetDirty(false);
+      }
+    }
+
+    if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagExportButton))
+    {
+      const bool exportInProgress = mExportInProgress.load(std::memory_order_relaxed);
+      const bool shouldDisable = !hasReadyPreviewExport || exportInProgress;
+      if (pCtrl->IsDisabled() != shouldDisable)
+        pCtrl->SetDisabled(shouldDisable);
+
+      const double activeValue = exportInProgress ? 1.0 : 0.0;
+      if (std::abs(pCtrl->GetValue() - activeValue) > 1e-6)
+      {
+        pCtrl->SetValue(activeValue);
         pCtrl->SetDirty(false);
       }
     }

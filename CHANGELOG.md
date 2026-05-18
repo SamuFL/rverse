@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Drag-and-drop sample loading — drag any WAV or AIFF file directly onto the plugin's header/footer/waveform areas to load it (rverse-aif)
 - macOS maintainer tooling for release signing/notarization: `scripts/sign-and-notarize.sh`, `scripts/build-macos-installer.sh`, and a minimal installer entitlements plist
 - Waveform-panel preview transport — small Play/Stop buttons let users audition the riser+hit path without configuring MIDI, while preserving the existing MIDI-triggered playback behavior
+- Header export action — a blue Export button now writes the current normal riser+hit result to a stereo 24-bit WAV via the native save dialog, using the same readiness gate as Play and ignoring Master Volume
 
 ### Changed
 - macOS release distribution now targets a signed, notarized, stapled `.pkg` installer instead of the manual zip + `xattr` workflow
