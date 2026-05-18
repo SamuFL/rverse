@@ -52,7 +52,8 @@ The built plugins appear in `build/RVRSE/` — see [Plugin Formats](#plugin-form
 
 1. **Load** a one-shot hit sample (uncompressed WAV or AIFF) via the LOAD SAMPLE button.
 2. **Preview** the sound either by clicking the waveform-panel **Play** button (centered below the waveform) or by playing a MIDI note.
-3. The riser is your hit sample processed through reverb → reversed → time-stretched to match
+3. **Export** the current normal riser+hit result from the header **Export** button to a 24-bit WAV file in one step.
+4. The riser is your hit sample processed through reverb → reversed → time-stretched to match
    the configured riser length (default: 4 beats at host BPM).
 
 ```
@@ -392,6 +393,7 @@ No `xattr` workaround should be needed for official release installers.
 2. Click **LOAD SAMPLE** and select an uncompressed WAV or AIFF hit sample (up to 30 seconds, mono or stereo).
 3. **Trigger playback** either from MIDI or from the waveform-panel **Play** button — the reverse-reverb riser plays immediately, and the dry hit fires at the beat boundary (default: 4 beats at host BPM).
 4. **Stop playback** either by releasing the MIDI note or by clicking the waveform-panel **Stop** button. Both paths use the same 5ms anti-click fade-out.
+5. Click the header **Export** button to save the current normal riser+hit render as a stereo 24-bit WAV. Export uses the ready offline riser buffer, ignores Master Volume, and stays available while playback is running.
 
 ### DAW Parameters
 

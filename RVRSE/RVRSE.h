@@ -8,6 +8,7 @@
 #include "Stutter.h"
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 
@@ -33,6 +34,8 @@ enum ECtrlTags
   // Header
   kCtrlTagTitle = 0,
   kCtrlTagLoadButton,
+  kCtrlTagExportButton,
+  kCtrlTagExportStatus,
   kCtrlTagSampleName,
   // Zone panels (backgrounds)
   kCtrlTagHeaderPanel,
@@ -105,7 +108,7 @@ public:
   void ShowUnsupportedFormatError(const char* errorMessage);
 #endif
 
-private:
+public:
   struct PreviewCommand
   {
     enum class EType
@@ -119,12 +122,27 @@ private:
     int velocity = rvrse::PREVIEW_TRIGGER_VELOCITY;
   };
 
+  struct ExportUiState
+  {
+    std::mutex mMutex;
+    std::string mPendingStatusText;
+    std::string mPendingAlertText;
+    int mPendingStatusFrames = -2; ///< -1 = persistent, -2 = none queued
+    std::atomic<bool> mInProgress { false };
+  };
+
+private:
+
   void ClearLoadedSampleState();
   void QueueSampleLoadError(const char* errorMessage, bool clearLoadedState = false);
 
   /// Internal sample load implementation. Must only be called from the UI thread
   /// or from UnserializeState (host-managed restore path).
   void LoadSampleFromFile(const char* filePath);
+  void StartExportFromUI();
+  bool HasReadyPreviewExportData() const;
+  void QueueExportStatus(const char* statusText, int visibleFrames = -1);
+  void QueueExportError(const char* errorMessage);
 
   /// Persisted sample file path (saved/restored with DAW project)
   std::string mSampleFilePath;
@@ -189,6 +207,11 @@ private:
   std::string mLastSampleStatusText;    ///< Last sample status text shown in the UI
   std::string mPendingSampleAlertText;  ///< Next sample-load error alert for OnIdle to show
   bool mPendingSampleStateClear = false; ///< Whether OnIdle should clear loaded sample state before publishing UI
+
+  // --- Export state / UI feedback ---
+  std::string mActiveExportStatusText;  ///< Export status text currently shown in the header
+  int mExportStatusFramesRemaining = 0; ///< OnIdle countdown for transient export status (-1 = persistent)
+  std::shared_ptr<ExportUiState> mExportUiState { std::make_shared<ExportUiState>() };
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state
