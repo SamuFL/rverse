@@ -145,6 +145,10 @@ constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample lengt
 constexpr int    kMaxSampleFrames    = 192000 * kMaxSampleLengthSeconds; ///< Max frames at 192 kHz (supports all standard rates)
 constexpr int    kMaxSampleChannels  = 2;                  ///< Stereo max
 
+// --- Manual sample trimming ---
+constexpr double kTrimMinRegionMs = 10.0; ///< Minimum editable/committable trim region length
+constexpr double kTrimMaxMs = kMaxSampleLengthSeconds * 1000.0; ///< Upper trim param bound in milliseconds
+
 /// Supported file extensions for the open-file dialog
 constexpr const char* kSupportedAudioExts = "wav aif aiff";
 

@@ -6,6 +6,7 @@
 #include "RvrseProcessor.h"
 #include "SampleData.h"
 #include "Stutter.h"
+#include "TrimUtils.h"
 
 #include <atomic>
 #include <cstdint>
@@ -26,6 +27,8 @@ enum EParams
   kParamHitVolume,
   kParamDebugStage, // Reserved in all builds to keep parameter indices stable.
   kParamStretchQuality,
+  kParamTrimStartMs,
+  kParamTrimEndMs,
   kNumParams
 };
 
@@ -91,6 +94,7 @@ public:
   bool OnHostRequestingSupportedViewConfiguration(int width, int height) override { return true; }
   void OnIdle() override;
 #endif
+  void OnParamChange(int paramIdx, EParamSource source, int sampleOffset = -1) override;
   
 #if IPLUG_DSP
   void ProcessBlock(sample** inputs, sample** outputs, int nFrames) override;
@@ -135,10 +139,13 @@ private:
 
   void ClearLoadedSampleState();
   void QueueSampleLoadError(const char* errorMessage, bool clearLoadedState = false);
+  void CommitTrimParameters(double trimStartMs, double trimEndMs);
+  void QueueSequenceForCurrentTrim();
+  rvrse::TrimRangeFrames GetCommittedTrimRangeForSample(const std::shared_ptr<rvrse::SampleData>& sample) const;
 
   /// Internal sample load implementation. Must only be called from the UI thread
   /// or from UnserializeState (host-managed restore path).
-  void LoadSampleFromFile(const char* filePath);
+  void LoadSampleFromFile(const char* filePath, bool preserveTrim = false);
   void StartExportFromUI();
   bool HasReadyPreviewExportData() const;
   void QueueExportStatus(const char* statusText, int visibleFrames = -1);
@@ -149,15 +156,20 @@ private:
 
   // --- Sample data (offline → real-time handoff) ---
 
-  /// The loaded hit sample — written by background loader, read by audio thread.
-  std::shared_ptr<rvrse::SampleData> mHitSample;
-  std::mutex mSampleMutex; ///< Protects mHitSample swap (not held on audio thread)
+  /// Full original loaded sample for trim editing + offline processing.
+  std::shared_ptr<rvrse::SampleData> mSourceSample;
+  /// Next full playback sample awaiting coordinated commit with a matching riser.
+  std::shared_ptr<rvrse::SampleData> mPendingPlaySample;
+  std::mutex mSampleMutex; ///< Protects source/pending sample state (never held per-sample)
 
-  /// Audio-thread's local copy of the sample pointer (lock-free read)
+  /// Audio-thread's local copy of the full playback sample (resampled to output rate).
   std::shared_ptr<rvrse::SampleData> mPlaySample;
-
-  /// Set to true by loader thread when a new sample is ready for the audio thread
-  std::atomic<bool> mNewSampleReady { false };
+  rvrse::TrimRangeFrames mPendingTrimRangeRt; ///< Next committed trim range at playback sample rate
+  int mPendingSequenceId = 0; ///< Sequence id paired with mPendingPlaySample + mPendingTrimRangeRt
+  std::atomic<int> mLatestRequestedSequenceId { 0 };
+  std::atomic<int> mCommittedSequenceId { 0 };
+  std::atomic<int> mCommittedTrimStartFrame { 0 };
+  std::atomic<int> mCommittedTrimEndFrame { 0 };
 
   /// Current load state for UI feedback
   std::atomic<rvrse::ESampleLoadState> mLoadState { rvrse::ESampleLoadState::Empty };
@@ -184,6 +196,8 @@ private:
   float mLastLush = -1.0f;            ///< Last Lush value sent to processor
   double mLastRiserLength = -1.0;     ///< Last Riser Length sent to processor
   int mLastStretchQuality = -1;       ///< Last Stretch Quality sent to processor
+  double mLastTrimStartMs = -1.0;     ///< Last trim start sent to the processor
+  double mLastTrimEndMs = -1.0;       ///< Last trim end sent to the processor
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
   /// NOTE: shared_ptr read/write across threads is technically a data race in C++17.
@@ -198,7 +212,10 @@ private:
 
   // --- Waveform display state (UI thread only) ---
   std::shared_ptr<rvrse::RiserData> mWaveformLastRiser; ///< Last riser pointer fed to waveform
-  std::shared_ptr<rvrse::SampleData> mWaveformLastHit;  ///< Last hit pointer fed to waveform
+  std::shared_ptr<rvrse::SampleData> mWaveformLastCommittedHit; ///< Last committed hit sample fed to the top waveform
+  std::shared_ptr<rvrse::SampleData> mWaveformLastSourceHit;    ///< Last full source sample fed to the lower waveform
+  int mWaveformLastCommittedTrimStart = -1; ///< Last committed trim start for top waveform caching
+  int mWaveformLastCommittedTrimEnd = -1;   ///< Last committed trim end for top waveform caching
   std::vector<float> mWaveformMonoBuf; ///< Temp buffer for stereo→mono mix
 
   // --- UI-thread label updates from background loader ---

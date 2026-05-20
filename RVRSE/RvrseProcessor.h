@@ -10,6 +10,7 @@
 #include "Reverb.h"
 #include "SampleData.h"
 #include "TimeStretch.h"
+#include "TrimUtils.h"
 
 #include <algorithm>
 #include <atomic>
@@ -30,6 +31,7 @@ struct RiserData
   std::vector<float> mRight;   ///< Right channel of final_riser[]
   double mSampleRate = 0.0;    ///< Sample rate of the riser data
   int mBeatAlignedFrames = 0;  ///< Frame count at the exact beat boundary (before overlap)
+  int mSequenceId = 0;         ///< Sequence token for coordinated riser+hit commits
 
 #ifndef NDEBUG
   // Debug: intermediate pipeline buffers (populated alongside the main output)
@@ -68,11 +70,17 @@ public:
   // --- Setters (trigger async rebuild) ---
 
   /// Set the source hit sample. Triggers a full pipeline rebuild (reverb → reverse → stretch).
-  void setSample(std::shared_ptr<SampleData> sample)
+  int setSample(std::shared_ptr<SampleData> sample,
+                double trimStartMs = 0.0,
+                double trimEndMs = 0.0)
   {
+    int sequenceId = 0;
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       mSourceSample = std::move(sample);
+      mTrimStartMs = trimStartMs;
+      mTrimEndMs = trimEndMs;
+      sequenceId = ++mSequenceId;
       // Clear cached intermediate buffers since the source changed
       mCachedReversedL.clear();
       mCachedReversedR.clear();
@@ -82,6 +90,7 @@ public:
 #endif
     }
     rebuildAsync(EPipelineStage::Reverb);
+    return sequenceId;
   }
 
   /// Set the Lush amount (0.0–1.0). Triggers rebuild from reverb stage onwards.
@@ -100,6 +109,33 @@ public:
 #endif
     }
     rebuildAsync(EPipelineStage::Reverb);
+  }
+
+  /// Set manual sample trim in milliseconds from the original sample edges.
+  /// Triggers a full rebuild because the source slice changes.
+  int setTrimMs(double trimStartMs, double trimEndMs)
+  {
+    int sequenceId = 0;
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      if (std::abs(mTrimStartMs - trimStartMs) < 1e-9 &&
+          std::abs(mTrimEndMs - trimEndMs) < 1e-9)
+      {
+        return mSequenceId;
+      }
+
+      mTrimStartMs = trimStartMs;
+      mTrimEndMs = trimEndMs;
+      sequenceId = ++mSequenceId;
+      mCachedReversedL.clear();
+      mCachedReversedR.clear();
+#ifndef NDEBUG
+      mCachedReverbedL.clear();
+      mCachedReverbedR.clear();
+#endif
+    }
+    rebuildAsync(EPipelineStage::Reverb);
+    return sequenceId;
   }
 
   /// Set the riser length in beats. Only re-stretches (skips reverb + reverse).
@@ -178,6 +214,12 @@ public:
     return std::atomic_load(&mRiserOutput);
   }
 
+  /// Peek the latest published riser candidate without clearing the ready flag.
+  std::shared_ptr<RiserData> peekRiser() const
+  {
+    return std::atomic_load(&mRiserOutput);
+  }
+
   /// @return true if the pipeline is currently processing
   bool isProcessing() const { return mProcessing.load(std::memory_order_acquire); }
 
@@ -216,6 +258,7 @@ private:
     std::shared_ptr<SampleData> sample;
     double riserLengthBeats, bpm, sampleRate;
     EStretchQuality quality;
+    int sequenceId;
     std::vector<float> cachedRevL, cachedRevR;
 #ifndef NDEBUG
     std::vector<float> cachedRvbL, cachedRvbR;
@@ -228,6 +271,7 @@ private:
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
       quality = mStretchQuality;
+      sequenceId = mSequenceId;
       cachedRevL = mCachedReversedL;
       cachedRevR = mCachedReversedR;
 #ifndef NDEBUG
@@ -264,6 +308,7 @@ private:
     stretchBufferStereo(cachedRevL, cachedRevR, stretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
+    riser->mSequenceId = sequenceId;
 
     // Record where the exact beat boundary falls (before the overlap region)
     const double samplesPerBeat = (sampleRate * 60.0) / bpm;
@@ -302,8 +347,9 @@ private:
     // Snapshot parameters under lock
     std::shared_ptr<SampleData> sample;
     float lush;
-    double riserLengthBeats, bpm, sampleRate;
+    double riserLengthBeats, bpm, sampleRate, trimStartMs, trimEndMs;
     EStretchQuality quality;
+    int sequenceId;
     std::vector<float> cachedRevL, cachedRevR;
 #ifndef NDEBUG
     std::vector<float> cachedRvbL, cachedRvbR;
@@ -316,7 +362,10 @@ private:
       riserLengthBeats = mRiserLengthBeats;
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
+      trimStartMs = mTrimStartMs;
+      trimEndMs = mTrimEndMs;
       quality = mStretchQuality;
+      sequenceId = mSequenceId;
 
       if (fromStage == EPipelineStage::Stretch)
       {
@@ -357,17 +406,27 @@ private:
       std::vector<float> srcL, srcR;
       double processingRate;
 
+      const TrimRangeFrames trimRange = ResolveTrimRangeFrames(
+        sample->NumFrames(), sample->mSampleRate, trimStartMs, trimEndMs, kTrimMinRegionMs
+      );
+
       if (std::abs(sample->mSampleRate - sampleRate) > 0.5)
       {
-        resampleLinearStereo(sample->mLeft, sample->mRight,
+        std::vector<float> trimmedL(sample->mLeft.begin() + trimRange.mStartFrame,
+                                    sample->mLeft.begin() + trimRange.mEndFrameExclusive);
+        std::vector<float> trimmedR(sample->mRight.begin() + trimRange.mStartFrame,
+                                    sample->mRight.begin() + trimRange.mEndFrameExclusive);
+        resampleLinearStereo(trimmedL, trimmedR,
                              sample->mSampleRate, sampleRate,
                              srcL, srcR);
         processingRate = sampleRate;
       }
       else
       {
-        srcL = sample->mLeft;
-        srcR = sample->mRight;
+        srcL.assign(sample->mLeft.begin() + trimRange.mStartFrame,
+                    sample->mLeft.begin() + trimRange.mEndFrameExclusive);
+        srcR.assign(sample->mRight.begin() + trimRange.mStartFrame,
+                    sample->mRight.begin() + trimRange.mEndFrameExclusive);
         processingRate = sample->mSampleRate;
       }
 
@@ -465,6 +524,7 @@ private:
     stretchBufferStereo(reversedL, reversedR, stretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
+    riser->mSequenceId = sequenceId;
 
     // Record where the exact beat boundary falls (before the overlap region)
     const double samplesPerBeat = (sampleRate * 60.0) / bpm;
@@ -512,7 +572,10 @@ private:
   double mRiserLengthBeats = kRiserLengthValues[kRiserLengthDefault];
   double mBPM = kDefaultBPM;
   double mOutputSampleRate = 44100.0;
+  double mTrimStartMs = 0.0;
+  double mTrimEndMs = 0.0;
   EStretchQuality mStretchQuality = static_cast<EStretchQuality>(kStretchQualityDefault);
+  int mSequenceId = 0;
 
   // --- Cached intermediate buffers (protected by mParamMutex) ---
   std::vector<float> mCachedReversedL;

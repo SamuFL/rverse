@@ -152,6 +152,47 @@ void TryQueueExportProgress(const std::shared_ptr<RVRSE::ExportUiState>& uiState
   uiState->mPendingStatusFrames = -1;
 }
 
+std::shared_ptr<rvrse::SampleData> BuildPlaybackSampleFromSource(
+  const std::shared_ptr<rvrse::SampleData>& sourceSample,
+  double outputSampleRate)
+{
+  if (!sourceSample || !sourceSample->IsLoaded())
+    return {};
+
+  auto playbackSample = std::make_shared<rvrse::SampleData>(*sourceSample);
+  if (outputSampleRate <= 0.0 || std::abs(sourceSample->mSampleRate - outputSampleRate) <= 0.5)
+    return playbackSample;
+
+  auto resampled = std::make_shared<rvrse::SampleData>();
+  rvrse::resampleLinearStereo(sourceSample->mLeft, sourceSample->mRight,
+                              sourceSample->mSampleRate, outputSampleRate,
+                              resampled->mLeft, resampled->mRight);
+  resampled->mSampleRate = outputSampleRate;
+  resampled->mNumChannels = sourceSample->mNumChannels;
+  resampled->mFilePath = sourceSample->mFilePath;
+  resampled->mFileName = sourceSample->mFileName;
+  return resampled;
+}
+
+std::shared_ptr<rvrse::SampleData> BuildTrimmedSampleCopy(
+  const std::shared_ptr<rvrse::SampleData>& sample,
+  const rvrse::TrimRangeFrames& range)
+{
+  if (!sample || !sample->IsLoaded() || !range.IsValid())
+    return {};
+
+  auto trimmed = std::make_shared<rvrse::SampleData>();
+  trimmed->mLeft.assign(sample->mLeft.begin() + range.mStartFrame,
+                        sample->mLeft.begin() + range.mEndFrameExclusive);
+  trimmed->mRight.assign(sample->mRight.begin() + range.mStartFrame,
+                         sample->mRight.begin() + range.mEndFrameExclusive);
+  trimmed->mSampleRate = sample->mSampleRate;
+  trimmed->mNumChannels = sample->mNumChannels;
+  trimmed->mFilePath = sample->mFilePath;
+  trimmed->mFileName = sample->mFileName;
+  return trimmed;
+}
+
 } // namespace
 
 #if IPLUG_EDITOR
@@ -297,6 +338,12 @@ RVRSE::RVRSE(const InstanceInfo& info)
   GetParam(kParamStretchQuality)->InitEnum("Stretch Quality", rvrse::kStretchQualityDefault, {
     "High", "Low"
   });
+  GetParam(kParamTrimStartMs)->InitDouble("Trim Start",
+    0.0, 0.0, rvrse::kTrimMaxMs, 1.0, "ms", IParam::kFlagCannotAutomate, "",
+    IParam::ShapeLinear(), IParam::kUnitMilliseconds);
+  GetParam(kParamTrimEndMs)->InitDouble("Trim End",
+    0.0, 0.0, rvrse::kTrimMaxMs, 1.0, "ms", IParam::kFlagCannotAutomate, "",
+    IParam::ShapeLinear(), IParam::kUnitMilliseconds);
 
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
@@ -447,7 +494,10 @@ RVRSE::RVRSE(const InstanceInfo& info)
 
     // Reset waveform tracking so OnIdle re-feeds data to the new controls
     mWaveformLastRiser.reset();
-    mWaveformLastHit.reset();
+    mWaveformLastCommittedHit.reset();
+    mWaveformLastSourceHit.reset();
+    mWaveformLastCommittedTrimStart = -1;
+    mWaveformLastCommittedTrimEnd = -1;
 
     // Main background
     pGraphics->AttachPanelBackground(kColorDark);
@@ -733,6 +783,12 @@ RVRSE::RVRSE(const InstanceInfo& info)
       .GetReducedFromTop(140.f)   // below volume knob
       .GetReducedFromBottom(84.f); // above logo/donate
     pGraphics->AttachControl(new rvrse::HitPreviewControl(hitPreviewArea), kCtrlTagHitPreview);
+    if (auto* pHitPreview = static_cast<rvrse::HitPreviewControl*>(pGraphics->GetControlWithTag(kCtrlTagHitPreview)))
+    {
+      pHitPreview->SetTrimCommitCallback([this](double trimStartMs, double trimEndMs) {
+        CommitTrimParameters(trimStartMs, trimEndMs);
+      });
+    }
 
     // Logo (PNG bitmap) — lower-right
     const IBitmap logoBitmap = pGraphics->LoadBitmap(LOGO_FN);
@@ -777,10 +833,9 @@ RVRSE::RVRSE(const InstanceInfo& info)
            kCtrlTagHitSectionLabel,
            kCtrlTagExportStatus,
            kCtrlTagMasterVolLabel,
-           kCtrlTagMasterVolValue,
-           kCtrlTagHitPreview,
-           kCtrlTagLogo
-         })
+            kCtrlTagMasterVolValue,
+            kCtrlTagLogo
+          })
     {
       if (auto* pCtrl = pGraphics->GetControlWithTag(tag))
         pCtrl->SetIgnoreMouse(true);
@@ -822,22 +877,43 @@ RVRSE::RVRSE(const InstanceInfo& info)
 #endif
 }
 
+void RVRSE::OnParamChange(int paramIdx, EParamSource source, int sampleOffset)
+{
+  Plugin::OnParamChange(paramIdx, source, sampleOffset);
+
+  if (paramIdx == kParamTrimStartMs || paramIdx == kParamTrimEndMs)
+    QueueSequenceForCurrentTrim();
+}
+
 void RVRSE::ClearLoadedSampleState()
 {
   mSampleFilePath.clear();
 
   {
     std::lock_guard<std::mutex> lock(mSampleMutex);
-    mHitSample.reset();
+    mSourceSample.reset();
+    mPendingPlaySample.reset();
+    mPendingTrimRangeRt = {};
+    mPendingSequenceId = 0;
   }
 
   std::atomic_store(&mPlaySample, std::shared_ptr<rvrse::SampleData> {});
   std::atomic_store(&mRiserBuffer, std::shared_ptr<rvrse::RiserData> {});
-  mProcessor.setSample(nullptr);
-  mNewSampleReady.store(false, std::memory_order_release);
+  mProcessor.setSample(nullptr, 0.0, 0.0);
+  mLatestRequestedSequenceId.store(0, std::memory_order_release);
+  mCommittedSequenceId.store(0, std::memory_order_release);
+  mCommittedTrimStartFrame.store(0, std::memory_order_release);
+  mCommittedTrimEndFrame.store(0, std::memory_order_release);
   mLoadState.store(rvrse::ESampleLoadState::Empty);
   mRiserPos.store(-1, std::memory_order_relaxed);
   mHitPos.store(-1, std::memory_order_relaxed);
+  mLastTrimStartMs = -1.0;
+  mLastTrimEndMs = -1.0;
+  mWaveformLastRiser.reset();
+  mWaveformLastCommittedHit.reset();
+  mWaveformLastSourceHit.reset();
+  mWaveformLastCommittedTrimStart = -1;
+  mWaveformLastCommittedTrimEnd = -1;
 }
 
 void RVRSE::QueueSampleLoadError(const char* errorMessage, bool clearLoadedState)
@@ -855,6 +931,102 @@ bool RVRSE::HasReadyPreviewExportData() const
   return mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
          playbackHit && playbackHit->IsLoaded() &&
          riser && riser->IsReady();
+}
+
+rvrse::TrimRangeFrames RVRSE::GetCommittedTrimRangeForSample(
+  const std::shared_ptr<rvrse::SampleData>& sample) const
+{
+  if (!sample || !sample->IsLoaded())
+    return {};
+
+  return {
+    mCommittedTrimStartFrame.load(std::memory_order_acquire),
+    mCommittedTrimEndFrame.load(std::memory_order_acquire)
+  };
+}
+
+void RVRSE::CommitTrimParameters(double trimStartMs, double trimEndMs)
+{
+#if IPLUG_EDITOR
+  if (!GetUI())
+    return;
+
+  auto sendTrimParam = [&](int paramIdx, double value) {
+    BeginInformHostOfParamChangeFromUI(paramIdx);
+    SendParameterValueFromUI(paramIdx, GetParam(paramIdx)->ToNormalized(value));
+    EndInformHostOfParamChangeFromUI(paramIdx);
+  };
+
+  sendTrimParam(kParamTrimStartMs, trimStartMs);
+  sendTrimParam(kParamTrimEndMs, trimEndMs);
+#else
+  (void) trimStartMs;
+  (void) trimEndMs;
+#endif
+}
+
+void RVRSE::QueueSequenceForCurrentTrim()
+{
+  std::shared_ptr<rvrse::SampleData> sourceSample;
+  {
+    std::lock_guard<std::mutex> lock(mSampleMutex);
+    sourceSample = mSourceSample;
+  }
+
+  if (!sourceSample || !sourceSample->IsLoaded())
+    return;
+
+  double trimStartMs = GetParam(kParamTrimStartMs)->Value();
+  double trimEndMs = GetParam(kParamTrimEndMs)->Value();
+
+  const auto sourceTrimRange = rvrse::ResolveTrimRangeFrames(
+    sourceSample->NumFrames(), sourceSample->mSampleRate, trimStartMs, trimEndMs, rvrse::kTrimMinRegionMs
+  );
+  const double normalizedTrimStartMs = rvrse::TrimRangeToStartMs(sourceTrimRange, sourceSample->mSampleRate);
+  const double normalizedTrimEndMs = rvrse::TrimRangeToEndMs(sourceTrimRange, sourceSample->NumFrames(), sourceSample->mSampleRate);
+
+  if (std::abs(trimStartMs - normalizedTrimStartMs) > 0.5)
+  {
+    GetParam(kParamTrimStartMs)->Set(normalizedTrimStartMs);
+    if (GetUI())
+      SendParameterValueFromDelegate(kParamTrimStartMs, normalizedTrimStartMs, false);
+    trimStartMs = normalizedTrimStartMs;
+  }
+
+  if (std::abs(trimEndMs - normalizedTrimEndMs) > 0.5)
+  {
+    GetParam(kParamTrimEndMs)->Set(normalizedTrimEndMs);
+    if (GetUI())
+      SendParameterValueFromDelegate(kParamTrimEndMs, normalizedTrimEndMs, false);
+    trimEndMs = normalizedTrimEndMs;
+  }
+
+  const int sequenceId = mProcessor.setTrimMs(trimStartMs, trimEndMs);
+  mLatestRequestedSequenceId.store(sequenceId, std::memory_order_release);
+  mLastTrimStartMs = trimStartMs;
+  mLastTrimEndMs = trimEndMs;
+
+  const double outputSampleRate = GetSampleRate();
+  std::thread([this, sourceSample, trimStartMs, trimEndMs, outputSampleRate, sequenceId]() {
+    auto playbackSample = BuildPlaybackSampleFromSource(sourceSample, outputSampleRate);
+    if (!playbackSample || !playbackSample->IsLoaded())
+      return;
+
+    const auto playbackTrimRange = rvrse::ResolveTrimRangeFrames(
+      playbackSample->NumFrames(), playbackSample->mSampleRate, trimStartMs, trimEndMs, rvrse::kTrimMinRegionMs
+    );
+
+    if (mLatestRequestedSequenceId.load(std::memory_order_acquire) != sequenceId)
+      return;
+
+    std::lock_guard<std::mutex> lock(mSampleMutex);
+    if (mLatestRequestedSequenceId.load(std::memory_order_acquire) != sequenceId)
+      return;
+
+    mPendingPlaySample = playbackSample;
+    mPendingTrimRangeRt = playbackTrimRange;
+    mPendingSequenceId = sequenceId;
+  }).detach();
 }
 
 void RVRSE::QueueExportStatus(const char* statusText, int visibleFrames)
@@ -887,8 +1059,10 @@ void RVRSE::StartExportFromUI()
 
       const auto hit = std::atomic_load(&mPlaySample);
       const auto riser = std::atomic_load(&mRiserBuffer);
+      const auto committedTrimRange = GetCommittedTrimRangeForSample(hit);
       const bool canExport = mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
                              hit && hit->IsLoaded() &&
+                             committedTrimRange.IsValid() &&
                              riser && riser->IsReady();
 
       if (!canExport)
@@ -914,9 +1088,10 @@ void RVRSE::StartExportFromUI()
         TryQueueExportProgress(exportUiState, exportOpState);
       }).detach();
 
-      std::thread([exportUiState, exportOpState, exportPath = normalizedExportPath, hit, riser, renderConfig]() {
+      auto trimmedHit = BuildTrimmedSampleCopy(hit, committedTrimRange);
+      std::thread([exportUiState, exportOpState, exportPath = normalizedExportPath, hit = trimmedHit, riser, renderConfig]() {
         rvrse::ExportRenderData renderedAudio;
-        if (!rvrse::RenderNormalExport(*riser, *hit, renderConfig, renderedAudio))
+        if (!hit || !rvrse::RenderNormalExport(*riser, *hit, renderConfig, renderedAudio))
         {
           exportOpState->mCompleted.store(true, std::memory_order_release);
           exportUiState->mInProgress.store(false, std::memory_order_release);
@@ -1187,11 +1362,12 @@ void RVRSE::OnIdle()
     {
       const auto riser = std::atomic_load(&mRiserBuffer);
       const auto playbackHit = std::atomic_load(&mPlaySample);
-      std::shared_ptr<rvrse::SampleData> hit;
+      const auto committedTrimRange = GetCommittedTrimRangeForSample(playbackHit);
+      std::shared_ptr<rvrse::SampleData> sourceHit;
 
       {
         std::lock_guard<std::mutex> lock(mSampleMutex);
-        hit = mHitSample;
+        sourceHit = mSourceSample;
       }
 
       // Feed riser data when pointer changes
@@ -1210,27 +1386,57 @@ void RVRSE::OnIdle()
         mWaveformLastRiser.reset();
       }
 
-      // Feed hit data when pointer changes
-      if (hit && hit->IsLoaded() && hit != mWaveformLastHit)
+      // Feed committed trimmed hit data to the top waveform only when the armed sequence changes
+      if (playbackHit && playbackHit->IsLoaded() && committedTrimRange.IsValid() &&
+          (playbackHit != mWaveformLastCommittedHit ||
+           committedTrimRange.mStartFrame != mWaveformLastCommittedTrimStart ||
+           committedTrimRange.mEndFrameExclusive != mWaveformLastCommittedTrimEnd))
       {
-        const int nFrames = hit->NumFrames();
+        const int nFrames = committedTrimRange.NumFrames();
         mWaveformMonoBuf.resize(nFrames);
         for (int i = 0; i < nFrames; ++i)
-          mWaveformMonoBuf[i] = (hit->mLeft[i] + (hit->mNumChannels > 1 ? hit->mRight[i] : hit->mLeft[i])) * 0.5f;
+        {
+          const int sampleIdx = committedTrimRange.mStartFrame + i;
+          mWaveformMonoBuf[i] = (playbackHit->mLeft[sampleIdx] +
+                                (playbackHit->mNumChannels > 1 ? playbackHit->mRight[sampleIdx] : playbackHit->mLeft[sampleIdx])) * 0.5f;
+        }
         pWaveform->SetHitData(mWaveformMonoBuf.data(), nFrames);
-
-        // Also feed the hit preview control
-        if (pHitPreview)
-          pHitPreview->SetData(mWaveformMonoBuf.data(), nFrames);
-
-        mWaveformLastHit = hit;
+        mWaveformLastCommittedHit = playbackHit;
+        mWaveformLastCommittedTrimStart = committedTrimRange.mStartFrame;
+        mWaveformLastCommittedTrimEnd = committedTrimRange.mEndFrameExclusive;
       }
-      else if (!hit && mWaveformLastHit)
+      else if ((!playbackHit || !committedTrimRange.IsValid()) && mWaveformLastCommittedHit)
       {
         pWaveform->SetHitData(nullptr, 0);
-        if (pHitPreview)
-          pHitPreview->SetData(nullptr, 0);
-        mWaveformLastHit.reset();
+        mWaveformLastCommittedHit.reset();
+        mWaveformLastCommittedTrimStart = -1;
+        mWaveformLastCommittedTrimEnd = -1;
+      }
+
+      // Feed the lower/original hit preview from the full original sample
+      if (pHitPreview && sourceHit && sourceHit->IsLoaded() && sourceHit != mWaveformLastSourceHit)
+      {
+        const int nFrames = sourceHit->NumFrames();
+        mWaveformMonoBuf.resize(nFrames);
+        for (int i = 0; i < nFrames; ++i)
+          mWaveformMonoBuf[i] = (sourceHit->mLeft[i] +
+                                (sourceHit->mNumChannels > 1 ? sourceHit->mRight[i] : sourceHit->mLeft[i])) * 0.5f;
+        pHitPreview->SetData(mWaveformMonoBuf.data(), nFrames, sourceHit->mSampleRate);
+        mWaveformLastSourceHit = sourceHit;
+      }
+      else if (pHitPreview && !sourceHit && mWaveformLastSourceHit)
+      {
+        pHitPreview->SetData(nullptr, 0, 0.0);
+        mWaveformLastSourceHit.reset();
+      }
+
+      if (pHitPreview)
+      {
+        const double trimStartMs = GetParam(kParamTrimStartMs)->Value();
+        const double trimEndMs = GetParam(kParamTrimEndMs)->Value();
+        pHitPreview->SetCommittedTrimMs(trimStartMs, trimEndMs);
+        pHitPreview->SetEditable(sourceHit && sourceHit->IsLoaded() &&
+                                 rvrse::CanEditTrim(sourceHit->NumFrames(), sourceHit->mSampleRate, rvrse::kTrimMinRegionMs));
       }
 
       // Update visual volume and fade-in envelope
@@ -1239,9 +1445,9 @@ void RVRSE::OnIdle()
       pWaveform->SetFadeInFrac(static_cast<float>(GetParam(kParamFadeIn)->Value()) / 100.f);
 
       // Update playhead position
-      if (riser && playbackHit)
+      if (riser && committedTrimRange.IsValid())
       {
-        const int totalFrames = riser->NumFrames() + playbackHit->NumFrames();
+        const int totalFrames = riser->NumFrames() + committedTrimRange.NumFrames();
         if (totalFrames > 0)
         {
           float pos = -1.f;
@@ -1273,7 +1479,7 @@ void RVRSE::ShowUnsupportedFormatError(const char* errorMessage)
 }
 #endif
 
-void RVRSE::LoadSampleFromFile(const char* filePath)
+void RVRSE::LoadSampleFromFile(const char* filePath, bool preserveTrim)
 {
   mSampleFilePath = filePath;
   mLoadState.store(rvrse::ESampleLoadState::Loading);
@@ -1293,6 +1499,19 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
     }
   }
 
+  if (!preserveTrim)
+  {
+    GetParam(kParamTrimStartMs)->Set(0.0);
+    GetParam(kParamTrimEndMs)->Set(0.0);
+    if (GetUI())
+    {
+      SendParameterValueFromDelegate(kParamTrimStartMs, 0.0, false);
+      SendParameterValueFromDelegate(kParamTrimEndMs, 0.0, false);
+    }
+    mLastTrimStartMs = 0.0;
+    mLastTrimEndMs = 0.0;
+  }
+
   // Do the actual loading on a background thread to avoid blocking the UI
   std::string pathCopy(filePath);
   std::thread([this, pathCopy]() {
@@ -1301,36 +1520,40 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
     if (result.success)
     {
       auto newSample = std::make_shared<rvrse::SampleData>(std::move(result.data));
+      const double trimStartMs = GetParam(kParamTrimStartMs)->Value();
+      const double trimEndMs = GetParam(kParamTrimEndMs)->Value();
+      const auto sourceTrimRange = rvrse::ResolveTrimRangeFrames(
+        newSample->NumFrames(), newSample->mSampleRate, trimStartMs, trimEndMs, rvrse::kTrimMinRegionMs
+      );
+      const double normalizedTrimStartMs = rvrse::TrimRangeToStartMs(sourceTrimRange, newSample->mSampleRate);
+      const double normalizedTrimEndMs = rvrse::TrimRangeToEndMs(sourceTrimRange, newSample->NumFrames(), newSample->mSampleRate);
 
-      // Resample the hit to the DAW's output sample rate if they differ.
-      // This ensures ProcessBlock can play it sample-by-sample at the correct pitch.
-      const double outputSR = GetSampleRate();
-      auto playSample = newSample;
+      if (std::abs(trimStartMs - normalizedTrimStartMs) > 0.5)
+        GetParam(kParamTrimStartMs)->Set(normalizedTrimStartMs);
+      if (std::abs(trimEndMs - normalizedTrimEndMs) > 0.5)
+        GetParam(kParamTrimEndMs)->Set(normalizedTrimEndMs);
 
-      if (outputSR > 0.0 && std::abs(newSample->mSampleRate - outputSR) > 0.5)
-      {
-        auto resampled = std::make_shared<rvrse::SampleData>();
-        rvrse::resampleLinearStereo(newSample->mLeft, newSample->mRight,
-                                    newSample->mSampleRate, outputSR,
-                                    resampled->mLeft, resampled->mRight);
-        resampled->mSampleRate = outputSR;
-        resampled->mNumChannels = newSample->mNumChannels;
-        resampled->mFilePath = newSample->mFilePath;
-        resampled->mFileName = newSample->mFileName;
-        playSample = resampled;
-      }
+      auto playSample = BuildPlaybackSampleFromSource(newSample, GetSampleRate());
+      const auto playbackTrimRange = playSample
+        ? rvrse::ResolveTrimRangeFrames(
+            playSample->NumFrames(), playSample->mSampleRate,
+            normalizedTrimStartMs, normalizedTrimEndMs, rvrse::kTrimMinRegionMs)
+        : rvrse::TrimRangeFrames {};
+
+      const int sequenceId = mProcessor.setSample(newSample, normalizedTrimStartMs, normalizedTrimEndMs);
+      mLatestRequestedSequenceId.store(sequenceId, std::memory_order_release);
 
       {
         std::lock_guard<std::mutex> lock(mSampleMutex);
-        mHitSample = playSample;
+        mSourceSample = newSample;
+        mPendingPlaySample = playSample;
+        mPendingTrimRangeRt = playbackTrimRange;
+        mPendingSequenceId = sequenceId;
       }
 
-      // Signal the audio thread that a new sample is ready
-      mNewSampleReady.store(true, std::memory_order_release);
       mLoadState.store(rvrse::ESampleLoadState::Ready);
-
-      // Feed the ORIGINAL sample into the offline pipeline (it resamples internally)
-      mProcessor.setSample(newSample);
+      mLastTrimStartMs = normalizedTrimStartMs;
+      mLastTrimEndMs = normalizedTrimEndMs;
 
       {
         WDL_String displayStr;
@@ -1343,6 +1566,7 @@ void RVRSE::LoadSampleFromFile(const char* filePath)
         std::lock_guard<std::mutex> lock(mStatusTextMutex);
         mPendingSampleStatusText = displayStr.Get();
       }
+
     }
     else
     {
@@ -1380,7 +1604,7 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
     {
       if (std::filesystem::is_regular_file(restoredPath))
       {
-        LoadSampleFromFile(restoredPath.c_str());
+        LoadSampleFromFile(restoredPath.c_str(), true);
       }
       else
       {
@@ -1517,25 +1741,51 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     mProcessor.setStretchQuality(stretchQuality, offline);
   }
 
-  // Check if a new sample is ready from the loader thread (lock-free flag)
-  if (mNewSampleReady.load(std::memory_order_acquire))
+  // Check if a new riser buffer is ready from the offline pipeline (lock-free).
+  // Sequence changes (sample/trim) commit the hit source + trim bounds together
+  // with the matching riser; ordinary offline rebuilds only swap the riser.
+  if (mProcessor.isNewRiserReady() && mRiserPos < 0 && mHitPos < 0)
   {
+    const auto pendingRiser = mProcessor.peekRiser();
+    std::shared_ptr<rvrse::SampleData> pendingPlaySample;
+    rvrse::TrimRangeFrames pendingTrimRange;
+    int pendingSequenceId = 0;
+
     {
       std::lock_guard<std::mutex> lock(mSampleMutex);
-      std::atomic_store(&mPlaySample, mHitSample);
+      pendingPlaySample = mPendingPlaySample;
+      pendingTrimRange = mPendingTrimRangeRt;
+      pendingSequenceId = mPendingSequenceId;
     }
-    mNewSampleReady.store(false, std::memory_order_release);
-    // Reset all voice state when new sample arrives
-    mRiserPos = -1;
-    mHitPos = -1;
-    mSamplesFromNoteOn = -1;
-  }
 
-  // Check if a new riser buffer is ready from the offline pipeline (lock-free).
-  // Latch: only swap when no riser is actively playing to avoid mid-note discontinuities.
-  if (mProcessor.isNewRiserReady() && mRiserPos < 0)
-  {
-    std::atomic_store(&mRiserBuffer, mProcessor.consumeRiser());
+    if (pendingRiser && pendingRiser->IsReady() &&
+        pendingSequenceId > 0 &&
+        pendingPlaySample && pendingPlaySample->IsLoaded() &&
+        pendingRiser->mSequenceId == pendingSequenceId)
+    {
+      std::atomic_store(&mPlaySample, pendingPlaySample);
+      mCommittedTrimStartFrame.store(pendingTrimRange.mStartFrame, std::memory_order_release);
+      mCommittedTrimEndFrame.store(pendingTrimRange.mEndFrameExclusive, std::memory_order_release);
+      mCommittedSequenceId.store(pendingSequenceId, std::memory_order_release);
+      std::atomic_store(&mRiserBuffer, mProcessor.consumeRiser());
+
+      {
+        std::lock_guard<std::mutex> lock(mSampleMutex);
+        if (mPendingSequenceId == pendingSequenceId)
+        {
+          mPendingPlaySample.reset();
+          mPendingTrimRangeRt = {};
+          mPendingSequenceId = 0;
+        }
+      }
+
+      mSamplesFromNoteOn = -1;
+    }
+    else if (pendingRiser && pendingRiser->IsReady() &&
+             pendingRiser->mSequenceId == mCommittedSequenceId.load(std::memory_order_acquire))
+    {
+      std::atomic_store(&mRiserBuffer, mProcessor.consumeRiser());
+    }
   }
 
   // Get local pointers — no further locking needed
@@ -1546,6 +1796,9 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // loads on every access; written back after the loop for UI thread visibility)
   int riserPos = mRiserPos.load(std::memory_order_relaxed);
   int hitPos   = mHitPos.load(std::memory_order_relaxed);
+  const int hitTrimStart = mCommittedTrimStartFrame.load(std::memory_order_relaxed);
+  const int hitTrimEnd = mCommittedTrimEndFrame.load(std::memory_order_relaxed);
+  const int hitTrimLength = std::max(0, hitTrimEnd - hitTrimStart);
 
   PreviewCommand previewCommand;
   while (mPreviewCommandQueue.Pop(previewCommand))
@@ -1684,7 +1937,7 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     // --- Check if it's time to fire the hit ---
     if (mSamplesFromNoteOn >= 0 && hitPos < 0)
     {
-      if (mSamplesFromNoteOn >= mHitOffset && hit && hit->IsLoaded())
+      if (mSamplesFromNoteOn >= mHitOffset && hit && hit->IsLoaded() && hitTrimLength > 0)
       {
         hitPos = 0; // Fire the hit!
       }
@@ -1697,10 +1950,11 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
     if (hitPos >= 0 && hit && hit->IsLoaded())
     {
-      if (hitPos < hit->NumFrames())
+      if (hitPos < hitTrimLength)
       {
-        hitL = hit->mLeft[hitPos] * mVelocityGain * hitVolumeGain;
-        hitR = hit->mRight[hitPos] * mVelocityGain * hitVolumeGain;
+        const int sampleIdx = hitTrimStart + hitPos;
+        hitL = hit->mLeft[sampleIdx] * mVelocityGain * hitVolumeGain;
+        hitR = hit->mRight[sampleIdx] * mVelocityGain * hitVolumeGain;
 
         if (mHitFadeRemaining > 0)
         {

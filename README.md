@@ -51,9 +51,10 @@ The built plugins appear in `build/RVRSE/` — see [Plugin Formats](#plugin-form
 ## How It Works
 
 1. **Load** a one-shot hit sample (uncompressed WAV or AIFF) via the LOAD SAMPLE button.
-2. **Preview** the sound either by clicking the waveform-panel **Play** button (centered below the waveform) or by playing a MIDI note.
-3. **Export** the current normal riser+hit result from the header **Export** button to a 24-bit WAV file in one step.
-4. The riser is your hit sample processed through reverb → reversed → time-stretched to match
+2. **Trim** the source on the lower hit waveform by dragging the front/back handles; the dimmed outer regions are excluded, but the original file stays preserved internally.
+3. **Preview** the sound either by clicking the waveform-panel **Play** button (centered below the waveform) or by playing a MIDI note.
+4. **Export** the current normal riser+hit result from the header **Export** button to a 24-bit WAV file in one step.
+5. The riser is your hit sample processed through reverb → reversed → time-stretched to match
    the configured riser length (default: 4 beats at host BPM).
 
 ```
@@ -65,6 +66,9 @@ MIDI Note-On                                         Hit fires here
 
 Because the riser IS the hit reversed and reverbed, the timbral build-up always matches the
 impact perfectly.
+
+The upper waveform always shows the currently committed playable sequence (processed riser +
+trimmed hit), while the lower hit waveform is the edit surface for the original loaded sample.
 
 ---
 
