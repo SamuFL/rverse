@@ -133,6 +133,38 @@ TEST_CASE("BufferUtils: applyTailFadeOut", "[bufferutils]")
   }
 }
 
+TEST_CASE("BufferUtils: applyRegionEdgeFadeStereo", "[bufferutils]")
+{
+  SECTION("Applies short fade at region boundaries")
+  {
+    std::vector<float> left(20, 1.0f);
+    std::vector<float> right(20, 1.0f);
+
+    applyRegionEdgeFadeStereo(left, right, 5, 15, 2);
+
+    REQUIRE(left[4] == Approx(1.0f));
+    REQUIRE(left[5] == Approx(0.5f).margin(0.001f));
+    REQUIRE(left[6] == Approx(1.0f).margin(0.001f));
+    REQUIRE(left[13] == Approx(0.5f).margin(0.001f));
+    REQUIRE(left[14] == Approx(0.0f).margin(0.001f));
+    REQUIRE(right[5] == Approx(0.5f).margin(0.001f));
+    REQUIRE(right[14] == Approx(0.0f).margin(0.001f));
+  }
+
+  SECTION("Clamps fade to half the region length")
+  {
+    std::vector<float> left(6, 1.0f);
+    std::vector<float> right(6, 1.0f);
+
+    applyRegionEdgeFadeStereo(left, right, 1, 5, 10);
+
+    REQUIRE(left[1] < 1.0f);
+    REQUIRE(left[4] < 1.0f);
+    REQUIRE(left[0] == Approx(1.0f));
+    REQUIRE(right[0] == Approx(1.0f));
+  }
+}
+
 // ---------------------------------------------------------------------------
 // trimTrailingSilence
 // ---------------------------------------------------------------------------

@@ -139,6 +139,7 @@ static_assert(kRiserOverlapBeatsMax <= 1.0,
 constexpr double kDefaultBPM         = 120.0;
 constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration in milliseconds (anti-click)
 constexpr double kStutterFadeMs      = 2.0;    ///< Stutter gate ramp duration in milliseconds (anti-click)
+constexpr double kTrimEdgeFadeMs     = 2.0;    ///< Trim-edge fade for hit-region boundary conditioning
 
 // --- Sample Loading ---
 constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample length in seconds

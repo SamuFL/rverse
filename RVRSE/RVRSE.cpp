@@ -186,6 +186,8 @@ std::shared_ptr<rvrse::SampleData> BuildTrimmedSampleCopy(
                         sample->mLeft.begin() + range.mEndFrameExclusive);
   trimmed->mRight.assign(sample->mRight.begin() + range.mStartFrame,
                          sample->mRight.begin() + range.mEndFrameExclusive);
+  const int fadeFrames = rvrse::TrimMsToFrames(rvrse::kTrimEdgeFadeMs, sample->mSampleRate);
+  rvrse::applyRegionEdgeFadeStereo(trimmed->mLeft, trimmed->mRight, 0, trimmed->NumFrames(), fadeFrames);
   trimmed->mSampleRate = sample->mSampleRate;
   trimmed->mNumChannels = sample->mNumChannels;
   trimmed->mFilePath = sample->mFilePath;
@@ -1015,6 +1017,10 @@ void RVRSE::QueueSequenceForCurrentTrim()
     const auto playbackTrimRange = rvrse::ResolveTrimRangeFrames(
       playbackSample->NumFrames(), playbackSample->mSampleRate, trimStartMs, trimEndMs, rvrse::kTrimMinRegionMs
     );
+    const int fadeFrames = rvrse::TrimMsToFrames(rvrse::kTrimEdgeFadeMs, playbackSample->mSampleRate);
+    rvrse::applyRegionEdgeFadeStereo(playbackSample->mLeft, playbackSample->mRight,
+                                     playbackTrimRange.mStartFrame, playbackTrimRange.mEndFrameExclusive,
+                                     fadeFrames);
 
     if (mLatestRequestedSequenceId.load(std::memory_order_acquire) != sequenceId)
       return;
@@ -1539,6 +1545,13 @@ void RVRSE::LoadSampleFromFile(const char* filePath, bool preserveTrim)
             playSample->NumFrames(), playSample->mSampleRate,
             normalizedTrimStartMs, normalizedTrimEndMs, rvrse::kTrimMinRegionMs)
         : rvrse::TrimRangeFrames {};
+      if (playSample && playSample->IsLoaded())
+      {
+        const int fadeFrames = rvrse::TrimMsToFrames(rvrse::kTrimEdgeFadeMs, playSample->mSampleRate);
+        rvrse::applyRegionEdgeFadeStereo(playSample->mLeft, playSample->mRight,
+                                         playbackTrimRange.mStartFrame, playbackTrimRange.mEndFrameExclusive,
+                                         fadeFrames);
+      }
 
       const int sequenceId = mProcessor.setSample(newSample, normalizedTrimStartMs, normalizedTrimEndMs);
       mLatestRequestedSequenceId.store(sequenceId, std::memory_order_release);
