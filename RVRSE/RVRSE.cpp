@@ -882,7 +882,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
 
 void RVRSE::OnParamChange(int paramIdx, EParamSource source, int sampleOffset)
 {
-  Plugin::OnParamChange(paramIdx, source, sampleOffset);
+  iplug::Plugin::OnParamChange(paramIdx, source, sampleOffset);
 
   if (paramIdx == kParamTrimStartMs || paramIdx == kParamTrimEndMs)
     QueueSequenceForCurrentTrim();
