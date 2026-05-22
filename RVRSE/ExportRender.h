@@ -48,7 +48,7 @@ inline bool RenderNormalExport(const RiserData& riser,
   if (riserFrames <= 0 || hitFrames <= 0)
     return false;
 
-  const int hitOffset = std::max(0, riser.mBeatAlignedFrames);
+  const int hitOffset = riser.HitStartFrame();
   const int totalFrames = std::max(riserFrames, hitOffset + hitFrames);
   if (totalFrames <= 0)
     return false;

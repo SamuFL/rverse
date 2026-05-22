@@ -10,6 +10,7 @@
 #include "Reverb.h"
 #include "SampleData.h"
 #include "TimeStretch.h"
+#include "TransitionTiming.h"
 #include "TrimUtils.h"
 
 #include <algorithm>
@@ -30,7 +31,10 @@ struct RiserData
   std::vector<float> mLeft;    ///< Left channel of final_riser[] (stretched + faded)
   std::vector<float> mRight;   ///< Right channel of final_riser[]
   double mSampleRate = 0.0;    ///< Sample rate of the riser data
-  int mBeatAlignedFrames = 0;  ///< Frame count at the exact beat boundary (before overlap)
+  int mBeatAlignedFrames = 0;  ///< Frame count at the exact musical beat anchor
+  int mEffectiveSeamFrames = 0; ///< Full seam-conditioning window (R)
+  int mRiserPostBeatFrames = 0; ///< Riser extension past the beat (R/2)
+  int mHitPreBeatFrames = 0;    ///< Early hit start before the beat (H/2)
   int mSequenceId = 0;         ///< Sequence token for coordinated riser+hit commits
 
 #ifndef NDEBUG
@@ -43,6 +47,7 @@ struct RiserData
 
   int NumFrames() const { return static_cast<int>(mLeft.size()); }
   bool IsReady() const { return !mLeft.empty() && mSampleRate > 0.0; }
+  int HitStartFrame() const { return std::max(0, mBeatAlignedFrames - mHitPreBeatFrames); }
 
 #ifndef NDEBUG
   /// @return Number of frames in the reverbed debug buffer
@@ -287,32 +292,19 @@ private:
       return;
     }
 
-    // --- Synchronous stretch ---
-    // Compute stretch factor for the base riser length (on-beat target)
-    const double baseStretchFactor = calcStretchFactor(
+    const TransitionTiming transitionTiming = CalculateTransitionTiming(
       static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate
     );
 
-    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
-    // get a longer crossfade to mask the smeared transient tail
-    const double overlapBeats = std::min(
-      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
-      kRiserOverlapBeatsMax
-    );
-    const double totalBeats = riserLengthBeats + overlapBeats;
-    const double stretchFactor = calcStretchFactor(
-      static_cast<int>(cachedRevL.size()), totalBeats, bpm, sampleRate
-    );
-
     auto riser = std::make_shared<RiserData>();
-    stretchBufferStereo(cachedRevL, cachedRevR, stretchFactor,
+    stretchBufferStereo(cachedRevL, cachedRevR, transitionTiming.mStretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
     riser->mSequenceId = sequenceId;
-
-    // Record where the exact beat boundary falls (before the overlap region)
-    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
+    riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;
+    riser->mEffectiveSeamFrames = transitionTiming.mEffectiveSeamFrames;
+    riser->mRiserPostBeatFrames = transitionTiming.mRiserPostBeatFrames;
+    riser->mHitPreBeatFrames = transitionTiming.mHitPreBeatFrames;
 
 #ifndef NDEBUG
     riser->mReverbedL = std::move(cachedRvbL);
@@ -321,15 +313,9 @@ private:
     riser->mReversedR = std::move(cachedRevR);
 #endif
 
-    // Tail fade-out — when enabled, scale with overlap so the fade covers the full overlap region
-    if (kRiserTailFadeBeats > 0.0)
+    if (transitionTiming.mEffectiveSeamFrames > 0)
     {
-      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
-      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
-      if (fadeSamples > 0)
-      {
-        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
-      }
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mEffectiveSeamFrames);
     }
 
     // Only publish if no newer rebuild has been requested
@@ -503,32 +489,19 @@ private:
       return;
     }
 
-    // --- Stage 3: Time-Stretch ---
-    // Compute stretch factor for the base riser length (on-beat target)
-    const double baseStretchFactor = calcStretchFactor(
+    const TransitionTiming transitionTiming = CalculateTransitionTiming(
       static_cast<int>(reversedL.size()), riserLengthBeats, bpm, sampleRate
     );
 
-    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
-    // get a longer crossfade to mask the smeared transient tail
-    const double overlapBeats = std::min(
-      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
-      kRiserOverlapBeatsMax
-    );
-    const double totalBeats = riserLengthBeats + overlapBeats;
-    const double stretchFactor = calcStretchFactor(
-      static_cast<int>(reversedL.size()), totalBeats, bpm, sampleRate
-    );
-
     auto riser = std::make_shared<RiserData>();
-    stretchBufferStereo(reversedL, reversedR, stretchFactor,
+    stretchBufferStereo(reversedL, reversedR, transitionTiming.mStretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
     riser->mSequenceId = sequenceId;
-
-    // Record where the exact beat boundary falls (before the overlap region)
-    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
+    riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;
+    riser->mEffectiveSeamFrames = transitionTiming.mEffectiveSeamFrames;
+    riser->mRiserPostBeatFrames = transitionTiming.mRiserPostBeatFrames;
+    riser->mHitPreBeatFrames = transitionTiming.mHitPreBeatFrames;
 
 #ifndef NDEBUG
     // Store intermediate buffers for debug playback
@@ -538,18 +511,9 @@ private:
     riser->mReversedR = std::move(reversedR);
 #endif
 
-    // --- Stage 4: Tail fade-out ---
-    // When enabled, fade covers at least kRiserTailFadeBeats or the full overlap,
-    // whichever is longer, so the riser decays smoothly through the entire overlap
-    // region into the hit. Set kRiserTailFadeBeats to 0.0 to disable.
-    if (kRiserTailFadeBeats > 0.0)
+    if (transitionTiming.mEffectiveSeamFrames > 0)
     {
-      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
-      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
-      if (fadeSamples > 0)
-      {
-        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
-      }
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mEffectiveSeamFrames);
     }
 
     // Final abort check before publishing

@@ -5,6 +5,7 @@
 #include "BufferUtils.h"
 #include "Constants.h"
 #include "SampleLoader.h"
+#include "TransitionTiming.h"
 #include "WaveformControl.h"
 #include "dr_wav.h"
 
@@ -1670,7 +1671,7 @@ void RVRSE::TriggerPlayback(int& riserPos,
     if (debugStage == rvrse::kDebugNormal)
     {
       mSamplesFromNoteOn = 0;
-      mHitOffset = riser->mBeatAlignedFrames;
+      mHitOffset = riser->HitStartFrame();
     }
     else
     {
@@ -1678,7 +1679,7 @@ void RVRSE::TriggerPlayback(int& riserPos,
     }
 #else
     mSamplesFromNoteOn = 0;
-    mHitOffset = riser->mBeatAlignedFrames;
+    mHitOffset = riser->HitStartFrame();
 #endif
   }
   else if (hit && hit->IsLoaded())

@@ -254,6 +254,8 @@ without audible clicks or artefacts.
 4. Release the mouse.
    - Verify the next preview/MIDI note uses the new trimmed start.
    - Verify the top waveform updates only after the new playable sequence is ready.
+   - Verify the transition still lands musically on the beat: the hit starts slightly early, but
+     its fade-in midpoint should feel aligned with the beat instead of sounding late or flammed.
 5. Repeat the same test with the **back** handle.
 6. Double-click the front handle, then the back handle.
    - Verify each side resets to `0 ms`.
@@ -270,6 +272,7 @@ without audible clicks or artefacts.
 - [ ] Lower waveform is the trim edit surface and updates live during drag
 - [ ] Top waveform remains on the last committed sequence until rebuild completes
 - [ ] Front/back trim affect both the audible dry hit and derived riser source
+- [ ] The seam remains smooth after trimming without an overly softened handoff at the beat
 - [ ] Double-click reset works on both handles
 - [ ] Trim persists across save/load
 - [ ] Loading a different sample resets trim to full-range

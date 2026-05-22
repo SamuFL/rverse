@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - macOS release distribution now targets a signed, notarized, stapled `.pkg` installer instead of the manual zip + `xattr` workflow
 - README and macOS install instructions now document the `.pkg` installer flow and remove the quarantine workaround
 - The top waveform now reflects only the last fully committed playable sequence, while trim edits happen on the lower/original hit waveform and take effect on the next armed preview/note after the offline rebuild finishes (#42)
+- The riser→hit handoff now uses a seam-centering heuristic: the effective riser seam window still drives the tail fade, but only half of that window extends past the beat while the trimmed hit starts half of its own edge-fade early, keeping the musical beat aligned to the midpoint of the hit fade-in (#42)
 
 ### Fixed
 - Sample loading via the file dialog now reliably updates the waveform, hit playback, and sample status UI after the drag-and-drop merge changes (rverse-aif)

@@ -15,6 +15,7 @@ iplug_add_plugin(${PROJECT_NAME}
     SampleLoader.h
     SampleLoader.cpp
     TrimUtils.h
+    TransitionTiming.h
     WaveformControl.h
     TimeStretch.cpp
     dr_libs_impl.cpp

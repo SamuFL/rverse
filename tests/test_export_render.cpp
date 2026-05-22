@@ -10,6 +10,7 @@ TEST_CASE("ExportRender: mixes riser and hit at beat boundary", "[export]")
   riser.mRight = {0.5f, 0.5f, 0.5f, 0.5f};
   riser.mSampleRate = 48000.0;
   riser.mBeatAlignedFrames = 2;
+  riser.mHitPreBeatFrames = 1;
 
   rvrse::SampleData hit;
   hit.mLeft = {0.25f, 0.5f, 0.75f};
@@ -27,14 +28,13 @@ TEST_CASE("ExportRender: mixes riser and hit at beat boundary", "[export]")
 
   REQUIRE(output.IsReady());
   REQUIRE(output.mSampleRate == 48000);
-  REQUIRE(output.mNumFrames == 5);
+  REQUIRE(output.mNumFrames == 4);
 
   const std::vector<float> expected = {
     0.0f, 0.0f,
-    0.5f, 0.25f,
     1.0f, 1.75f,
     1.5f, 1.25f,
-    1.5f, 0.5f
+    2.0f, 0.75f
   };
 
   REQUIRE(output.mInterleaved.size() == expected.size());

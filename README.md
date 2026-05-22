@@ -69,6 +69,9 @@ impact perfectly.
 
 The upper waveform always shows the currently committed playable sequence (processed riser +
 trimmed hit), while the lower hit waveform is the edit surface for the original loaded sample.
+The current transition heuristic centers the seam around the beat: the riser is stretched slightly
+past the beat while the trimmed hit starts a few milliseconds early, so the midpoint of the hit's
+trim-edge fade-in lands on the beat instead of the raw sample start.
 
 ---
 
