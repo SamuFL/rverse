@@ -10,6 +10,8 @@
 #include "Reverb.h"
 #include "SampleData.h"
 #include "TimeStretch.h"
+#include "TransitionTiming.h"
+#include "TrimUtils.h"
 
 #include <algorithm>
 #include <atomic>
@@ -29,7 +31,11 @@ struct RiserData
   std::vector<float> mLeft;    ///< Left channel of final_riser[] (stretched + faded)
   std::vector<float> mRight;   ///< Right channel of final_riser[]
   double mSampleRate = 0.0;    ///< Sample rate of the riser data
-  int mBeatAlignedFrames = 0;  ///< Frame count at the exact beat boundary (before overlap)
+  int mBeatAlignedFrames = 0;  ///< Frame count at the exact musical beat anchor
+  int mEffectiveSeamFrames = 0; ///< Full seam-conditioning window (R)
+  int mRiserPostBeatFrames = 0; ///< Riser extension past the beat (R/2)
+  int mHitPreBeatFrames = 0;    ///< Early hit start before the beat (H/2)
+  int mSequenceId = 0;         ///< Sequence token for coordinated riser+hit commits
 
 #ifndef NDEBUG
   // Debug: intermediate pipeline buffers (populated alongside the main output)
@@ -41,6 +47,7 @@ struct RiserData
 
   int NumFrames() const { return static_cast<int>(mLeft.size()); }
   bool IsReady() const { return !mLeft.empty() && mSampleRate > 0.0; }
+  int HitStartFrame() const { return std::max(0, mBeatAlignedFrames - mHitPreBeatFrames); }
 
 #ifndef NDEBUG
   /// @return Number of frames in the reverbed debug buffer
@@ -68,11 +75,17 @@ public:
   // --- Setters (trigger async rebuild) ---
 
   /// Set the source hit sample. Triggers a full pipeline rebuild (reverb → reverse → stretch).
-  void setSample(std::shared_ptr<SampleData> sample)
+  int setSample(std::shared_ptr<SampleData> sample,
+                double trimStartMs = 0.0,
+                double trimEndMs = 0.0)
   {
+    int sequenceId = 0;
     {
       std::lock_guard<std::mutex> lock(mParamMutex);
       mSourceSample = std::move(sample);
+      mTrimStartMs = trimStartMs;
+      mTrimEndMs = trimEndMs;
+      sequenceId = ++mSequenceId;
       // Clear cached intermediate buffers since the source changed
       mCachedReversedL.clear();
       mCachedReversedR.clear();
@@ -82,6 +95,7 @@ public:
 #endif
     }
     rebuildAsync(EPipelineStage::Reverb);
+    return sequenceId;
   }
 
   /// Set the Lush amount (0.0–1.0). Triggers rebuild from reverb stage onwards.
@@ -100,6 +114,33 @@ public:
 #endif
     }
     rebuildAsync(EPipelineStage::Reverb);
+  }
+
+  /// Set manual sample trim in milliseconds from the original sample edges.
+  /// Triggers a full rebuild because the source slice changes.
+  int setTrimMs(double trimStartMs, double trimEndMs)
+  {
+    int sequenceId = 0;
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      if (std::abs(mTrimStartMs - trimStartMs) < 1e-9 &&
+          std::abs(mTrimEndMs - trimEndMs) < 1e-9)
+      {
+        return mSequenceId;
+      }
+
+      mTrimStartMs = trimStartMs;
+      mTrimEndMs = trimEndMs;
+      sequenceId = ++mSequenceId;
+      mCachedReversedL.clear();
+      mCachedReversedR.clear();
+#ifndef NDEBUG
+      mCachedReverbedL.clear();
+      mCachedReverbedR.clear();
+#endif
+    }
+    rebuildAsync(EPipelineStage::Reverb);
+    return sequenceId;
   }
 
   /// Set the riser length in beats. Only re-stretches (skips reverb + reverse).
@@ -178,6 +219,12 @@ public:
     return std::atomic_load(&mRiserOutput);
   }
 
+  /// Peek the latest published riser candidate without clearing the ready flag.
+  std::shared_ptr<RiserData> peekRiser() const
+  {
+    return std::atomic_load(&mRiserOutput);
+  }
+
   /// @return true if the pipeline is currently processing
   bool isProcessing() const { return mProcessing.load(std::memory_order_acquire); }
 
@@ -216,6 +263,7 @@ private:
     std::shared_ptr<SampleData> sample;
     double riserLengthBeats, bpm, sampleRate;
     EStretchQuality quality;
+    int sequenceId;
     std::vector<float> cachedRevL, cachedRevR;
 #ifndef NDEBUG
     std::vector<float> cachedRvbL, cachedRvbR;
@@ -228,6 +276,7 @@ private:
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
       quality = mStretchQuality;
+      sequenceId = mSequenceId;
       cachedRevL = mCachedReversedL;
       cachedRevR = mCachedReversedR;
 #ifndef NDEBUG
@@ -243,31 +292,19 @@ private:
       return;
     }
 
-    // --- Synchronous stretch ---
-    // Compute stretch factor for the base riser length (on-beat target)
-    const double baseStretchFactor = calcStretchFactor(
+    const TransitionTiming transitionTiming = CalculateTransitionTiming(
       static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate
     );
 
-    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
-    // get a longer crossfade to mask the smeared transient tail
-    const double overlapBeats = std::min(
-      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
-      kRiserOverlapBeatsMax
-    );
-    const double totalBeats = riserLengthBeats + overlapBeats;
-    const double stretchFactor = calcStretchFactor(
-      static_cast<int>(cachedRevL.size()), totalBeats, bpm, sampleRate
-    );
-
     auto riser = std::make_shared<RiserData>();
-    stretchBufferStereo(cachedRevL, cachedRevR, stretchFactor,
+    stretchBufferStereo(cachedRevL, cachedRevR, transitionTiming.mStretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
-
-    // Record where the exact beat boundary falls (before the overlap region)
-    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
+    riser->mSequenceId = sequenceId;
+    riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;
+    riser->mEffectiveSeamFrames = transitionTiming.mEffectiveSeamFrames;
+    riser->mRiserPostBeatFrames = transitionTiming.mRiserPostBeatFrames;
+    riser->mHitPreBeatFrames = transitionTiming.mHitPreBeatFrames;
 
 #ifndef NDEBUG
     riser->mReverbedL = std::move(cachedRvbL);
@@ -276,15 +313,9 @@ private:
     riser->mReversedR = std::move(cachedRevR);
 #endif
 
-    // Tail fade-out — when enabled, scale with overlap so the fade covers the full overlap region
-    if (kRiserTailFadeBeats > 0.0)
+    if (transitionTiming.mEffectiveSeamFrames > 0)
     {
-      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
-      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
-      if (fadeSamples > 0)
-      {
-        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
-      }
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mEffectiveSeamFrames);
     }
 
     // Only publish if no newer rebuild has been requested
@@ -302,8 +333,9 @@ private:
     // Snapshot parameters under lock
     std::shared_ptr<SampleData> sample;
     float lush;
-    double riserLengthBeats, bpm, sampleRate;
+    double riserLengthBeats, bpm, sampleRate, trimStartMs, trimEndMs;
     EStretchQuality quality;
+    int sequenceId;
     std::vector<float> cachedRevL, cachedRevR;
 #ifndef NDEBUG
     std::vector<float> cachedRvbL, cachedRvbR;
@@ -316,7 +348,10 @@ private:
       riserLengthBeats = mRiserLengthBeats;
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
+      trimStartMs = mTrimStartMs;
+      trimEndMs = mTrimEndMs;
       quality = mStretchQuality;
+      sequenceId = mSequenceId;
 
       if (fromStage == EPipelineStage::Stretch)
       {
@@ -357,17 +392,27 @@ private:
       std::vector<float> srcL, srcR;
       double processingRate;
 
+      const TrimRangeFrames trimRange = ResolveTrimRangeFrames(
+        sample->NumFrames(), sample->mSampleRate, trimStartMs, trimEndMs, kTrimMinRegionMs
+      );
+
       if (std::abs(sample->mSampleRate - sampleRate) > 0.5)
       {
-        resampleLinearStereo(sample->mLeft, sample->mRight,
+        std::vector<float> trimmedL(sample->mLeft.begin() + trimRange.mStartFrame,
+                                    sample->mLeft.begin() + trimRange.mEndFrameExclusive);
+        std::vector<float> trimmedR(sample->mRight.begin() + trimRange.mStartFrame,
+                                    sample->mRight.begin() + trimRange.mEndFrameExclusive);
+        resampleLinearStereo(trimmedL, trimmedR,
                              sample->mSampleRate, sampleRate,
                              srcL, srcR);
         processingRate = sampleRate;
       }
       else
       {
-        srcL = sample->mLeft;
-        srcR = sample->mRight;
+        srcL.assign(sample->mLeft.begin() + trimRange.mStartFrame,
+                    sample->mLeft.begin() + trimRange.mEndFrameExclusive);
+        srcR.assign(sample->mRight.begin() + trimRange.mStartFrame,
+                    sample->mRight.begin() + trimRange.mEndFrameExclusive);
         processingRate = sample->mSampleRate;
       }
 
@@ -444,31 +489,19 @@ private:
       return;
     }
 
-    // --- Stage 3: Time-Stretch ---
-    // Compute stretch factor for the base riser length (on-beat target)
-    const double baseStretchFactor = calcStretchFactor(
+    const TransitionTiming transitionTiming = CalculateTransitionTiming(
       static_cast<int>(reversedL.size()), riserLengthBeats, bpm, sampleRate
     );
 
-    // Adaptive overlap: scale with stretch factor so heavily-stretched risers
-    // get a longer crossfade to mask the smeared transient tail
-    const double overlapBeats = std::min(
-      kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
-      kRiserOverlapBeatsMax
-    );
-    const double totalBeats = riserLengthBeats + overlapBeats;
-    const double stretchFactor = calcStretchFactor(
-      static_cast<int>(reversedL.size()), totalBeats, bpm, sampleRate
-    );
-
     auto riser = std::make_shared<RiserData>();
-    stretchBufferStereo(reversedL, reversedR, stretchFactor,
+    stretchBufferStereo(reversedL, reversedR, transitionTiming.mStretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
-
-    // Record where the exact beat boundary falls (before the overlap region)
-    const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-    riser->mBeatAlignedFrames = static_cast<int>(std::lround(riserLengthBeats * samplesPerBeat));
+    riser->mSequenceId = sequenceId;
+    riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;
+    riser->mEffectiveSeamFrames = transitionTiming.mEffectiveSeamFrames;
+    riser->mRiserPostBeatFrames = transitionTiming.mRiserPostBeatFrames;
+    riser->mHitPreBeatFrames = transitionTiming.mHitPreBeatFrames;
 
 #ifndef NDEBUG
     // Store intermediate buffers for debug playback
@@ -478,18 +511,9 @@ private:
     riser->mReversedR = std::move(reversedR);
 #endif
 
-    // --- Stage 4: Tail fade-out ---
-    // When enabled, fade covers at least kRiserTailFadeBeats or the full overlap,
-    // whichever is longer, so the riser decays smoothly through the entire overlap
-    // region into the hit. Set kRiserTailFadeBeats to 0.0 to disable.
-    if (kRiserTailFadeBeats > 0.0)
+    if (transitionTiming.mEffectiveSeamFrames > 0)
     {
-      const double fadeTotalBeats = std::max(kRiserTailFadeBeats, overlapBeats);
-      const int fadeSamples = static_cast<int>(samplesPerBeat * fadeTotalBeats);
-      if (fadeSamples > 0)
-      {
-        applyTailFadeOutStereo(riser->mLeft, riser->mRight, fadeSamples);
-      }
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mEffectiveSeamFrames);
     }
 
     // Final abort check before publishing
@@ -512,7 +536,10 @@ private:
   double mRiserLengthBeats = kRiserLengthValues[kRiserLengthDefault];
   double mBPM = kDefaultBPM;
   double mOutputSampleRate = 44100.0;
+  double mTrimStartMs = 0.0;
+  double mTrimEndMs = 0.0;
   EStretchQuality mStretchQuality = static_cast<EStretchQuality>(kStretchQualityDefault);
+  int mSequenceId = 0;
 
   // --- Cached intermediate buffers (protected by mParamMutex) ---
   std::vector<float> mCachedReversedL;

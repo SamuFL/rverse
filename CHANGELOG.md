@@ -12,10 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - macOS maintainer tooling for release signing/notarization: `scripts/sign-and-notarize.sh`, `scripts/build-macos-installer.sh`, and a minimal installer entitlements plist
 - Waveform-panel preview transport — small Play/Stop buttons let users audition the riser+hit path without configuring MIDI, while preserving the existing MIDI-triggered playback behavior
 - Header export action — a blue Export button now writes the current normal riser+hit result to a stereo 24-bit WAV via the native save dialog, using the same readiness gate as Play and ignoring Master Volume
+- Manual sample trimming — the lower hit waveform now exposes always-visible front/back trim handles with live dimmed-region preview and drag readout in milliseconds; the committed trim applies to both the dry hit and the derived riser source (#42)
 
 ### Changed
 - macOS release distribution now targets a signed, notarized, stapled `.pkg` installer instead of the manual zip + `xattr` workflow
 - README and macOS install instructions now document the `.pkg` installer flow and remove the quarantine workaround
+- The top waveform now reflects only the last fully committed playable sequence, while trim edits happen on the lower/original hit waveform and take effect on the next armed preview/note after the offline rebuild finishes (#42)
+- The riser→hit handoff now uses a seam-centering heuristic: the effective riser seam window still drives the tail fade, but only half of that window extends past the beat while the trimmed hit starts half of its own edge-fade early, keeping the musical beat aligned to the midpoint of the hit fade-in (#42)
 
 ### Fixed
 - Sample loading via the file dialog now reliably updates the waveform, hit playback, and sample status UI after the drag-and-drop merge changes (rverse-aif)

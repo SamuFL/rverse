@@ -118,13 +118,14 @@ constexpr int kStretchQualityDefault = kStretchQualityHigh;
 /// Examples: 1/16 = 0.0625 (subtle), 1/4 = 0.25 (gentle), 1.0 = full beat.
 constexpr double kRiserTailFadeBeats = 0.0625;  ///< 1/16 of a beat
 
-/// Base overlap in beats when the base stretch factor is 1.0 (no stretching).
-/// For overlap purposes, the effective stretch factor is clamped to a minimum
-/// of 1.0, so the overlap never shrinks below this base amount. The actual
-/// overlap is:
+/// Base seam window in beats when the base stretch factor is 1.0 (no stretching).
+/// For seam purposes, the effective stretch factor is clamped to a minimum of
+/// 1.0, so the window never shrinks below this base amount. The adaptive
+/// component is:
 ///   overlapBeats = min(kRiserOverlapBeatsBase * max(1.0, baseStretchFactor), kRiserOverlapBeatsMax)
-/// At higher stretch ratios the overlap increases proportionally, up to the
-/// configured maximum, to help the stretched transient blend smoothly into the hit.
+/// The final seam window is max(kRiserTailFadeBeats, overlapBeats). The riser
+/// is then stretched to extend by half of that window past the beat, while the
+/// tail fade still covers the full seam window.
 constexpr double kRiserOverlapBeatsBase = 1.0 / 32.0;  ///< 1/32 of a beat at 1× stretch
 constexpr double kRiserOverlapBeatsMax  = 1.0;          ///< Cap at 1 beat for extreme stretches
 
@@ -139,11 +140,16 @@ static_assert(kRiserOverlapBeatsMax <= 1.0,
 constexpr double kDefaultBPM         = 120.0;
 constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration in milliseconds (anti-click)
 constexpr double kStutterFadeMs      = 2.0;    ///< Stutter gate ramp duration in milliseconds (anti-click)
+constexpr double kTrimEdgeFadeMs     = 5.0;    ///< Trim-edge fade for hit-region boundary conditioning
 
 // --- Sample Loading ---
 constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample length in seconds
 constexpr int    kMaxSampleFrames    = 192000 * kMaxSampleLengthSeconds; ///< Max frames at 192 kHz (supports all standard rates)
 constexpr int    kMaxSampleChannels  = 2;                  ///< Stereo max
+
+// --- Manual sample trimming ---
+constexpr double kTrimMinRegionMs = 10.0; ///< Minimum editable/committable trim region length
+constexpr double kTrimMaxMs = kMaxSampleLengthSeconds * 1000.0; ///< Upper trim param bound in milliseconds
 
 /// Supported file extensions for the open-file dialog
 constexpr const char* kSupportedAudioExts = "wav aif aiff";

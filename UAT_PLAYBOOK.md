@@ -42,6 +42,8 @@ Run these tests manually after every change to the DSP pipeline or plugin behavi
 | 8 | Hit Volume      | -60 to +6       | 0         | dB    | 0.1   |
 | 9 | Debug Stage     | Normal / Reverbed / Reversed / Riser Only | Normal | — | enum |
 | 10 | Stretch Quality | High / Low | High | — | enum |
+| 11 | Trim Start     | 0–30000        | 0         | ms    | 1     |
+| 12 | Trim End       | 0–30000        | 0         | ms    | 1     |
 
 ---
 
@@ -234,6 +236,47 @@ without audible clicks or artefacts.
 - [ ] GUI knobs visually track CC input in real-time (Rate and Depth move as CC values change)
 - [ ] No audible clicks at any point during continuous modulation
 - [ ] No CPU spikes or audio dropouts during rapid modulation
+
+---
+
+## Test Scenario 3b — Manual Sample Trimming
+
+**Goal:** Verify that trimming edits the lower/original hit waveform, while the top waveform and audible result update only after the rebuilt playable sequence is committed.
+
+### Steps
+
+1. Load a reference sample with obvious leading and trailing content (for example, a hit with silence before it and tail after it).
+2. Confirm the lower hit waveform shows the full sample with visible front/back trim handles.
+3. Drag the **front** handle inward.
+   - Verify the excluded left region is dimmed live.
+   - Verify a temporary numeric `ms` readout follows the active handle.
+   - Verify the top waveform does **not** update while dragging.
+4. Release the mouse.
+   - Verify the next preview/MIDI note uses the new trimmed start.
+   - Verify the top waveform updates only after the new playable sequence is ready.
+   - Verify the transition still lands musically on the beat: the hit starts slightly early, but
+     its fade-in midpoint should feel aligned with the beat instead of sounding late or flammed.
+5. Repeat the same test with the **back** handle.
+6. Double-click the front handle, then the back handle.
+   - Verify each side resets to `0 ms`.
+7. Save the DAW project, close it, and reopen it.
+   - Verify the trim values and waveform state are restored.
+8. Load a **different** sample manually.
+   - Verify trim resets to full-range for the newly loaded file.
+9. Test with a very short sample whose duration is shorter than the minimum trim region.
+   - Verify handles remain visible.
+   - Verify dragging has no effect and no drag readout appears.
+
+### Pass Criteria
+
+- [ ] Lower waveform is the trim edit surface and updates live during drag
+- [ ] Top waveform remains on the last committed sequence until rebuild completes
+- [ ] Front/back trim affect both the audible dry hit and derived riser source
+- [ ] The seam remains smooth after trimming without an overly softened handoff at the beat
+- [ ] Double-click reset works on both handles
+- [ ] Trim persists across save/load
+- [ ] Loading a different sample resets trim to full-range
+- [ ] Too-short samples fail gracefully with visible but inert handles
 
 ---
 

@@ -120,6 +120,51 @@ inline void applyTailFadeOutStereo(std::vector<float>& left,
   applyTailFadeOut(right, fadeSamples);
 }
 
+/// Apply a short fade-in and fade-out around a region inside a mono buffer.
+/// The fade is applied at the region start and region end, leaving the rest untouched.
+inline void applyRegionEdgeFade(std::vector<float>& buf,
+                                int startFrame,
+                                int endFrameExclusive,
+                                int fadeSamples)
+{
+  if (buf.empty() || fadeSamples <= 0)
+    return;
+
+  startFrame = std::clamp(startFrame, 0, static_cast<int>(buf.size()));
+  endFrameExclusive = std::clamp(endFrameExclusive, startFrame, static_cast<int>(buf.size()));
+  const int regionLen = endFrameExclusive - startFrame;
+  const int fadeLen = std::min(fadeSamples, regionLen / 2);
+  if (fadeLen <= 0)
+    return;
+
+  if (fadeLen == 1)
+  {
+    buf[static_cast<size_t>(startFrame)] = 0.0f;
+    buf[static_cast<size_t>(endFrameExclusive - 1)] = 0.0f;
+    return;
+  }
+
+  for (int i = 0; i < fadeLen; ++i)
+  {
+    const float denom = static_cast<float>(fadeLen - 1);
+    const float inGain = static_cast<float>(i) / denom;
+    const float outGain = static_cast<float>(fadeLen - i - 1) / denom;
+    buf[static_cast<size_t>(startFrame + i)] *= inGain;
+    buf[static_cast<size_t>(endFrameExclusive - fadeLen + i)] *= outGain;
+  }
+}
+
+/// Apply a short fade-in and fade-out around a region inside stereo buffers.
+inline void applyRegionEdgeFadeStereo(std::vector<float>& left,
+                                      std::vector<float>& right,
+                                      int startFrame,
+                                      int endFrameExclusive,
+                                      int fadeSamples)
+{
+  applyRegionEdgeFade(left, startFrame, endFrameExclusive, fadeSamples);
+  applyRegionEdgeFade(right, startFrame, endFrameExclusive, fadeSamples);
+}
+
 // ---------------------------------------------------------------------------
 // Silence trimming
 // ---------------------------------------------------------------------------

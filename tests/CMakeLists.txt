@@ -24,6 +24,8 @@ add_executable(rvrse_tests
   test_sample_loader.cpp
   test_drag_and_drop.cpp
   test_export_render.cpp
+  test_transition_timing.cpp
+  test_trim_utils.cpp
   ${CMAKE_SOURCE_DIR}/RVRSE/SampleLoader.cpp
   ${CMAKE_SOURCE_DIR}/RVRSE/dr_libs_impl.cpp
   ${CMAKE_SOURCE_DIR}/RVRSE/TimeStretch.cpp
