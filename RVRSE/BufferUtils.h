@@ -137,10 +137,18 @@ inline void applyRegionEdgeFade(std::vector<float>& buf,
   if (fadeLen <= 0)
     return;
 
+  if (fadeLen == 1)
+  {
+    buf[static_cast<size_t>(startFrame)] = 0.0f;
+    buf[static_cast<size_t>(endFrameExclusive - 1)] = 0.0f;
+    return;
+  }
+
   for (int i = 0; i < fadeLen; ++i)
   {
-    const float inGain = static_cast<float>(i + 1) / static_cast<float>(fadeLen);
-    const float outGain = static_cast<float>(fadeLen - i - 1) / static_cast<float>(fadeLen);
+    const float denom = static_cast<float>(fadeLen - 1);
+    const float inGain = static_cast<float>(i) / denom;
+    const float outGain = static_cast<float>(fadeLen - i - 1) / denom;
     buf[static_cast<size_t>(startFrame + i)] *= inGain;
     buf[static_cast<size_t>(endFrameExclusive - fadeLen + i)] *= outGain;
   }

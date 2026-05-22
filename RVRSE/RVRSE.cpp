@@ -1181,6 +1181,24 @@ void RVRSE::OnIdle()
     SendParameterValueFromDelegate(p.idx, p.value, false);
   }
 
+  PendingTrimNormalization pendingTrimNormalization;
+  {
+    std::lock_guard<std::mutex> lock(mStatusTextMutex);
+    pendingTrimNormalization = mPendingTrimNormalization;
+    mPendingTrimNormalization = {};
+  }
+
+  if (pendingTrimNormalization.mHasUpdate)
+  {
+    GetParam(kParamTrimStartMs)->Set(pendingTrimNormalization.mTrimStartMs);
+    GetParam(kParamTrimEndMs)->Set(pendingTrimNormalization.mTrimEndMs);
+    if (GetUI())
+    {
+      SendParameterValueFromDelegate(kParamTrimStartMs, pendingTrimNormalization.mTrimStartMs, false);
+      SendParameterValueFromDelegate(kParamTrimEndMs, pendingTrimNormalization.mTrimEndMs, false);
+    }
+  }
+
   // Update BPM display when host tempo changes
   const double currentBPM = mLastBPM.load(std::memory_order_relaxed);
   if (GetUI() && std::abs(currentBPM - mLastDisplayedBPM) > 0.01)
@@ -1519,28 +1537,26 @@ void RVRSE::LoadSampleFromFile(const char* filePath, bool preserveTrim)
     mLastTrimEndMs = 0.0;
   }
 
+  const double requestedTrimStartMs = GetParam(kParamTrimStartMs)->Value();
+  const double requestedTrimEndMs = GetParam(kParamTrimEndMs)->Value();
+  const double outputSampleRate = GetSampleRate();
+
   // Do the actual loading on a background thread to avoid blocking the UI
   std::string pathCopy(filePath);
-  std::thread([this, pathCopy]() {
+  std::thread([this, pathCopy, requestedTrimStartMs, requestedTrimEndMs, outputSampleRate]() {
     auto result = rvrse::LoadSample(pathCopy);
 
     if (result.success)
     {
       auto newSample = std::make_shared<rvrse::SampleData>(std::move(result.data));
-      const double trimStartMs = GetParam(kParamTrimStartMs)->Value();
-      const double trimEndMs = GetParam(kParamTrimEndMs)->Value();
       const auto sourceTrimRange = rvrse::ResolveTrimRangeFrames(
-        newSample->NumFrames(), newSample->mSampleRate, trimStartMs, trimEndMs, rvrse::kTrimMinRegionMs
+        newSample->NumFrames(), newSample->mSampleRate,
+        requestedTrimStartMs, requestedTrimEndMs, rvrse::kTrimMinRegionMs
       );
       const double normalizedTrimStartMs = rvrse::TrimRangeToStartMs(sourceTrimRange, newSample->mSampleRate);
       const double normalizedTrimEndMs = rvrse::TrimRangeToEndMs(sourceTrimRange, newSample->NumFrames(), newSample->mSampleRate);
 
-      if (std::abs(trimStartMs - normalizedTrimStartMs) > 0.5)
-        GetParam(kParamTrimStartMs)->Set(normalizedTrimStartMs);
-      if (std::abs(trimEndMs - normalizedTrimEndMs) > 0.5)
-        GetParam(kParamTrimEndMs)->Set(normalizedTrimEndMs);
-
-      auto playSample = BuildPlaybackSampleFromSource(newSample, GetSampleRate());
+      auto playSample = BuildPlaybackSampleFromSource(newSample, outputSampleRate);
       const auto playbackTrimRange = playSample
         ? rvrse::ResolveTrimRangeFrames(
             playSample->NumFrames(), playSample->mSampleRate,
@@ -1579,6 +1595,11 @@ void RVRSE::LoadSampleFromFile(const char* filePath, bool preserveTrim)
 
         std::lock_guard<std::mutex> lock(mStatusTextMutex);
         mPendingSampleStatusText = displayStr.Get();
+        if (std::abs(requestedTrimStartMs - normalizedTrimStartMs) > 0.5 ||
+            std::abs(requestedTrimEndMs - normalizedTrimEndMs) > 0.5)
+        {
+          mPendingTrimNormalization = {true, normalizedTrimStartMs, normalizedTrimEndMs};
+        }
       }
 
     }

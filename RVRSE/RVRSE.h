@@ -135,6 +135,13 @@ public:
     std::atomic<bool> mInProgress { false };
   };
 
+  struct PendingTrimNormalization
+  {
+    bool mHasUpdate = false;
+    double mTrimStartMs = 0.0;
+    double mTrimEndMs = 0.0;
+  };
+
 private:
 
   void ClearLoadedSampleState();
@@ -224,6 +231,7 @@ private:
   std::string mLastSampleStatusText;    ///< Last sample status text shown in the UI
   std::string mPendingSampleAlertText;  ///< Next sample-load error alert for OnIdle to show
   bool mPendingSampleStateClear = false; ///< Whether OnIdle should clear loaded sample state before publishing UI
+  PendingTrimNormalization mPendingTrimNormalization; ///< UI-thread param correction computed by the loader thread
 
   // --- Export state / UI feedback ---
   std::string mActiveExportStatusText;  ///< Export status text currently shown in the header

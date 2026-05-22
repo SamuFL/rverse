@@ -143,11 +143,12 @@ TEST_CASE("BufferUtils: applyRegionEdgeFadeStereo", "[bufferutils]")
     applyRegionEdgeFadeStereo(left, right, 5, 15, 2);
 
     REQUIRE(left[4] == Approx(1.0f));
-    REQUIRE(left[5] == Approx(0.5f).margin(0.001f));
+    REQUIRE(left[5] == Approx(0.0f).margin(0.001f));
     REQUIRE(left[6] == Approx(1.0f).margin(0.001f));
-    REQUIRE(left[13] == Approx(0.5f).margin(0.001f));
+    REQUIRE(left[13] == Approx(1.0f).margin(0.001f));
     REQUIRE(left[14] == Approx(0.0f).margin(0.001f));
-    REQUIRE(right[5] == Approx(0.5f).margin(0.001f));
+    REQUIRE(right[5] == Approx(0.0f).margin(0.001f));
+    REQUIRE(right[13] == Approx(1.0f).margin(0.001f));
     REQUIRE(right[14] == Approx(0.0f).margin(0.001f));
   }
 
@@ -158,8 +159,10 @@ TEST_CASE("BufferUtils: applyRegionEdgeFadeStereo", "[bufferutils]")
 
     applyRegionEdgeFadeStereo(left, right, 1, 5, 10);
 
-    REQUIRE(left[1] < 1.0f);
-    REQUIRE(left[4] < 1.0f);
+    REQUIRE(left[1] == Approx(0.0f).margin(0.001f));
+    REQUIRE(left[2] == Approx(1.0f).margin(0.001f));
+    REQUIRE(left[3] == Approx(1.0f).margin(0.001f));
+    REQUIRE(left[4] == Approx(0.0f).margin(0.001f));
     REQUIRE(left[0] == Approx(1.0f));
     REQUIRE(right[0] == Approx(1.0f));
   }
