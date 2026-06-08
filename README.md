@@ -85,7 +85,7 @@ it prevents audio glitches and real-time safety violations.
 Runs heavy DSP that would be too expensive for real-time. Produces a pre-computed riser buffer.
 
 - Sample loading and decoding (`SampleLoader`)
-- Reverb application (`Reverb.h`)
+- Reverb application (`IReverbEngine` via `AirwindowsReverbEngine.h`)
 - Buffer reversal (`BufferUtils.h`)
 - Time-stretching (`TimeStretch.h`)
 - Pipeline orchestration (`RvrseProcessor.h`)
@@ -138,7 +138,10 @@ Every source file belongs to exactly one layer:
 | `Constants.h` | Shared | All numeric constants — no magic numbers anywhere |
 | `SampleData.h` | Shared | `SampleData` struct: deinterleaved stereo float32 + metadata |
 | `SampleLoader.h/.cpp` | **Offline** | Stateless `LoadSample()` — reads WAV/AIFF from disk via dr_wav |
-| `Reverb.h` | **Offline** | Schroeder/Moorer reverb (8 comb filters + 4 allpass filters) |
+| `ReverbEngine.h` | **Offline** | Offline reverb seam (`IReverbEngine`, shared dry/wet mapping) |
+| `AirwindowsMatrixVerb.h` | **Offline** | Local Airwindows MatrixVerb DSP port |
+| `AirwindowsReverbEngine.h` | **Offline** | Chosen offline reverb adapter and tuning bridge |
+| `ReverbEngineFactory.h` | **Offline** | Factory that instantiates the retained Airwindows engine |
 | `BufferUtils.h` | **Offline** | `reverseBuffer`, `resampleLinear`, `applyTailFadeOut` |
 | `TimeStretch.h` | **Offline** | Spectral time-stretcher (signalsmith-stretch, MIT) |
 | `RvrseProcessor.h` | **Offline** | Pipeline orchestrator — chains all offline stages |
@@ -207,9 +210,8 @@ Source sample (at native sample rate, e.g. 96 kHz)
 Resample to DAW output rate          [resampleLinearStereo — BufferUtils.h]
     │
     ▼
-Apply reverb                         [applyReverbStereo — Reverb.h]
-    8 parallel comb filters            Schroeder/Moorer algorithm
-    → 4 series allpass filters         "Lush" controls feedback + room + damping,
+Apply reverb                         [IReverbEngine via AirwindowsReverbEngine.h]
+    Airwindows MatrixVerb              "Lush" controls the Airwindows tuning range
                                        with a 100/0 → 50/100 dry/wet blend
     │
     ▼
@@ -440,7 +442,10 @@ rverse/
 │   ├── WaveformControl.h     # Waveform display controls (riser + hit + preview)
 │   ├── SampleData.h          # Sample data struct
 │   ├── SampleLoader.h / .cpp # Audio file loading (dr_wav)
-│   ├── Reverb.h              # Schroeder/Moorer reverb
+│   ├── ReverbEngine.h        # Offline reverb seam + shared blend helpers
+│   ├── AirwindowsMatrixVerb.h# Local Airwindows MatrixVerb DSP port
+│   ├── AirwindowsReverbEngine.h # Chosen Airwindows adapter
+│   ├── ReverbEngineFactory.h # Reverb seam factory
 │   ├── BufferUtils.h         # Buffer utilities (reverse, resample, fade)
 │   ├── TimeStretch.h         # Spectral time-stretcher (signalsmith-stretch)
 │   ├── RvrseProcessor.h      # Offline pipeline orchestrator
@@ -456,7 +461,7 @@ rverse/
 │   ├── test_smoke.cpp        # Smoke tests (framework + basic DSP)
 │   ├── test_constants.cpp    # Constants.h relational invariants
 │   ├── test_buffer_utils.cpp # Reverse, resample, fade, trim
-│   ├── test_reverb.cpp       # Schroeder reverb properties
+│   ├── test_reverb.cpp       # Reverb seam + Airwindows regressions
 │   ├── test_time_stretch.cpp # Spectral stretcher factors + edge cases
 │   ├── test_stutter.cpp      # Gate symmetry, convergence, phase
 │   └── test_sample_loader.cpp# WAV loading, deinterleave, error handling

@@ -13,11 +13,9 @@ iplug_add_plugin(${PROJECT_NAME}
     Constants.h
     AirwindowsMatrixVerb.h
     AirwindowsReverbEngine.h
-    CurrentSchroederReverbEngine.h
     ReverbEngine.h
     ReverbEngineDevConfig.h
     ReverbEngineFactory.h
-    WDLReverbEngine.h
     SampleData.h
     SampleLoader.h
     SampleLoader.cpp
@@ -43,7 +41,6 @@ iplug_add_plugin(${PROJECT_NAME}
 if(WIN32)
   target_compile_definitions(_${PROJECT_NAME}-base INTERFACE
     NOMINMAX
-    WIN32_LEAN_AND_MEAN
   )
 
   set(_rc_file "${CMAKE_CURRENT_SOURCE_DIR}/resources/main.rc")

@@ -333,7 +333,7 @@ pipeline buffers, allowing isolation of each processing stage for diagnostics.
 - **No hit fires** after the buffer ends.
 - Duration should be original sample length + reverb tail (up to ~5 s extra).
 - No fade-in, no stutter applied — raw reverb output.
-- Useful for checking if the **Schroeder reverb introduces pitch colouring**.
+- Useful for checking the **raw Airwindows reverb tone** before reversal and stretch.
 
 #### 5.3 — Reversed
 - Set **Debug Stage = Reversed**.

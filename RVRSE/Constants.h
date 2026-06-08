@@ -75,7 +75,7 @@ constexpr int kNumDebugStages = 4;
 constexpr double kTuneMinSemitones   = -24.0;
 constexpr double kTuneMaxSemitones   =  24.0;
 
-// --- Reverb (Schroeder / Moorer) ---
+// --- Reverb ---
 /// Maximum reverb tail duration appended to the source sample before processing.
 /// This silence extension allows the reverb to ring out naturally, producing the
 /// characteristic reverse-reverb "whoosh" that builds toward the hit.
@@ -90,16 +90,6 @@ constexpr float  kSilenceThreshold   = 0.032f;
 /// fraction of the reverbed peak so fixed-threshold trimming doesn't delete
 /// the entire buffer at high Lush settings.
 constexpr float  kSilenceThresholdPeakFraction = 0.5f;
-
-constexpr int   kNumCombs            = 8;       ///< Number of parallel comb filters
-constexpr int   kNumAllpasses        = 4;       ///< Number of series allpass filters
-constexpr float kReverbMinRoomFactor = 0.5f;    ///< Room size multiplier at Lush = 0
-constexpr float kReverbMaxRoomFactor = 1.5f;    ///< Room size multiplier at Lush = 1
-constexpr float kReverbMinFeedback   = 0.70f;   ///< Comb feedback at Lush = 0
-constexpr float kReverbMaxFeedback   = 0.90f;   ///< Comb feedback at Lush = 1
-constexpr float kReverbMinDamping    = 0.2f;    ///< Comb LP damping at Lush = 0
-constexpr float kReverbMaxDamping    = 0.5f;    ///< Comb LP damping at Lush = 1
-constexpr float kReverbAllpassGain   = 0.5f;    ///< Allpass feedback coefficient
 
 // --- Time-Stretching (signalsmith-stretch) ---
 // Quality preset selection for the spectral stretcher.

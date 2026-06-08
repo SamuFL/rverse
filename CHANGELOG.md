@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The riser→hit handoff now uses a seam-centering heuristic: the effective riser seam window still drives the tail fade, but only half of that window extends past the beat while the trimmed hit starts half of its own edge-fade early, keeping the musical beat aligned to the midpoint of the hit fade-in (#42)
 - The Airwindows MatrixVerb evaluation build now removes its explicit wet-path input pre-delay, disables vibrato modulation, brightens the wet tuning, boosts the wet output level, leaves the stretched riser onset unshifted so the render can run naturally into the hit without the diagnostic onset-correction gap, and applies a fixed 25 ms technical head fade to soften the riser start
 - Lush now keeps more direct source at the top of the range by linearly mapping 0–100% to a 100/0 → 50/100 dry/wet blend instead of fading fully dry out
+- The offline reverb seam now retains only the chosen Airwindows MatrixVerb path; rejected comparison engines and the legacy Schroeder implementation have been removed
 
 ### Fixed
 - Sample loading via the file dialog now reliably updates the waveform, hit playback, and sample status UI after the drag-and-drop merge changes (rverse-aif)

@@ -137,12 +137,9 @@ output = (faded + hit_sample) * masterVolume;
 
 ### Reverb (MVP)
 
-Use a **Schroeder/Moorer-style algorithmic reverb** — a network of parallel comb filters feeding into series allpass filters. No convolution, no external libraries. The `Lush` knob maps linearly to both room size (comb filter delay times) and wet gain.
-
-Implement as a stateless function:
-```cpp
-void applyReverb(const float* in, float* out, size_t numSamples, float lushAmount);
-```
+Use an **offline Airwindows MatrixVerb path** behind a small reverb abstraction. The `Lush`
+knob drives the retained Airwindows tuning range, while the shared blend law maps linearly
+from `100/0` dry/wet at `Lush = 0` to `50/100` at `Lush = 100`.
 
 ### Time-Stretching
 
@@ -190,7 +187,7 @@ constexpr int CC_RISER_TUNE    = 2;   // Breath controller
 | Build system | CMake via iPlug2OOS template | Recommended starting point for 2025/26 |
 | GUI | IGraphics (iPlug2 native) | Vector graphics, no extra dependencies |
 | Audio file I/O | dr_libs (header-only) | WAV + AIFF, single header, no build complexity |
-| Reverb DSP | Custom Schroeder (self-written) | No external libs needed |
+| Reverb DSP | Airwindows MatrixVerb (MIT) behind local seam | Chosen evaluation winner; permissive license |
 | Time-stretch | signalsmith-stretch (MIT, header-only) | Spectral, polyphonic-aware, transient-preserving |
 | CI/CD | GitHub Actions | Auto-build on Windows + macOS |
 | License | MIT | Permissive; warmup project should be maximally forkable |
@@ -245,7 +242,10 @@ rvrse/
 │   ├── RVRSE.h / .cpp               ← iPlug2 plugin class (IPlug + IGraphics)
 │   ├── RvrseProcessor.h / .cpp      ← offline pipeline orchestrator
 │   ├── RvrseVoice.h / .cpp          ← real-time playback voice (riser + hit)
-│   ├── Reverb.h / .cpp              ← Schroeder reverb, stateless
+│   ├── ReverbEngine.h               ← Offline reverb seam + shared blend helpers
+│   ├── AirwindowsMatrixVerb.h       ← Local Airwindows MatrixVerb DSP port
+│   ├── AirwindowsReverbEngine.h     ← Chosen offline reverb adapter
+│   ├── ReverbEngineFactory.h        ← Reverb seam factory
 │   ├── TimeStretch.h / .cpp         ← spectral time-stretcher (signalsmith-stretch)
 │   ├── Stutter.h / .cpp             ← real-time stutter gate (audio thread only)
 │   └── WaveformView.h / .cpp        ← IControl subclass for waveform display

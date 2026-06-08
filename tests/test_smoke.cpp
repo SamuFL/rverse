@@ -6,7 +6,6 @@
 
 #include "Constants.h"
 #include "BufferUtils.h"
-#include "Reverb.h"
 #include "TimeStretch.h"
 #include "Stutter.h"
 
