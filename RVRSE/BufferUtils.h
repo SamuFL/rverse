@@ -120,6 +120,34 @@ inline void applyTailFadeOutStereo(std::vector<float>& left,
   applyTailFadeOut(right, fadeSamples);
 }
 
+/// Apply a linear fade-in to the first N samples of a mono buffer.
+inline void applyHeadFadeIn(std::vector<float>& buf, int fadeSamples)
+{
+  if (buf.empty() || fadeSamples <= 0) return;
+
+  const int fadeLen = std::min(fadeSamples, static_cast<int>(buf.size()));
+  if (fadeLen == 1)
+  {
+    buf[0] = 0.0f;
+    return;
+  }
+
+  for (int i = 0; i < fadeLen; ++i)
+  {
+    const float gain = static_cast<float>(i) / static_cast<float>(fadeLen - 1);
+    buf[static_cast<size_t>(i)] *= gain;
+  }
+}
+
+/// Apply a linear fade-in to the first N samples of stereo buffers.
+inline void applyHeadFadeInStereo(std::vector<float>& left,
+                                  std::vector<float>& right,
+                                  int fadeSamples)
+{
+  applyHeadFadeIn(left, fadeSamples);
+  applyHeadFadeIn(right, fadeSamples);
+}
+
 /// Apply a short fade-in and fade-out around a region inside a mono buffer.
 /// The fade is applied at the region start and region end, leaving the rest untouched.
 inline void applyRegionEdgeFade(std::vector<float>& buf,
@@ -250,6 +278,101 @@ inline void trimTrailingSilenceStereo(std::vector<float>& left,
   const int newSize = std::min(len, lastLoud + 1 + marginSamples);
   left.resize(static_cast<size_t>(newSize));
   right.resize(static_cast<size_t>(newSize));
+}
+
+/// Detect the first sustained, meaningful onset in stereo material using a
+/// smoothed envelope, relative threshold, and minimum hold time.
+inline size_t findSustainedEnvelopeOnsetStereo(const std::vector<float>& left,
+                                               const std::vector<float>& right,
+                                               float peakFraction,
+                                               float absoluteFloor,
+                                               int smoothingFrames,
+                                               int holdFrames,
+                                               int maxSearchFrames)
+{
+  const size_t len = std::min(left.size(), right.size());
+  if (len == 0) return 0;
+
+  const size_t searchLen = std::min(len, static_cast<size_t>(std::max(1, maxSearchFrames)));
+  const int smoothing = std::max(1, smoothingFrames);
+  const int hold = std::max(1, holdFrames);
+  const size_t required = static_cast<size_t>(std::max(smoothing, hold));
+  if (searchLen < required) return 0;
+
+  std::vector<float> envelope(searchLen, 0.0f);
+  float runningSum = 0.0f;
+  for (size_t i = 0; i < searchLen; ++i)
+  {
+    const float magnitude = std::max(std::abs(left[i]), std::abs(right[i]));
+    runningSum += magnitude;
+    if (i >= static_cast<size_t>(smoothing))
+      runningSum -= envelope[i - static_cast<size_t>(smoothing)];
+    envelope[i] = magnitude;
+  }
+
+  std::vector<float> smoothed(searchLen, 0.0f);
+  runningSum = 0.0f;
+  float peakEnvelope = 0.0f;
+  for (size_t i = 0; i < searchLen; ++i)
+  {
+    runningSum += envelope[i];
+    if (i >= static_cast<size_t>(smoothing))
+      runningSum -= envelope[i - static_cast<size_t>(smoothing)];
+    const int window = static_cast<int>(std::min(i + 1, static_cast<size_t>(smoothing)));
+    smoothed[i] = runningSum / static_cast<float>(window);
+    peakEnvelope = std::max(peakEnvelope, smoothed[i]);
+  }
+
+  const float threshold = std::max(absoluteFloor, peakEnvelope * peakFraction);
+  if (peakEnvelope < threshold)
+    return 0;
+
+  for (size_t start = 0; start + static_cast<size_t>(hold) <= searchLen; ++start)
+  {
+    bool sustained = true;
+    for (size_t i = 0; i < static_cast<size_t>(hold); ++i)
+    {
+      if (smoothed[start + i] < threshold)
+      {
+        sustained = false;
+        break;
+      }
+    }
+
+    if (sustained)
+      return start;
+  }
+
+  return 0;
+}
+
+/// Shift a stereo buffer left by the given onset and zero-pad the end. Returns
+/// the number of frames removed from the front.
+inline size_t shiftBufferLeftStereo(std::vector<float>& left,
+                                    std::vector<float>& right,
+                                    size_t frames)
+{
+  const size_t len = std::min(left.size(), right.size());
+  if (len == 0 || frames == 0)
+    return 0;
+
+  const size_t shift = std::min(frames, len - 1);
+  if (shift == 0)
+    return 0;
+
+  for (size_t i = 0; i + shift < len; ++i)
+  {
+    left[i] = left[i + shift];
+    right[i] = right[i + shift];
+  }
+
+  for (size_t i = len - shift; i < len; ++i)
+  {
+    left[i] = 0.0f;
+    right[i] = 0.0f;
+  }
+
+  return shift;
 }
 
 } // namespace rvrse

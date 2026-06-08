@@ -86,6 +86,10 @@ constexpr double kReverbTailSeconds  = 5.0;     ///< Seconds of silence appended
 /// and trimmed after reverb processing. -30 dB ≈ 0.032.
 /// The riser fade-in envelope masks any residual energy at the trim point.
 constexpr float  kSilenceThreshold   = 0.032f;
+/// For quiet sources, the reverb-tail trim threshold is clamped to this
+/// fraction of the reverbed peak so fixed-threshold trimming doesn't delete
+/// the entire buffer at high Lush settings.
+constexpr float  kSilenceThresholdPeakFraction = 0.5f;
 
 constexpr int   kNumCombs            = 8;       ///< Number of parallel comb filters
 constexpr int   kNumAllpasses        = 4;       ///< Number of series allpass filters

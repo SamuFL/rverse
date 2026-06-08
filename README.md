@@ -209,7 +209,8 @@ Resample to DAW output rate          [resampleLinearStereo — BufferUtils.h]
     ▼
 Apply reverb                         [applyReverbStereo — Reverb.h]
     8 parallel comb filters            Schroeder/Moorer algorithm
-    → 4 series allpass filters         "Lush" knob controls feedback + room + damping
+    → 4 series allpass filters         "Lush" controls feedback + room + damping,
+                                       with a 100/0 → 50/100 dry/wet blend
     │
     ▼
 Cache reversed buffers ★             [Optimisation: skip reverb on BPM-only changes]
@@ -409,7 +410,7 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 | Parameter | Range | Default | Notes |
 |---|---|---|---|
 | Master Volume | 0–100% | 100% | Overall output level |
-| Lush | 0–100% | 40% | Reverb amount — triggers offline rebuild |
+| Lush | 0–100% | 40% | Reverb amount — linearly blends from 100/0 to 50/100 dry/wet and triggers offline rebuild |
 | Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 | Time-stretch target — triggers offline rebuild |
 | Fade In | 0–100% | 60% | Linear ramp over portion of riser length |
 | Riser Volume | -60 to +6 dB | 0 dB | Independent riser voice gain |
@@ -466,7 +467,8 @@ rverse/
 ├── CHANGELOG.md              # Release notes (Keep a Changelog format)
 ├── AGENTS.md                 # AI agent instructions and workflow rules
 ├── docs/prototypes/          # Archived HTML/PNG design prototypes
-└── LICENSE                   # MIT license
+├── LICENSE                   # Project MIT license
+└── THIRD_PARTY_NOTICES.txt   # Third-party license notices
 ```
 
 ---
@@ -555,4 +557,5 @@ workflow.
 
 ## License
 
-See [LICENSE](./LICENSE) for details.
+See [LICENSE](./LICENSE) for the project license and
+[THIRD_PARTY_NOTICES.txt](./THIRD_PARTY_NOTICES.txt) for bundled third-party notices.

@@ -133,6 +133,22 @@ TEST_CASE("BufferUtils: applyTailFadeOut", "[bufferutils]")
   }
 }
 
+TEST_CASE("BufferUtils: applyHeadFadeInStereo", "[bufferutils]")
+{
+  std::vector<float> left(8, 1.0f);
+  std::vector<float> right(8, 1.0f);
+
+  applyHeadFadeInStereo(left, right, 4);
+
+  REQUIRE(left[0] == Approx(0.0f).margin(0.001f));
+  REQUIRE(left[1] == Approx(1.0f / 3.0f).margin(0.001f));
+  REQUIRE(left[2] == Approx(2.0f / 3.0f).margin(0.001f));
+  REQUIRE(left[3] == Approx(1.0f).margin(0.001f));
+  REQUIRE(left[4] == Approx(1.0f).margin(0.001f));
+  REQUIRE(right[0] == Approx(0.0f).margin(0.001f));
+  REQUIRE(right[3] == Approx(1.0f).margin(0.001f));
+}
+
 TEST_CASE("BufferUtils: applyRegionEdgeFadeStereo", "[bufferutils]")
 {
   SECTION("Applies short fade at region boundaries")
@@ -223,4 +239,41 @@ TEST_CASE("BufferUtils: trimTrailingSilenceStereo equalizes lengths", "[bufferut
   // Both should be trimmed to 50 + 1 + 16 = 67
   REQUIRE(left.size() == 67);
   REQUIRE(left.size() == right.size());
+}
+
+TEST_CASE("BufferUtils: findSustainedEnvelopeOnsetStereo ignores weak early leakage", "[bufferutils]")
+{
+  std::vector<float> left(64, 0.0f);
+  std::vector<float> right(64, 0.0f);
+
+  for (int i = 10; i < 14; ++i)
+  {
+    left[static_cast<size_t>(i)] = 0.04f;
+    right[static_cast<size_t>(i)] = 0.03f;
+  }
+  for (int i = 24; i < 40; ++i)
+  {
+    left[static_cast<size_t>(i)] = 0.32f;
+    right[static_cast<size_t>(i)] = 0.28f;
+  }
+
+  const size_t onset = findSustainedEnvelopeOnsetStereo(
+    left, right,
+    0.15f, 0.01f,
+    2, 4, 48
+  );
+
+  REQUIRE(onset == 24);
+}
+
+TEST_CASE("BufferUtils: shiftBufferLeftStereo keeps length and zero-pads tail", "[bufferutils]")
+{
+  std::vector<float> left = {0.0f, 0.0f, 0.2f, 0.4f, 0.6f};
+  std::vector<float> right = {0.0f, 0.0f, 1.0f, 0.5f, 0.25f};
+
+  const size_t shifted = shiftBufferLeftStereo(left, right, 2);
+
+  REQUIRE(shifted == 2);
+  REQUIRE(left == std::vector<float>{0.2f, 0.4f, 0.6f, 0.0f, 0.0f});
+  REQUIRE(right == std::vector<float>{1.0f, 0.5f, 0.25f, 0.0f, 0.0f});
 }

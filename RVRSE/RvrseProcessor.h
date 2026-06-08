@@ -7,7 +7,7 @@
 
 #include "BufferUtils.h"
 #include "Constants.h"
-#include "Reverb.h"
+#include "ReverbEngineFactory.h"
 #include "SampleData.h"
 #include "TimeStretch.h"
 #include "TransitionTiming.h"
@@ -15,7 +15,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -72,6 +74,11 @@ struct RiserData
 class RvrseProcessor
 {
 public:
+  RvrseProcessor()
+  : mReverbEngine(MakeActiveReverbEngine())
+  {
+  }
+
   // --- Setters (trigger async rebuild) ---
 
   /// Set the source hit sample. Triggers a full pipeline rebuild (reverb → reverse → stretch).
@@ -432,15 +439,43 @@ private:
       std::vector<float> lushedL(totalFrames);
       std::vector<float> lushedR(totalFrames);
 
-      applyReverbStereo(
+      const ReverbSettings reverbSettings { lush };
+      const auto reverbStageStart = std::chrono::steady_clock::now();
+
+      mReverbEngine->ProcessStereo(
         srcL.data(), srcR.data(),
         lushedL.data(), lushedR.data(),
-        totalFrames, processingRate, lush
+        totalFrames, processingRate, reverbSettings
       );
 
+      if constexpr (kEnableReverbTiming)
+      {
+        const auto reverbStageEnd = std::chrono::steady_clock::now();
+        const auto elapsedMs = std::chrono::duration<double, std::milli>(
+          reverbStageEnd - reverbStageStart
+        ).count();
+
+        std::fprintf(stderr,
+                     "[RVRSE] Offline reverb stage (%s): %.3f ms for %zu frames at %.1f Hz\n",
+                     mReverbEngine->GetName(),
+                     elapsedMs,
+                     totalFrames,
+                     processingRate);
+      }
+
       // Trim trailing silence so the stretcher doesn't waste work on dead air.
-      // The trim is conservative — a small margin ensures no audible decay is lost.
-      trimTrailingSilenceStereo(lushedL, lushedR, kSilenceThreshold);
+      // For quiet sources, clamp the threshold to the reverbed peak so a fixed
+      // absolute gate can't erase the whole buffer at high Lush settings.
+      float peakAbs = 0.0f;
+      for (const float sampleValue : lushedL)
+        peakAbs = std::max(peakAbs, std::abs(sampleValue));
+      for (const float sampleValue : lushedR)
+        peakAbs = std::max(peakAbs, std::abs(sampleValue));
+
+      const float silenceThreshold = peakAbs > 0.0f
+        ? std::min(kSilenceThreshold, peakAbs * kSilenceThresholdPeakFraction)
+        : kSilenceThreshold;
+      trimTrailingSilenceStereo(lushedL, lushedR, silenceThreshold);
 
       // Abort check
       if (mGeneration.load(std::memory_order_acquire) != generation)
@@ -496,6 +531,45 @@ private:
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(reversedL, reversedR, transitionTiming.mStretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
+
+    if constexpr (kActiveReverbEngine == EReverbEngineKind::AirwindowsMatrixVerb)
+    {
+      if (kAirwindowsReverbDevTuning.mAlignWetOnset)
+      {
+        const int smoothingFrames = std::max(1, static_cast<int>(
+          std::lround(sampleRate * kAirwindowsReverbDevTuning.mOnsetSmoothingMs / 1000.0)
+        ));
+        const int holdFrames = std::max(1, static_cast<int>(
+          std::lround(sampleRate * kAirwindowsReverbDevTuning.mOnsetHoldMs / 1000.0)
+        ));
+        const int maxTrimFrames = std::max(1, static_cast<int>(
+          std::lround(sampleRate * kAirwindowsReverbDevTuning.mOnsetMaxTrimMs / 1000.0)
+        ));
+        const int fadeInFrames = std::max(1, static_cast<int>(
+          std::lround(sampleRate * kAirwindowsReverbDevTuning.mOnsetFadeInMs / 1000.0)
+        ));
+
+        const size_t onsetFrame = findSustainedEnvelopeOnsetStereo(
+          riser->mLeft, riser->mRight,
+          kAirwindowsReverbDevTuning.mOnsetPeakFraction,
+          kAirwindowsReverbDevTuning.mOnsetAbsoluteFloor,
+          smoothingFrames, holdFrames, maxTrimFrames
+        );
+
+        if (onsetFrame > 0)
+        {
+          shiftBufferLeftStereo(riser->mLeft, riser->mRight, onsetFrame);
+          applyHeadFadeInStereo(riser->mLeft, riser->mRight, fadeInFrames);
+        }
+      }
+
+      const int headFadeFrames = std::max(0, static_cast<int>(
+        std::lround(sampleRate * kAirwindowsReverbDevTuning.mHeadFadeInMs / 1000.0)
+      ));
+      if (headFadeFrames > 0)
+        applyHeadFadeInStereo(riser->mLeft, riser->mRight, headFadeFrames);
+    }
+
     riser->mSampleRate = sampleRate;
     riser->mSequenceId = sequenceId;
     riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;
@@ -531,6 +605,7 @@ private:
 
   // --- Parameters (protected by mParamMutex) ---
   std::mutex mParamMutex;
+  std::unique_ptr<IReverbEngine> mReverbEngine;
   std::shared_ptr<SampleData> mSourceSample;
   float mLush = static_cast<float>(kLushDefault / 100.0);
   double mRiserLengthBeats = kRiserLengthValues[kRiserLengthDefault];

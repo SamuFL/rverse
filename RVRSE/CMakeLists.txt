@@ -11,6 +11,13 @@ iplug_add_plugin(${PROJECT_NAME}
     RVRSE.cpp
     RVRSE.h
     Constants.h
+    AirwindowsMatrixVerb.h
+    AirwindowsReverbEngine.h
+    CurrentSchroederReverbEngine.h
+    ReverbEngine.h
+    ReverbEngineDevConfig.h
+    ReverbEngineFactory.h
+    WDLReverbEngine.h
     SampleData.h
     SampleLoader.h
     SampleLoader.cpp

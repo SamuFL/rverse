@@ -6,13 +6,37 @@
 ///        Offline only — must never be called from the audio thread.
 
 #include "Constants.h"
+#include "ReverbEngine.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <vector>
 
 namespace rvrse {
+
+struct SchroederReverbTuning
+{
+  float mMinRoomFactor = kReverbMinRoomFactor;
+  float mMaxRoomFactor = kReverbMaxRoomFactor;
+  float mMinFeedback = kReverbMinFeedback;
+  float mMaxFeedback = kReverbMaxFeedback;
+  float mMinDamping = kReverbMinDamping;
+  float mMaxDamping = kReverbMaxDamping;
+  float mAllpassGain = kReverbAllpassGain;
+  float mInputGain = 1.0f;
+  bool mScaleDelayByRoomFactor = true;
+  int mStereoSpreadSamplesAt44100 = 0;
+  std::array<int, kNumCombs> mCombTuningSamplesAt44100 = {
+    1310, 1636, 1813, 1927, 1398, 1618, 1768, 1971
+  };
+  std::array<int, kNumAllpasses> mAllpassTuningSamplesAt44100 = {
+    221, 75, 146, 49
+  };
+};
+
+constexpr SchroederReverbTuning kDefaultSchroederReverbTuning {};
 
 // ---------------------------------------------------------------------------
 // Internal helper: simple circular delay buffer
@@ -145,46 +169,29 @@ public:
   /// Configure the reverb for a given sample rate and room size.
   /// @param sampleRate  Sample rate in Hz
   /// @param roomSize    Room size factor (0.0–1.0), maps from Lush knob
-  void init(double sampleRate, float roomSize)
+  void init(double sampleRate, float roomSize,
+            const SchroederReverbTuning& tuning = kDefaultSchroederReverbTuning)
   {
-    // Scale delay times by room size and sample rate.
-    // Base delay times in ms (classic Schroeder values, slightly detuned to reduce ringing):
-    //   Combs:    29.7, 37.1, 41.1, 43.7, 31.7, 36.7, 40.1, 44.7  ms
-    //   Allpasses: 5.0,  1.7,  3.3,  1.1  ms
-
     const float sampleRateF = static_cast<float>(sampleRate);
+    const float roomFactor = tuning.mMinRoomFactor + roomSize * (tuning.mMaxRoomFactor - tuning.mMinRoomFactor);
+    const float feedback = tuning.mMinFeedback + roomSize * (tuning.mMaxFeedback - tuning.mMinFeedback);
+    const float damping = tuning.mMinDamping + roomSize * (tuning.mMaxDamping - tuning.mMinDamping);
+    const float delayScale = (sampleRateF / 44100.0f) * (tuning.mScaleDelayByRoomFactor ? roomFactor : 1.0f);
 
-    // Room size scales the delay times: small room = shorter delays, large room = longer
-    const float roomFactor = kReverbMinRoomFactor + roomSize * (kReverbMaxRoomFactor - kReverbMinRoomFactor);
-
-    // Feedback coefficient — longer decay for larger rooms
-    const float feedback = kReverbMinFeedback + roomSize * (kReverbMaxFeedback - kReverbMinFeedback);
-
-    // Damping — slightly more damping in larger rooms (warmer sound)
-    const float damping = kReverbMinDamping + roomSize * (kReverbMaxDamping - kReverbMinDamping);
-
-    auto msToSamples = [sampleRateF, roomFactor](float ms) -> int {
-      return std::max(1, static_cast<int>(ms * roomFactor * sampleRateF / 1000.0f));
-    };
-
-    // Initialise 8 comb filters with detuned delay times
-    static constexpr float kCombDelaysMs[kNumCombs] = {
-      29.7f, 37.1f, 41.1f, 43.7f, 31.7f, 36.7f, 40.1f, 44.7f
+    auto scaledDelaySamples = [delayScale](int baseSamplesAt44100) -> int {
+      return std::max(1, static_cast<int>(std::lround(baseSamplesAt44100 * delayScale)));
     };
 
     for (int i = 0; i < kNumCombs; ++i)
     {
-      mCombs[i].init(msToSamples(kCombDelaysMs[i]), feedback, damping);
+      mCombs[i].init(scaledDelaySamples(tuning.mCombTuningSamplesAt44100[static_cast<size_t>(i)]),
+                     feedback, damping);
     }
-
-    // Initialise 4 allpass filters in series
-    static constexpr float kAllpassDelaysMs[kNumAllpasses] = {
-      5.0f, 1.7f, 3.3f, 1.1f
-    };
 
     for (int i = 0; i < kNumAllpasses; ++i)
     {
-      mAllpasses[i].init(msToSamples(kAllpassDelaysMs[i]), kReverbAllpassGain);
+      mAllpasses[i].init(scaledDelaySamples(tuning.mAllpassTuningSamplesAt44100[static_cast<size_t>(i)]),
+                         tuning.mAllpassGain);
     }
   }
 
@@ -234,14 +241,16 @@ private:
 /// @param out          Output buffer (numSamples floats) — may alias `in`
 /// @param numSamples   Number of samples to process
 /// @param sampleRate   Sample rate of the audio data
-/// @param lushAmount   Reverb amount (0.0–1.0): controls room size AND wet/dry mix.
-///                     At 0.0 the output is fully dry; at 1.0 fully wet with max room size.
+/// @param lushAmount   Reverb amount (0.0–1.0): controls room size and blend.
+///                     At 0.0 the output is fully dry; at 1.0 it keeps 50% dry
+///                     while adding 100% wet at max room size.
 ///
 /// @note This function allocates internally (for delay lines). Offline use only.
 inline void applyReverb(const float* in, float* out, size_t numSamples,
-                        double sampleRate, float lushAmount)
+                        double sampleRate, float lushAmount,
+                        const SchroederReverbTuning& tuning = kDefaultSchroederReverbTuning)
 {
-  lushAmount = std::clamp(lushAmount, 0.0f, 1.0f);
+  lushAmount = ClampLush(lushAmount);
 
   if (lushAmount <= 0.0f || numSamples == 0)
   {
@@ -251,18 +260,19 @@ inline void applyReverb(const float* in, float* out, size_t numSamples,
     return;
   }
 
-  // Room size scales with lush; wet gain scales with lush
+  // Room size scales with lush; blend keeps some direct anchor even at max lush.
   const float roomSize = lushAmount;
-  const float wetGain = lushAmount;
-  const float dryGain = 1.0f - wetGain;
+  const float wetGain = GetReverbWetGain(lushAmount);
+  const float dryGain = GetReverbDryGain(lushAmount);
+  const float inputGain = tuning.mInputGain;
 
   SchroederReverb reverb;
-  reverb.init(sampleRate, roomSize);
+  reverb.init(sampleRate, roomSize, tuning);
 
   for (size_t i = 0; i < numSamples; ++i)
   {
     const float dry = in[i];
-    const float wet = reverb.processSample(dry);
+    const float wet = reverb.processSample(dry * inputGain);
     out[i] = dry * dryGain + wet * wetGain;
   }
 }
@@ -280,9 +290,10 @@ inline void applyReverb(const float* in, float* out, size_t numSamples,
 inline void applyReverbStereo(const float* inL, const float* inR,
                               float* outL, float* outR,
                               size_t numSamples,
-                              double sampleRate, float lushAmount)
+                              double sampleRate, float lushAmount,
+                              const SchroederReverbTuning& tuning = kDefaultSchroederReverbTuning)
 {
-  lushAmount = std::clamp(lushAmount, 0.0f, 1.0f);
+  lushAmount = ClampLush(lushAmount);
 
   if (lushAmount <= 0.0f || numSamples == 0)
   {
@@ -294,21 +305,36 @@ inline void applyReverbStereo(const float* inL, const float* inR,
   }
 
   const float roomSize = lushAmount;
-  const float wetGain = lushAmount;
-  const float dryGain = 1.0f - wetGain;
+  const float wetGain = GetReverbWetGain(lushAmount);
+  const float dryGain = GetReverbDryGain(lushAmount);
+  const float inputGain = tuning.mInputGain;
+  const int stereoSpread = tuning.mStereoSpreadSamplesAt44100;
 
   // Two independent reverb engines for stereo width
   SchroederReverb reverbL;
   SchroederReverb reverbR;
-  reverbL.init(sampleRate, roomSize);
-  reverbR.init(sampleRate, roomSize);
+  reverbL.init(sampleRate, roomSize, tuning);
+  if (stereoSpread == 0)
+  {
+    reverbR.init(sampleRate, roomSize, tuning);
+  }
+  else
+  {
+    SchroederReverbTuning rightTuning = tuning;
+    for (int i = 0; i < kNumCombs; ++i)
+      rightTuning.mCombTuningSamplesAt44100[static_cast<size_t>(i)] += stereoSpread;
+    for (int i = 0; i < kNumAllpasses; ++i)
+      rightTuning.mAllpassTuningSamplesAt44100[static_cast<size_t>(i)] += stereoSpread;
+    rightTuning.mStereoSpreadSamplesAt44100 = 0;
+    reverbR.init(sampleRate, roomSize, rightTuning);
+  }
 
   for (size_t i = 0; i < numSamples; ++i)
   {
     const float dryL = inL[i];
     const float dryR = inR[i];
-    const float wetL = reverbL.processSample(dryL);
-    const float wetR = reverbR.processSample(dryR);
+    const float wetL = reverbL.processSample(dryL * inputGain);
+    const float wetR = reverbR.processSample(dryR * inputGain);
     outL[i] = dryL * dryGain + wetL * wetGain;
     outR[i] = dryR * dryGain + wetR * wetGain;
   }

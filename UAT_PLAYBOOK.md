@@ -111,7 +111,7 @@ otherwise stated.
 |------|-------|------------------|
 | 2.2a | 0% | Riser is very thin/dry — mostly the raw reversed sample with minimal reverb wash |
 | 2.2b | 40% (default) | Moderate reverb wash, balanced between dry transients and wet tail |
-| 2.2c | 100% | Dense, washy reverb — original transients nearly buried in reverb |
+| 2.2c | 100% | Dense, washy reverb with a retained dry anchor — the wet tail dominates but some direct attack remains |
 | 2.2d | Change 40→80 | Riser **rebuilds** after a short delay (offline processing) — next note-on plays the new riser |
 
 > **Note:** Lush triggers an offline pipeline rebuild. The change is NOT instantaneous
