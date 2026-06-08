@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <string>
@@ -147,21 +148,21 @@ TEST_CASE("Reverb engine adapter: Airwindows candidate can run without input pre
   std::vector<float> zeroPreDelayL(N, 0.0f);
   std::vector<float> zeroPreDelayR(N, 0.0f);
 
-  AirwindowsMatrixVerb engineWithPreDelay;
-  engineWithPreDelay.SetSampleRate(48000.0);
-  engineWithPreDelay.ProcessStereo(inputL.data(), inputR.data(),
-                                   defaultL.data(), defaultR.data(),
-                                   N, AirwindowsMatrixVerbParams {
-                                        0.90f, 0.15f, 0.10f, 0.05f, 0.85f, 0.50f, 1.0f, 1.0f
-                                      });
+  auto engineWithPreDelay = std::make_unique<AirwindowsMatrixVerb>();
+  engineWithPreDelay->SetSampleRate(48000.0);
+  engineWithPreDelay->ProcessStereo(inputL.data(), inputR.data(),
+                                    defaultL.data(), defaultR.data(),
+                                    N, AirwindowsMatrixVerbParams {
+                                         0.90f, 0.15f, 0.10f, 0.05f, 0.85f, 0.50f, 1.0f, 1.0f
+                                       });
 
-  AirwindowsMatrixVerb engineWithoutPreDelay;
-  engineWithoutPreDelay.SetSampleRate(48000.0);
-  engineWithoutPreDelay.ProcessStereo(inputL.data(), inputR.data(),
-                                      zeroPreDelayL.data(), zeroPreDelayR.data(),
-                                      N, AirwindowsMatrixVerbParams {
-                                           0.90f, 0.15f, 0.10f, 0.05f, 0.85f, 0.50f, 0.0f, 1.0f
-                                         });
+  auto engineWithoutPreDelay = std::make_unique<AirwindowsMatrixVerb>();
+  engineWithoutPreDelay->SetSampleRate(48000.0);
+  engineWithoutPreDelay->ProcessStereo(inputL.data(), inputR.data(),
+                                       zeroPreDelayL.data(), zeroPreDelayR.data(),
+                                       N, AirwindowsMatrixVerbParams {
+                                            0.90f, 0.15f, 0.10f, 0.05f, 0.85f, 0.50f, 0.0f, 1.0f
+                                          });
 
   REQUIRE(allFinite(zeroPreDelayL));
   REQUIRE(allFinite(zeroPreDelayR));
