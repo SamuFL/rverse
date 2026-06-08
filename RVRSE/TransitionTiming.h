@@ -22,7 +22,7 @@ struct TransitionTiming
 
   int HitStartFrame() const
   {
-    return std::max(0, mBeatAlignedFrames - mHitPreBeatFrames);
+    return (std::max)(0, mBeatAlignedFrames - mHitPreBeatFrames);
   }
 };
 
@@ -32,12 +32,12 @@ inline int BeatsToFrames(double beats, double bpm, double sampleRate)
     return 0;
 
   const double samplesPerBeat = (sampleRate * 60.0) / bpm;
-  return std::max(0, static_cast<int>(std::lround(beats * samplesPerBeat)));
+  return (std::max)(0, static_cast<int>(std::lround(beats * samplesPerBeat)));
 }
 
 inline int ComputeHitPreBeatFrames(double sampleRate)
 {
-  return std::max(0, TrimMsToFrames(kTrimEdgeFadeMs, sampleRate) / 2);
+  return (std::max)(0, TrimMsToFrames(kTrimEdgeFadeMs, sampleRate) / 2);
 }
 
 inline TransitionTiming CalculateTransitionTiming(int reversedFrames,
@@ -53,14 +53,14 @@ inline TransitionTiming CalculateTransitionTiming(int reversedFrames,
     return timing;
 
   const double baseStretchFactor = calcStretchFactor(reversedFrames, riserLengthBeats, bpm, sampleRate);
-  const double adaptiveOverlapBeats = std::min(
-    kRiserOverlapBeatsBase * std::max(1.0, baseStretchFactor),
+  const double adaptiveOverlapBeats = (std::min)(
+    kRiserOverlapBeatsBase * (std::max)(1.0, baseStretchFactor),
     kRiserOverlapBeatsMax
   );
-  const double effectiveSeamBeats = std::max(kRiserTailFadeBeats, adaptiveOverlapBeats);
+  const double effectiveSeamBeats = (std::max)(kRiserTailFadeBeats, adaptiveOverlapBeats);
 
   timing.mEffectiveSeamFrames = BeatsToFrames(effectiveSeamBeats, bpm, sampleRate);
-  timing.mRiserPostBeatFrames = std::max(0, static_cast<int>(std::lround(
+  timing.mRiserPostBeatFrames = (std::max)(0, static_cast<int>(std::lround(
     static_cast<double>(timing.mEffectiveSeamFrames) * 0.5
   )));
 

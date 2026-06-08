@@ -33,6 +33,13 @@ add_executable(rvrse_tests
 
 target_compile_features(rvrse_tests PRIVATE cxx_std_17)
 
+if(WIN32)
+  target_compile_definitions(rvrse_tests PRIVATE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+  )
+endif()
+
 target_include_directories(rvrse_tests PRIVATE
   ${CMAKE_SOURCE_DIR}/RVRSE           # Constants.h, BufferUtils.h, Reverb.h, etc.
   ${CMAKE_SOURCE_DIR}/RVRSE/libs/dr_libs  # dr_wav.h (for SampleLoader tests later)
