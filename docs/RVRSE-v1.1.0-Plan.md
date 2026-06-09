@@ -179,26 +179,16 @@ Goal: validate, polish, ship.
 
 ---
 
-## 5. Optional: the reverb engine spike
+## 5. Reverb engine decision
 
-**Status: optional in v1.1.0.** The decision is to keep what already works (Schroeder/Moorer in `Reverb.h`) and treat any improvement as a bonus. The blog post said "improved reverb engine" — that can mean tuned defaults and expanded ranges, not necessarily a new algorithm.
+**Status: resolved.** The evaluation is complete and Airwindows MatrixVerb is the retained
+offline reverb path behind the local abstraction seam.
 
-### 5.1 Decision rule
+### 5.1 Outcome
 
-Run the spike only if Days 1–2 finish on schedule. If pursued, hard cutoff is **end of Day 7**. If no candidate clearly beats the current engine by then, drop C-7 from v1.1.0 entirely and ship the existing reverb with retuned defaults.
-
-No "let me give it one more day" — this is the rule that protects the 2-week timeline.
-
-### 5.2 The spike (if pursued)
-
-1. Create `spike/reverb-eval` branch
-2. A/B test current `Reverb.h` vs **Airwindows** (MIT) vs **Freeverb3** (LGPL — note licensing implications even though RVRSE is MIT)
-3. Three reference samples: drum hit, vocal "ah", synth pad
-4. Decision committed to `docs/decisions/0001-reverb-engine.md`
-
-### 5.3 Honest framing for users
-
-If the spike doesn't ship: the v1.1.0 release notes should say "reverb tuning improvements; full engine evaluation continues into v1.2.0.".
+1. Keep the abstraction seam so the offline pipeline does not depend on a concrete reverb implementation.
+2. Retain only the Airwindows adapter and remove rejected comparison engines from production code.
+3. Carry the upstream MIT notice in `THIRD_PARTY_NOTICES.txt`.
 
 ---
 

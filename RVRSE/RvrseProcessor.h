@@ -7,7 +7,7 @@
 
 #include "BufferUtils.h"
 #include "Constants.h"
-#include "Reverb.h"
+#include "ReverbEngineFactory.h"
 #include "SampleData.h"
 #include "TimeStretch.h"
 #include "TransitionTiming.h"
@@ -72,6 +72,8 @@ struct RiserData
 class RvrseProcessor
 {
 public:
+  RvrseProcessor() = default;
+
   // --- Setters (trigger async rebuild) ---
 
   /// Set the source hit sample. Triggers a full pipeline rebuild (reverb → reverse → stretch).
@@ -227,6 +229,34 @@ public:
 
   /// @return true if the pipeline is currently processing
   bool isProcessing() const { return mProcessing.load(std::memory_order_acquire); }
+
+#ifdef RVRSE_TEST_BUILD
+  std::shared_ptr<RiserData> RunReverbPipelineForTests(std::shared_ptr<SampleData> sample,
+                                                       double outputSampleRate,
+                                                       float lush,
+                                                       int sequenceId = 1)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      mSourceSample = std::move(sample);
+      mOutputSampleRate = outputSampleRate;
+      mLush = lush;
+      mSequenceId = sequenceId;
+      mTrimStartMs = 0.0;
+      mTrimEndMs = 0.0;
+      mCachedReversedL.clear();
+      mCachedReversedR.clear();
+#ifndef NDEBUG
+      mCachedReverbedL.clear();
+      mCachedReverbedR.clear();
+#endif
+    }
+
+    const int generation = mGeneration.fetch_add(1, std::memory_order_release) + 1;
+    runPipeline(EPipelineStage::Reverb, generation);
+    return peekRiser();
+  }
+#endif
 
 private:
   /// Pipeline stages — rebuild starts from the specified stage onwards.
@@ -432,15 +462,34 @@ private:
       std::vector<float> lushedL(totalFrames);
       std::vector<float> lushedR(totalFrames);
 
-      applyReverbStereo(
+      const ReverbSettings reverbSettings { lush };
+
+      auto reverbEngine = MakeActiveReverbEngine();
+      if (!reverbEngine)
+      {
+        mProcessing.store(false, std::memory_order_release);
+        return;
+      }
+
+      reverbEngine->ProcessStereo(
         srcL.data(), srcR.data(),
         lushedL.data(), lushedR.data(),
-        totalFrames, processingRate, lush
+        totalFrames, processingRate, reverbSettings
       );
 
       // Trim trailing silence so the stretcher doesn't waste work on dead air.
-      // The trim is conservative — a small margin ensures no audible decay is lost.
-      trimTrailingSilenceStereo(lushedL, lushedR, kSilenceThreshold);
+      // For quiet sources, clamp the threshold to the reverbed peak so a fixed
+      // absolute gate can't erase the whole buffer at high Lush settings.
+      float peakAbs = 0.0f;
+      for (const float sampleValue : lushedL)
+        peakAbs = std::max(peakAbs, std::abs(sampleValue));
+      for (const float sampleValue : lushedR)
+        peakAbs = std::max(peakAbs, std::abs(sampleValue));
+
+      const float silenceThreshold = peakAbs > 0.0f
+        ? std::min(kSilenceThreshold, peakAbs * kSilenceThresholdPeakFraction)
+        : kSilenceThreshold;
+      trimTrailingSilenceStereo(lushedL, lushedR, silenceThreshold);
 
       // Abort check
       if (mGeneration.load(std::memory_order_acquire) != generation)
@@ -496,6 +545,13 @@ private:
     auto riser = std::make_shared<RiserData>();
     stretchBufferStereo(reversedL, reversedR, transitionTiming.mStretchFactor,
                         riser->mLeft, riser->mRight, sampleRate, quality);
+
+    const int headFadeFrames = std::max(0, static_cast<int>(
+      std::lround(sampleRate * kTechnicalHeadFadeInMs / 1000.0)
+    ));
+    if (headFadeFrames > 0)
+      applyHeadFadeInStereo(riser->mLeft, riser->mRight, headFadeFrames);
+
     riser->mSampleRate = sampleRate;
     riser->mSequenceId = sequenceId;
     riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;

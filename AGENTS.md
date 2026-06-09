@@ -105,7 +105,7 @@ and subtle real-time bugs that are painful to debug.
 Runs on a **background thread**. Never called from the audio thread.
 
 - Sample loading
-- Reverb application (`Reverb.h`)
+- Reverb application (`IReverbEngine` via `AirwindowsReverbEngine.h`)
 - Buffer reversal
 - Time-stretching (`Stretcher.h`)
 - Writes the result into `final_riser[]`

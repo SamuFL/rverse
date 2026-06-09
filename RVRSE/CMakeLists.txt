@@ -11,6 +11,11 @@ iplug_add_plugin(${PROJECT_NAME}
     RVRSE.cpp
     RVRSE.h
     Constants.h
+    AirwindowsMatrixVerb.h
+    AirwindowsReverbEngine.h
+    ReverbEngine.h
+    ReverbEngineDevConfig.h
+    ReverbEngineFactory.h
     SampleData.h
     SampleLoader.h
     SampleLoader.cpp
@@ -34,6 +39,10 @@ iplug_add_plugin(${PROJECT_NAME}
 # Plugin MODULE targets (VST3, CLAP) need it too for Win32 resource embedding
 # (fonts, images).
 if(WIN32)
+  target_compile_definitions(_${PROJECT_NAME}-base INTERFACE
+    NOMINMAX
+  )
+
   set(_rc_file "${CMAKE_CURRENT_SOURCE_DIR}/resources/main.rc")
   if(EXISTS "${_rc_file}")
     set(_rc_flags "/I\"${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts\" /I\"${CMAKE_CURRENT_SOURCE_DIR}/resources/img\" /I\"${CMAKE_CURRENT_SOURCE_DIR}/resources\"")
