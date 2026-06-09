@@ -352,7 +352,14 @@ inline size_t shiftBufferLeftStereo(std::vector<float>& left,
                                     std::vector<float>& right,
                                     size_t frames)
 {
-  const size_t len = std::min(left.size(), right.size());
+  if (left.size() != right.size())
+  {
+    const size_t maxLen = std::max(left.size(), right.size());
+    left.resize(maxLen, 0.0f);
+    right.resize(maxLen, 0.0f);
+  }
+
+  const size_t len = left.size();
   if (len == 0 || frames == 0)
     return 0;
 

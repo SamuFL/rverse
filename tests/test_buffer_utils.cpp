@@ -277,3 +277,15 @@ TEST_CASE("BufferUtils: shiftBufferLeftStereo keeps length and zero-pads tail", 
   REQUIRE(left == std::vector<float>{0.2f, 0.4f, 0.6f, 0.0f, 0.0f});
   REQUIRE(right == std::vector<float>{1.0f, 0.5f, 0.25f, 0.0f, 0.0f});
 }
+
+TEST_CASE("BufferUtils: shiftBufferLeftStereo equalizes mismatched channels before shifting", "[bufferutils]")
+{
+  std::vector<float> left = {0.0f, 0.5f, 1.0f};
+  std::vector<float> right = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+
+  const size_t shifted = shiftBufferLeftStereo(left, right, 1);
+
+  REQUIRE(shifted == 1);
+  REQUIRE(left == std::vector<float>{0.5f, 1.0f, 0.0f, 0.0f, 0.0f});
+  REQUIRE(right == std::vector<float>{0.25f, 0.5f, 0.75f, 1.0f, 0.0f});
+}

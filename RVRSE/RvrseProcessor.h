@@ -72,10 +72,7 @@ struct RiserData
 class RvrseProcessor
 {
 public:
-  RvrseProcessor()
-  : mReverbEngine(MakeActiveReverbEngine())
-  {
-  }
+  RvrseProcessor() = default;
 
   // --- Setters (trigger async rebuild) ---
 
@@ -232,6 +229,34 @@ public:
 
   /// @return true if the pipeline is currently processing
   bool isProcessing() const { return mProcessing.load(std::memory_order_acquire); }
+
+#ifdef RVRSE_TEST_BUILD
+  std::shared_ptr<RiserData> RunReverbPipelineForTests(std::shared_ptr<SampleData> sample,
+                                                       double outputSampleRate,
+                                                       float lush,
+                                                       int sequenceId = 1)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      mSourceSample = std::move(sample);
+      mOutputSampleRate = outputSampleRate;
+      mLush = lush;
+      mSequenceId = sequenceId;
+      mTrimStartMs = 0.0;
+      mTrimEndMs = 0.0;
+      mCachedReversedL.clear();
+      mCachedReversedR.clear();
+#ifndef NDEBUG
+      mCachedReverbedL.clear();
+      mCachedReverbedR.clear();
+#endif
+    }
+
+    const int generation = mGeneration.fetch_add(1, std::memory_order_release) + 1;
+    runPipeline(EPipelineStage::Reverb, generation);
+    return peekRiser();
+  }
+#endif
 
 private:
   /// Pipeline stages — rebuild starts from the specified stage onwards.
@@ -439,7 +464,14 @@ private:
 
       const ReverbSettings reverbSettings { lush };
 
-      mReverbEngine->ProcessStereo(
+      auto reverbEngine = MakeActiveReverbEngine();
+      if (!reverbEngine)
+      {
+        mProcessing.store(false, std::memory_order_release);
+        return;
+      }
+
+      reverbEngine->ProcessStereo(
         srcL.data(), srcR.data(),
         lushedL.data(), lushedR.data(),
         totalFrames, processingRate, reverbSettings
@@ -515,7 +547,7 @@ private:
                         riser->mLeft, riser->mRight, sampleRate, quality);
 
     const int headFadeFrames = std::max(0, static_cast<int>(
-      std::lround(sampleRate * kAirwindowsReverbDevTuning.mHeadFadeInMs / 1000.0)
+      std::lround(sampleRate * kTechnicalHeadFadeInMs / 1000.0)
     ));
     if (headFadeFrames > 0)
       applyHeadFadeInStereo(riser->mLeft, riser->mRight, headFadeFrames);
@@ -555,7 +587,6 @@ private:
 
   // --- Parameters (protected by mParamMutex) ---
   std::mutex mParamMutex;
-  std::unique_ptr<IReverbEngine> mReverbEngine;
   std::shared_ptr<SampleData> mSourceSample;
   float mLush = static_cast<float>(kLushDefault / 100.0);
   double mRiserLengthBeats = kRiserLengthValues[kRiserLengthDefault];

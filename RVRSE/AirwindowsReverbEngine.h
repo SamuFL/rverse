@@ -7,6 +7,7 @@
 #include "ReverbEngine.h"
 #include "ReverbEngineDevConfig.h"
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 

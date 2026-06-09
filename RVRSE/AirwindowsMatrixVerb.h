@@ -54,7 +54,7 @@ public:
     const double vibrato = std::clamp(static_cast<double>(params.mVibrato), 0.0, 1.0);
     const double roomSize = std::clamp(static_cast<double>(params.mRoomSize), 0.0, 1.0);
     const double flavor = std::clamp(static_cast<double>(params.mFlavor), 0.0, 1.0);
-    const double preDelayScale = std::max(0.0, static_cast<double>(params.mPreDelayScale));
+    const double preDelayScale = std::clamp(static_cast<double>(params.mPreDelayScale), 0.0, 1.0);
     const double wet = std::clamp(static_cast<double>(params.mWet), 0.0, 1.0);
 
     mBiquadC[0] = mBiquadB[0] = mBiquadA[0] = ((filter * 9000.0) + 1000.0) / mSampleRate;
@@ -87,7 +87,12 @@ public:
     mDelayJ = static_cast<int>(41.0 * size);
     mDelayK = static_cast<int>(37.0 * size);
     mDelayL = static_cast<int>(31.0 * size);
-    mDelayM = std::max(0, static_cast<int>(((29.0 * size) - (56.0 * size * std::fabs(crossmod))) * preDelayScale));
+    const int maxPreDelayFrames = static_cast<int>(mAML.size()) - 1;
+    mDelayM = std::clamp(
+      static_cast<int>(((29.0 * size) - (56.0 * size * std::fabs(crossmod))) * preDelayScale),
+      0,
+      maxPreDelayFrames
+    );
 
     for (size_t frame = 0; frame < numFrames; ++frame)
     {

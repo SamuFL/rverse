@@ -5,9 +5,7 @@
 #include <catch2/catch_approx.hpp>
 
 #include "AirwindowsReverbEngine.h"
-#define private public
 #include "RvrseProcessor.h"
-#undef private
 #include "ReverbEngineFactory.h"
 #include "Constants.h"
 #include "test_helpers.h"
@@ -101,15 +99,7 @@ TEST_CASE("RvrseProcessor: quiet high-lush source survives reverb tail trimming"
   sample->mFileName = "synthetic-quiet.wav";
 
   RvrseProcessor processor;
-  processor.mSourceSample = sample;
-  processor.mOutputSampleRate = sampleRate;
-  processor.mSequenceId = 1;
-  processor.mLush = 0.60f;
-  processor.mGeneration.store(1, std::memory_order_release);
-
-  processor.runPipeline(RvrseProcessor::EPipelineStage::Reverb, 1);
-
-  auto riser = processor.peekRiser();
+  auto riser = processor.RunReverbPipelineForTests(sample, sampleRate, 0.60f, 1);
   REQUIRE(riser != nullptr);
   REQUIRE(0.5f * (rms(riser->mLeft) + rms(riser->mRight)) > 0.0001f);
 }

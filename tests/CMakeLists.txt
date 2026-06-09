@@ -32,6 +32,7 @@ add_executable(rvrse_tests
 )
 
 target_compile_features(rvrse_tests PRIVATE cxx_std_17)
+target_compile_definitions(rvrse_tests PRIVATE RVRSE_TEST_BUILD)
 
 if(WIN32)
   target_compile_definitions(rvrse_tests PRIVATE

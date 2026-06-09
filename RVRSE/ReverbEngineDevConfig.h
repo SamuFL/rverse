@@ -18,7 +18,6 @@ struct AirwindowsReverbDevTuning
   float mFlavor = 0.50f;
   float mPreDelayScale = 0.0f;
   float mWetOutputGain = 3.0f;
-  double mHeadFadeInMs = 25.0;
 };
 constexpr AirwindowsReverbDevTuning kAirwindowsReverbDevTuning {};
 

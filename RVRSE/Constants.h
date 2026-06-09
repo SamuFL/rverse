@@ -90,6 +90,9 @@ constexpr float  kSilenceThreshold   = 0.032f;
 /// fraction of the reverbed peak so fixed-threshold trimming doesn't delete
 /// the entire buffer at high Lush settings.
 constexpr float  kSilenceThresholdPeakFraction = 0.5f;
+/// Fixed technical fade-in applied to the final stretched riser to avoid an
+/// abrupt wet-only start when the user fade-in is at zero.
+constexpr double kTechnicalHeadFadeInMs = 25.0;
 
 // --- Time-Stretching (signalsmith-stretch) ---
 // Quality preset selection for the spectral stretcher.
