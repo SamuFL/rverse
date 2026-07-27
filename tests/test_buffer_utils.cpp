@@ -149,6 +149,21 @@ TEST_CASE("BufferUtils: applyHeadFadeInStereo", "[bufferutils]")
   REQUIRE(right[3] == Approx(1.0f).margin(0.001f));
 }
 
+TEST_CASE("BufferUtils: range fade reaches zero at the release end", "[bufferutils]")
+{
+  std::vector<float> left(8, 1.0f);
+  std::vector<float> right(8, 1.0f);
+
+  applyLinearFadeOutRangeStereo(left, right, 4, 8);
+
+  REQUIRE(left[3] == Approx(1.0f));
+  REQUIRE(left[4] == Approx(1.0f));
+  REQUIRE(left[5] == Approx(2.0f / 3.0f));
+  REQUIRE(left[6] == Approx(1.0f / 3.0f));
+  REQUIRE(left[7] == Approx(0.0f));
+  REQUIRE(right == left);
+}
+
 TEST_CASE("BufferUtils: applyRegionEdgeFadeStereo", "[bufferutils]")
 {
   SECTION("Applies short fade at region boundaries")

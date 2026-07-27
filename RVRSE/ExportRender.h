@@ -49,11 +49,13 @@ inline bool RenderNormalExport(const RiserData& riser,
     return false;
 
   const int hitOffset = riser.HitStartFrame();
-  const int totalFrames = std::max(riserFrames, hitOffset + hitFrames);
+  const int totalFrames = riser.SequenceFrames(hitFrames);
   if (totalFrames <= 0)
     return false;
 
-  const int fadeInLen = static_cast<int>(static_cast<float>(riserFrames) * config.mFadeInPct);
+  const int fadeInLen = static_cast<int>(
+    static_cast<float>(riser.mBeatAnchorFrames) * config.mFadeInPct
+  );
   const float velocityGain = std::clamp(config.mVelocityGain, 0.0f, 1.0f);
   output.mSampleRate = static_cast<uint32_t>(std::lround(riser.mSampleRate > 0.0 ? riser.mSampleRate : hit.mSampleRate));
   output.mNumFrames = totalFrames;

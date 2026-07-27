@@ -47,6 +47,10 @@ constexpr const char* kRiserLengthLabels[kNumRiserLengths] = {
 // --- Parameter defaults ---
 constexpr double kLushDefault        = 40.0;   ///< Reverb wet amount (0–100%)
 constexpr double kFadeInDefault      = 60.0;   ///< Fade-in shape (0–100%)
+constexpr double kRiserReleaseMinMs  = 0.0;    ///< Minimum requested post-anchor riser release
+constexpr double kRiserReleaseMaxMs  = 500.0;  ///< Maximum requested post-anchor riser release
+constexpr double kRiserReleaseDefaultMs = 50.0; ///< Default requested release for new instances
+constexpr double kRiserReleaseStepMs = 1.0;    ///< UI resolution for Riser Release
 constexpr double kRiserVolumeDefault  = 0.0;    ///< Riser volume in dB (default: unity)
 constexpr double kHitVolumeDefault   = 0.0;    ///< Hit volume in dB (default: unity)
 constexpr double kVolumeMinDb        = -60.0;  ///< Voice volume minimum (-60 dB ≈ silence)
@@ -138,6 +142,7 @@ constexpr double kDefaultBPM         = 120.0;
 constexpr double kNoteOffFadeMs      = 5.0;    ///< Note-off fade-out duration in milliseconds (anti-click)
 constexpr double kStutterFadeMs      = 2.0;    ///< Stutter gate ramp duration in milliseconds (anti-click)
 constexpr double kTrimEdgeFadeMs     = 5.0;    ///< Trim-edge fade for hit-region boundary conditioning
+constexpr double kRenderStatusDelayMs = 200.0; ///< Delay before showing offline render feedback
 
 // --- Sample Loading ---
 constexpr int    kMaxSampleLengthSeconds = 30;             ///< Max sample length in seconds

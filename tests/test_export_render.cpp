@@ -9,7 +9,7 @@ TEST_CASE("ExportRender: mixes riser and hit at beat boundary", "[export]")
   riser.mLeft = {1.0f, 1.0f, 1.0f, 1.0f};
   riser.mRight = {0.5f, 0.5f, 0.5f, 0.5f};
   riser.mSampleRate = 48000.0;
-  riser.mBeatAlignedFrames = 2;
+  riser.mBeatAnchorFrames = 2;
   riser.mHitPreBeatFrames = 1;
 
   rvrse::SampleData hit;
@@ -19,7 +19,7 @@ TEST_CASE("ExportRender: mixes riser and hit at beat boundary", "[export]")
   hit.mNumChannels = 2;
 
   rvrse::ExportRenderConfig config;
-  config.mFadeInPct = 0.5f;
+  config.mFadeInPct = 0.0f;
   config.mRiserGain = 0.5f;
   config.mHitGain = 2.0f;
 
@@ -31,7 +31,7 @@ TEST_CASE("ExportRender: mixes riser and hit at beat boundary", "[export]")
   REQUIRE(output.mNumFrames == 4);
 
   const std::vector<float> expected = {
-    0.0f, 0.0f,
+    0.5f, 0.25f,
     1.0f, 1.75f,
     1.5f, 1.25f,
     2.0f, 0.75f
@@ -40,6 +40,30 @@ TEST_CASE("ExportRender: mixes riser and hit at beat boundary", "[export]")
   REQUIRE(output.mInterleaved.size() == expected.size());
   for (size_t i = 0; i < expected.size(); ++i)
     REQUIRE(output.mInterleaved[i] == Catch::Approx(expected[i]).margin(1e-6));
+}
+
+TEST_CASE("ExportRender: Fade In uses pre-anchor duration rather than release length", "[export]")
+{
+  rvrse::RiserData riser;
+  riser.mLeft = std::vector<float>(8, 1.0f);
+  riser.mRight = std::vector<float>(8, 1.0f);
+  riser.mSampleRate = 48000.0;
+  riser.mBeatAnchorFrames = 4;
+  riser.mEffectiveReleaseFrames = 4;
+
+  rvrse::SampleData hit;
+  hit.mLeft = {0.0f};
+  hit.mRight = {0.0f};
+  hit.mSampleRate = 48000.0;
+  hit.mNumChannels = 2;
+
+  rvrse::ExportRenderConfig config;
+  config.mFadeInPct = 0.5f;
+
+  rvrse::ExportRenderData output;
+  REQUIRE(rvrse::RenderNormalExport(riser, hit, config, output));
+  REQUIRE(output.mInterleaved[0] == Catch::Approx(0.0f));
+  REQUIRE(output.mInterleaved[2] == Catch::Approx(1.0f));
 }
 
 TEST_CASE("ExportRender: rejects missing render inputs", "[export]")

@@ -32,8 +32,9 @@ Every parameter listed here MUST have a corresponding control in the GUI. The "C
 | 1 | **Lush** | `kParamLush` | Continuous knob | 0 – 100 | 0.1 | 40 | % | Controls reverb room size + wet gain. 0% = dry, 100% = cathedral wash. The name is intentionally musical, not technical. |
 | 2 | **Riser Length** | `kParamRiserLength` | Discrete / stepped knob | 1/4, 1/2, 1, 2, 4, 8, 16 | — | 4 | beats | Duration of the riser before the hit. **Must latch to discrete musical values only** — no in-between positions. A stepped knob (7 positions) or a rotary selector works well. Display should show musical notation: "1/4", "1/2", "1", "2", "4", "8", "16" beats. iPlug2: use `InitEnum()` with 7 values, not `InitDouble()`. |
 | 3 | **Fade In** | `kParamFadeIn` | Continuous knob | 0 – 100 | 0.1 | 60 | % | Shape of the volume ramp from silence to full over the riser duration. 0% = no fade (full volume from start), 100% = linear ramp from silence. |
-| 4 | **Riser Volume** | `kParamRiserVolume` | Continuous knob | -60 – +6 | 0.1 | 0 | dB | Level of the riser output. -60 dB ≈ silence. Unity = 0 dB. |
-| 5 | **Stretch Quality** | `kParamStretchQuality` | Toggle / Slide switch | High / Low | — | High | — | **Low priority control** — can be smaller or tucked away. "High" = best quality (presetDefault, larger FFT), recommended for rendering/mixdown. "Low" = faster (~2× CPU saving), for real-time tweaking or resource-limited systems. Tooltip: "High quality recommended for final renders. Use Low for faster previews." |
+| 4 | **Riser Release** | `kParamRiserReleaseMs` | Commit-on-release knob | 0 – 500 | 1 | 50 | ms | Non-automatable post-anchor linear decay. Show 0/500 endpoints and a clamp icon/tooltip when the effective value is limited by Riser Length/tempo. |
+| 5 | **Riser Volume** | `kParamRiserVolume` | Continuous knob | -60 – +6 | 0.1 | 0 | dB | Level of the riser output. -60 dB ≈ silence. Unity = 0 dB. |
+| 6 | **Stretch Quality** | `kParamStretchQuality` | Toggle / Slide switch | High / Low | — | High | — | **Low priority control** — can be smaller or tucked away. "High" = best quality (presetDefault, larger FFT), recommended for rendering/mixdown. "Low" = faster (~2× CPU saving), for real-time tweaking or resource-limited systems. Tooltip: "High quality recommended for final renders. Use Low for faster previews." |
 
 ### 3.2 Riser Section — Real-Time Parameters
 > These respond instantly (per-sample in audio thread). Full MIDI CC support.
@@ -42,20 +43,20 @@ Every parameter listed here MUST have a corresponding control in the GUI. The "C
 
 | # | Parameter | Code Name | Control Type | Range | Step | Default | Unit | MIDI CC | Tooltip / UX Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| 6 | **Stutter Rate** | `kParamStutterRate` | Continuous knob | 0 – 30 | 0.1 | 0 (OFF) | Hz | CC 1 (mod wheel) | Rhythmic chop rate applied to the riser. 0 = stutter disabled. Higher values = faster chopping. |
-| 7 | **Stutter Depth** | `kParamStutterDepth` | Continuous knob | 0 – 1.0 | 0.01 | 0.5 | (normalized) | CC 11 (expression) | Wet/dry mix of the stutter gate. 0 = no stutter audible even if Rate > 0. Display as percentage (0–100%) in the GUI. |
+| 7 | **Stutter Rate** | `kParamStutterRate` | Continuous knob | 0 – 30 | 0.1 | 0 (OFF) | Hz | CC 1 (mod wheel) | Rhythmic chop rate applied to the riser. 0 = stutter disabled. Higher values = faster chopping. |
+| 8 | **Stutter Depth** | `kParamStutterDepth` | Continuous knob | 0 – 1.0 | 0.01 | 0.5 | (normalized) | CC 11 (expression) | Wet/dry mix of the stutter gate. 0 = no stutter audible even if Rate > 0. Display as percentage (0–100%) in the GUI. |
 
 ### 3.3 Hit Section
 
 | # | Parameter | Code Name | Control Type | Range | Step | Default | Unit | Tooltip / UX Notes |
 |---|---|---|---|---|---|---|---|---|
-| 8 | **Hit Volume** | `kParamHitVolume` | Continuous knob | -60 – +6 | 0.1 | 0 | dB | Level of the original dry hit when it fires at the beat boundary. |
+| 9 | **Hit Volume** | `kParamHitVolume` | Continuous knob | -60 – +6 | 0.1 | 0 | dB | Level of the original dry hit when it fires at the beat boundary. |
 
 ### 3.4 Global / Bottom Bar
 
 | # | Parameter | Code Name | Control Type | Range | Step | Default | Unit | Tooltip / UX Notes |
 |---|---|---|---|---|---|---|---|---|
-| 9 | **Master Volume** | `kParamMasterVol` | Continuous knob | 0 – 100 | 0.01 | 100 | % | Overall output level. NOTE: This is a percentage (0–100%), NOT dB. 100% = unity. |
+| 10 | **Master Volume** | `kParamMasterVol` | Continuous knob | 0 – 100 | 0.01 | 100 | % | Overall output level. NOTE: This is a percentage (0–100%), NOT dB. 100% = unity. |
 
 ### 3.5 Debug / Developer Parameters
 > These should be **hidden by default** in the release GUI. Exposed only via a secret gesture
@@ -63,7 +64,7 @@ Every parameter listed here MUST have a corresponding control in the GUI. The "C
 
 | # | Parameter | Code Name | Control Type | Values | Default | Tooltip / UX Notes |
 |---|---|---|---|---|---|---|
-| 10 | **Debug Stage** | `kParamDebugStage` | Dropdown / Menu | Normal, Reverbed, Reversed, Riser Only | Normal | Selects which pipeline stage buffer to audition. "Normal" = full riser+hit. Other modes play intermediate buffers for diagnostics. Developer tool — not for end users. |
+| 11 | **Debug Stage** | `kParamDebugStage` | Dropdown / Menu | Normal, Reverbed, Reversed, Riser Only | Normal | Selects which pipeline stage buffer to audition. "Normal" = full riser+hit. Other modes play intermediate buffers for diagnostics. Developer tool — not for end users. |
 
 ### 3.6 Future Parameters (NOT YET IMPLEMENTED — design space only)
 > These are defined in the product brief but not yet wired in code. The GUI design should
@@ -82,7 +83,7 @@ Every parameter listed here MUST have a corresponding control in the GUI. The "C
 | **Load Sample** | IVButtonControl | Opens native OS file dialog for WAV/AIFF. Prominent — this is the first thing a new user does. | Critical |
 | **Sample Name** | ITextControl | Shows loaded file: name, sample rate, channels, duration. E.g., "crash_01.wav (48kHz, stereo, 1.2s)". Shows "No sample loaded" when empty, "Loading..." during load, "Missing: filename" on error. | Critical |
 | **BPM Display** | ITextControl | Shows host tempo (read-only). Format: "BPM: 120.0". Updates from DAW. | High |
-| **Waveform Display** | Custom IControl | Shows the complete riser+hit waveform. Reversed riser on the left transitioning into the sharp hit transient on the right. Animated playhead during playback. This is the visual centrepiece. | High |
+| **Waveform Display** | Custom IControl | Shows one accurate sequence timeline with riser/hit at their real offsets, shaded Effective Riser Release overlap, Beat Anchor, and animated playhead. | High |
 | **Hit Waveform Preview** | Custom IControl | Smaller waveform of just the original loaded sample (pre-processing). Gives visual feedback that a sample is loaded. | Medium |
 | **MIDI CC Indicator** | Icon / glyph (◉) | Small indicator near Stutter Rate and Stutter Depth knobs. Lights up (accent color) when the knob is receiving external MIDI CC. Dim/hidden when not active. | Medium |
 | **Processing Indicator** | Subtle animation or text | Shows when the offline pipeline is recalculating (e.g., after Lush or Length change). Could be a spinner near the waveform, or the waveform itself fading to indicate "stale". | Low |

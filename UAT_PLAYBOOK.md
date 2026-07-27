@@ -44,6 +44,7 @@ Run these tests manually after every change to the DSP pipeline or plugin behavi
 | 10 | Stretch Quality | High / Low | High | — | enum |
 | 11 | Trim Start     | 0–30000        | 0         | ms    | 1     |
 | 12 | Trim End       | 0–30000        | 0         | ms    | 1     |
+| 13 | Riser Release  | 0–500          | 50        | ms    | 1     |
 
 ---
 
@@ -87,10 +88,10 @@ audible, artefact-free reverse-reverb riser for each.
 
 ---
 
-## Test Scenario 2 — Parameter Tests (All 8 Parameters)
+## Test Scenario 2 — Core Parameter Tests
 
-**Goal:** Verify that each DAW-automatable parameter produces the expected audible
-effect. Use the reference sample and DAW generic editor for all tests.
+**Goal:** Verify that each core sound parameter produces the expected audible effect.
+Use the reference sample and plugin UI; use the DAW generic editor for automatable parameters.
 
 **Setup:** Load the reference sample, set all parameters to defaults, trigger a
 sustained MIDI note for each sub-test. Change **one parameter at a time** unless
@@ -136,19 +137,18 @@ Riser Length is a **discrete** parameter. Only the following musical values are 
 > fire at the end of the riser regardless of length — verify the riser→hit timing is correct
 > for each setting.
 
-#### 2.3h Adaptive Riser-to-Hit Overlap (Stretch-Dependent)
+#### 2.3h Riser Release Limit (Length-Dependent)
 
-Test at **extreme** riser lengths to verify the adaptive overlap scales correctly:
+Set Riser Release to 500 ms and test the effective limit at extreme riser lengths:
 
 | Test | Riser Length | Sample | Expected |
 |------|-------------|--------|----------|
-| 2.3h-1 | 16 beats, 60 BPM | Short kick (<100 ms) | Riser end crossfades smoothly into hit — no audible gap or volume dip before hit |
-| 2.3h-2 | 1/4 beat, 180 BPM | Snare with tail (>1 s) | Minimal overlap (near 1/32 beat) — no over-bleed |
-| 2.3h-3 | 16 beats, 60 BPM | Snare with tail (>1 s) | Large overlap — riser tail gently merges into hit without hard cut |
+| 2.3h-1 | 16 beats, 60 BPM | Short kick (<100 ms) | Full requested 500 ms release |
+| 2.3h-2 | 1/4 beat, 180 BPM | Snare with tail (>1 s) | Release limited to the short pre-anchor duration; clamp icon visible |
+| 2.3h-3 | Return to 16 beats, 60 BPM | Snare with tail (>1 s) | Stored 500 ms request becomes fully effective again |
 
-> At high stretch ratios (e.g. 16 beats at 60 BPM with a short sample), the overlap
-> scales up automatically. The hit must still fire **exactly** on-beat; only the riser
-> tail extends further past the boundary.
+> Limiting must not overwrite the requested value. The hit's technical onset ramp remains
+> centered on the Beat Anchor at every length.
 
 ### 2.4 Fade In
 
@@ -686,10 +686,46 @@ without MIDI while preserving the existing MIDI-triggered behavior.
 
 ---
 
+## Test Scenario 12 — Riser Release
+
+**Goal:** Verify the offline post-anchor riser decay, limiting, committed-sequence handoff,
+and shared playback/export/waveform timing.
+
+### Tests
+
+1. Load kick, vocal, and pad references; audition Riser Release at 0, 50, 250, and 500 ms.
+2. At 0 ms, verify the riser has no post-anchor extension or release fade.
+3. At non-zero values, verify the dry hit remains intact while the riser fades linearly after the Beat Anchor.
+4. Select a short Riser Length at high tempo and request 500 ms. Verify the clamp icon appears,
+   its tooltip reports the effective limit, and the waveform shades only the effective region.
+5. Slow the tempo or increase Riser Length. Verify the original 500 ms request becomes effective again.
+6. Change Riser Release while playback is active. Verify the current and newly triggered notes use
+   the last committed sequence until rendering completes.
+7. Force a render longer than 200 ms. Verify delayed `Rendering...` feedback appears and Export is
+   disabled until the replacement sequence commits.
+8. Compare MIDI playback, UI preview, waveform playhead, and exported WAV alignment.
+9. Enable Stutter and verify it continues through the release without a gain jump at the Beat Anchor.
+10. Restore a v1 project state. Verify its adaptive riser tail remains until any Release gesture;
+    verify a gesture ending at 0 selects literal numeric bypass and double-click selects 50 ms.
+
+### Pass Criteria
+
+- [ ] 12.1 — Numeric 0 is a literal release bypass
+- [ ] 12.2 — 50/250/500 ms releases decay smoothly without clicks or DC jumps
+- [ ] 12.3 — Effective limiting is visible and non-destructive
+- [ ] 12.4 — Fade In remains based on pre-anchor Riser Length
+- [ ] 12.5 — Playback, preview, waveform, and Export share timing
+- [ ] 12.6 — Pending renders preserve performance and gate Export
+- [ ] 12.7 — v1 adaptive riser-tail migration exits only on a Release gesture
+- [ ] 12.8 — No objectionable loudness pump across kick, vocal, and pad references
+
+---
+
 ## Revision History
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
+| 2026-07-27 | Added Scenario 12: Riser Release, limiting, shared timeline, and pending renders |
 | 2026-05-18 | Added Scenario 10: UI preview transport                                 |
 | 2026-04-28 | Added Scenario 9: drag-and-drop sample loading                          |
 | 2026-04-05 | Added Scenario 6: sample persistence tests                              |

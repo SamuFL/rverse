@@ -41,7 +41,7 @@ Everything flows through two distinct processing layers: an **offline pipeline**
 
 | Layer | Parameters | Reason |
 |---|---|---|
-| Offline | Lush, Riser Length | Reverb + time-stretch require full buffer rebuilds — too expensive for real-time |
+| Offline | Lush, Riser Length, Riser Release | Reverb + time-stretch require background rendering — too expensive for real-time |
 | Real-time | Stutter Rate, Stutter Depth, all others | Lightweight gate math — must respond instantly to MIDI CC for expressiveness |
 
 ### Timing Model
@@ -50,8 +50,8 @@ RVRSE reads the host BPM via iPlug2's `ITimeInfo`. When a MIDI note-on arrives:
 
 1. Riser playback begins immediately from `final_riser[]`
 2. The plugin counts forward exactly `(Riser Length × samplesPerBeat)` samples
-3. At that exact sample offset, the dry hit fires — perfectly on the beat
-4. Both voices release naturally
+3. The dry hit's fixed technical onset ramp is centered on that Beat Anchor
+4. The riser continues for the Effective Riser Release and fades linearly beneath the hit
 
 > **The core idea:** because the riser IS the hit reversed and reverbed, the timbral build-up always matches the impact perfectly. One sample → complete transition. No sample hunting, no mismatched textures.
 
@@ -66,6 +66,7 @@ RVRSE reads the host BPM via iPlug2's `ITimeInfo`. When a MIDI note-on arrives:
 |---|---|---|---|
 | Lush | 0 – 100% | 40% | Reverb wet amount + room size (linked). 0 = dry reversed sample. 100 = fully washed-out reverb tail, reversed. |
 | Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 beats | How many beats before the hit the riser begins. Tempo-synced via host BPM. Discrete musical values only — no in-between positions. |
+| Riser Release | 0 – 500 ms | 50 ms | Requested post-anchor riser decay. Effective duration is limited to the pre-anchor riser length without overwriting the request. |
 
 ### Riser Section — Real-Time Parameters
 > These are computed per-sample in the audio thread. Full MIDI CC support. Changing them is instantaneous with no glitches.
@@ -109,12 +110,17 @@ lushed_buffer[]
       ↓
 reversed_buffer[]
       ↓
-  [ Spectral Time-Stretch ]  ←  Riser Length + host BPM
+  [ Spectral Time-Stretch ]  ←  Riser Length + host BPM + Riser Release
+      ↓
+  [ Linear Release Fade ]    ←  Beat Anchor → Effective Riser Release end
       ↓
 final_riser[]  →  ready for real-time playback
 ```
 
-On any offline parameter change: rebuild from the appropriate stage onwards (e.g. changing Lush re-runs everything; changing only Riser Length skips the reverb stage and stretches the existing `reversed_buffer[]`).
+On any offline parameter change: rebuild from the appropriate stage onwards (e.g. changing
+Lush re-runs everything; changing Riser Length, BPM, or Riser Release skips reverb and stretches
+the existing `reversed_buffer[]`). The previous playable sequence remains available until the
+replacement commits.
 
 ### Real-Time Layer (audio thread, per-sample)
 
@@ -147,10 +153,11 @@ Uses **signalsmith-stretch** (MIT, spectral, polyphonic-aware) for high-quality 
 Originally OLA for MVP; upgraded to spectral for production quality. Stretch factor:
 
 ```
-stretchFactor = (riserLengthBeats × samplesPerBeat) / reversed_buffer.size()
+effectiveReleaseFrames = min(requestedReleaseFrames, beatAnchorFrames)
+stretchFactor = (beatAnchorFrames + effectiveReleaseFrames) / reversed_buffer.size()
 ```
 
-Recalculate `final_riser[]` whenever Riser Length changes or the host BPM changes.
+Recalculate `final_riser[]` whenever Riser Length, Riser Release, or the host BPM changes.
 
 ### Stutter (Real-Time)
 

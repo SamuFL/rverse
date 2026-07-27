@@ -35,6 +35,14 @@ TEST_CASE("Constants: relational invariants", "[constants]")
     REQUIRE(kRiserTailFadeBeats <= 1.0);
   }
 
+  SECTION("Riser Release range contains the default")
+  {
+    REQUIRE(kRiserReleaseMinMs == 0.0);
+    REQUIRE(kRiserReleaseMinMs < kRiserReleaseDefaultMs);
+    REQUIRE(kRiserReleaseDefaultMs <= kRiserReleaseMaxMs);
+    REQUIRE(kRiserReleaseStepMs > 0.0);
+  }
+
   SECTION("Max sample frames formula")
   {
     REQUIRE(kMaxSampleFrames == kMaxSampleLengthSeconds * 192000);
