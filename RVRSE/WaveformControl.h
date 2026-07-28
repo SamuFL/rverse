@@ -54,6 +54,31 @@ public:
     SetDirty(false);
   }
 
+  /// Set committed sequence offsets in the shared playback/export timeline.
+  void SetSequenceTiming(int beatAnchorFrames,
+                         int hitStartFrame,
+                         int effectiveReleaseFrames,
+                         int sequenceFrames)
+  {
+    beatAnchorFrames = (std::max)(0, beatAnchorFrames);
+    hitStartFrame = (std::max)(0, hitStartFrame);
+    effectiveReleaseFrames = (std::max)(0, effectiveReleaseFrames);
+    sequenceFrames = (std::max)(0, sequenceFrames);
+    if (mBeatAnchorFrames == beatAnchorFrames &&
+        mHitStartFrame == hitStartFrame &&
+        mEffectiveReleaseFrames == effectiveReleaseFrames &&
+        mSequenceFrames == sequenceFrames)
+    {
+      return;
+    }
+
+    mBeatAnchorFrames = beatAnchorFrames;
+    mHitStartFrame = hitStartFrame;
+    mEffectiveReleaseFrames = effectiveReleaseFrames;
+    mSequenceFrames = sequenceFrames;
+    SetDirty(false);
+  }
+
   /// Set riser volume in dB for visual scaling.
   void SetRiserVolumeDb(float dB)
   {
@@ -116,7 +141,9 @@ public:
     const float h = r.H();
     const float midY = r.MH();
 
-    const int totalFrames = mRiserFrames + mHitFrames;
+    const int totalFrames = mSequenceFrames > 0
+      ? mSequenceFrames
+      : (std::max)(mRiserFrames, mHitStartFrame + mHitFrames);
     if (totalFrames == 0)
     {
       // Empty state — draw hint text
@@ -125,9 +152,16 @@ public:
       return;
     }
 
-    // Compute split point: riser takes proportional width
-    const float riserFrac = static_cast<float>(mRiserFrames) / static_cast<float>(totalFrames);
-    const float splitX = r.L + w * riserFrac;
+    const auto FrameToX = [&](int frame) {
+      return r.L + w * std::clamp(
+        static_cast<float>(frame) / static_cast<float>(totalFrames), 0.0f, 1.0f
+      );
+    };
+    const float riserEndX = FrameToX(mRiserFrames);
+    const float hitStartX = FrameToX(mHitStartFrame);
+    const float hitEndX = FrameToX(mHitStartFrame + mHitFrames);
+    const float beatAnchorX = FrameToX(mBeatAnchorFrames);
+    const float releaseEndX = FrameToX(mBeatAnchorFrames + mEffectiveReleaseFrames);
 
     // Shared peak across both waveforms for correct relative amplitude
     float sharedPeak = 0.001f;
@@ -145,24 +179,32 @@ public:
     // Draw riser waveform (gold) — with volume and fade-in envelope
     if (!mRiserPeaks.IsEmpty())
     {
-      DrawWaveform(g, mRiserPeaks, IRECT(r.L, r.T, splitX, r.B),
+      const float visualFadeInFrac = mRiserFrames > 0
+        ? mFadeInFrac * static_cast<float>(mBeatAnchorFrames) / static_cast<float>(mRiserFrames)
+        : 0.0f;
+      DrawWaveform(g, mRiserPeaks, IRECT(r.L, r.T, riserEndX, r.B),
                    gui::kColorGold, gui::kColorGold.WithOpacity(0.06f),
-                   sharedPeak, mRiserGain, mFadeInFrac);
+                   sharedPeak, mRiserGain, visualFadeInFrac);
     }
 
-    // Draw hit waveform (blue) — with volume scaling
+    // Draw hit at its real offset so the release overlap is visible.
     if (!mHitPeaks.IsEmpty())
     {
-      DrawWaveform(g, mHitPeaks, IRECT(splitX, r.T, r.R, r.B),
+      DrawWaveform(g, mHitPeaks, IRECT(hitStartX, r.T, hitEndX, r.B),
                    gui::kColorBlue, gui::kColorBlue.WithOpacity(0.06f),
                    sharedPeak, mHitGain, 0.f);
     }
 
-    // Separator line at split point
-    if (mRiserFrames > 0 && mHitFrames > 0)
+    if (mEffectiveReleaseFrames > 0)
     {
-      g.DrawLine(gui::kColorSeparator, splitX, r.T + 4.f, splitX, r.B - 4.f, nullptr, 1.f);
+      g.FillRect(
+        gui::kColorSteel.WithOpacity(0.10f),
+        IRECT(beatAnchorX, r.T, releaseEndX, r.B)
+      );
     }
+
+    // Beat Anchor is the canonical visual separator.
+    g.DrawLine(gui::kColorSeparator, beatAnchorX, r.T + 4.f, beatAnchorX, r.B - 4.f, nullptr, 1.f);
 
     // Center line (zero axis)
     g.DrawLine(gui::kColorSeparator, r.L, midY, r.R, midY, nullptr, 0.5f);
@@ -181,13 +223,13 @@ public:
     if (mRiserFrames > 0)
     {
       const IText riserLabel(11, gui::kColorGold.WithOpacity(0.4f), "Roboto-Regular", EAlign::Near, EVAlign::Middle);
-      IRECT labelR(r.L + 8.f, r.B - 18.f, splitX - 4.f, r.B - 4.f);
+      IRECT labelR(r.L + 8.f, r.B - 18.f, beatAnchorX - 4.f, r.B - 4.f);
       g.DrawText(riserLabel, "RISER", labelR);
     }
     if (mHitFrames > 0)
     {
       const IText hitLabel(11, gui::kColorBlue.WithOpacity(0.4f), "Roboto-Regular", EAlign::Far, EVAlign::Middle);
-      IRECT labelR(splitX + 4.f, r.B - 18.f, r.R - 8.f, r.B - 4.f);
+      IRECT labelR(beatAnchorX + 4.f, r.B - 18.f, r.R - 8.f, r.B - 4.f);
       g.DrawText(hitLabel, "HIT", labelR);
     }
   }
@@ -316,6 +358,10 @@ private:
   WaveformPeaks mHitPeaks;
   int mRiserFrames = 0;
   int mHitFrames = 0;
+  int mBeatAnchorFrames = 0;
+  int mHitStartFrame = 0;
+  int mEffectiveReleaseFrames = 0;
+  int mSequenceFrames = 0;
   float mPlayheadPos = -1.f; ///< 0..1 fraction, negative = hidden
   float mRiserGain = 1.f;    ///< Visual volume scaling for riser
   float mHitGain = 1.f;      ///< Visual volume scaling for hit

@@ -9,6 +9,7 @@
 #include "TrimUtils.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -29,6 +30,7 @@ enum EParams
   kParamStretchQuality,
   kParamTrimStartMs,
   kParamTrimEndMs,
+  kParamRiserReleaseMs,
   kNumParams
 };
 
@@ -60,6 +62,7 @@ enum ECtrlTags
   kCtrlTagLush,
   kCtrlTagRiserLength,
   kCtrlTagFadeIn,
+  kCtrlTagRiserRelease,
   kCtrlTagRiserVolume,
   kCtrlTagStretchQuality,
   kCtrlTagOfflineSectionLabel,
@@ -147,7 +150,9 @@ private:
   void ClearLoadedSampleState();
   void QueueSampleLoadError(const char* errorMessage, bool clearLoadedState = false);
   void CommitTrimParameters(double trimStartMs, double trimEndMs);
+  void CommitRiserRelease(double releaseMs);
   void QueueSequenceForCurrentTrim();
+  bool HasPendingRender() const;
   rvrse::TrimRangeFrames GetCommittedTrimRangeForSample(const std::shared_ptr<rvrse::SampleData>& sample) const;
 
   /// Internal sample load implementation. Must only be called from the UI thread
@@ -205,6 +210,7 @@ private:
   int mLastStretchQuality = -1;       ///< Last Stretch Quality sent to processor
   double mLastTrimStartMs = -1.0;     ///< Last trim start sent to the processor
   double mLastTrimEndMs = -1.0;       ///< Last trim end sent to the processor
+  std::atomic<bool> mLegacyTransition { false }; ///< Preserve v1 adaptive riser-tail behavior
 
   /// Audio-thread's local copy of the riser buffer (lock-free read from processor)
   /// NOTE: shared_ptr read/write across threads is technically a data race in C++17.
@@ -237,6 +243,9 @@ private:
   std::string mActiveExportStatusText;  ///< Export status text currently shown in the header
   int mExportStatusFramesRemaining = 0; ///< OnIdle countdown for transient export status (-1 = persistent)
   std::shared_ptr<ExportUiState> mExportUiState { std::make_shared<ExportUiState>() };
+  bool mRenderPending = false; ///< UI-thread pending-render edge tracking
+  bool mRenderStatusVisible = false;
+  std::chrono::steady_clock::time_point mRenderPendingSince;
 
   // --- Stutter gate (audio thread only) ---
   rvrse::StutterState mStutterState;  ///< Per-voice stutter phase state

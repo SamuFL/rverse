@@ -120,6 +120,42 @@ inline void applyTailFadeOutStereo(std::vector<float>& left,
   applyTailFadeOut(right, fadeSamples);
 }
 
+/// Apply an endpoint-correct linear fade from unity at startFrame to zero at
+/// endFrameExclusive - 1.
+inline void applyLinearFadeOutRange(std::vector<float>& buf,
+                                    int startFrame,
+                                    int endFrameExclusive)
+{
+  if (buf.empty())
+    return;
+
+  startFrame = std::clamp(startFrame, 0, static_cast<int>(buf.size()));
+  endFrameExclusive = std::clamp(endFrameExclusive, startFrame, static_cast<int>(buf.size()));
+  const int fadeLen = endFrameExclusive - startFrame;
+  if (fadeLen <= 0)
+    return;
+  if (fadeLen == 1)
+  {
+    buf[static_cast<size_t>(startFrame)] = 0.0f;
+    return;
+  }
+
+  for (int i = 0; i < fadeLen; ++i)
+  {
+    const float gain = 1.0f - static_cast<float>(i) / static_cast<float>(fadeLen - 1);
+    buf[static_cast<size_t>(startFrame + i)] *= gain;
+  }
+}
+
+inline void applyLinearFadeOutRangeStereo(std::vector<float>& left,
+                                          std::vector<float>& right,
+                                          int startFrame,
+                                          int endFrameExclusive)
+{
+  applyLinearFadeOutRange(left, startFrame, endFrameExclusive);
+  applyLinearFadeOutRange(right, startFrame, endFrameExclusive);
+}
+
 /// Apply a linear fade-in to the first N samples of a mono buffer.
 inline void applyHeadFadeIn(std::vector<float>& buf, int fadeSamples)
 {

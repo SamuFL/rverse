@@ -10,6 +10,7 @@
 #include "dr_wav.h"
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cmath>
@@ -314,6 +315,133 @@ private:
   EIcon mIcon;
   IColor mAccent;
 };
+
+class ReleaseKnobControl final : public IVKnobControl
+{
+public:
+  using CommitFunction = std::function<void(double)>;
+
+  ReleaseKnobControl(const IRECT& bounds,
+                     int paramIdx,
+                     const IVStyle& style,
+                     CommitFunction commitFunction)
+  : IVKnobControl(bounds, paramIdx, "RELEASE", style, false)
+  , mCommitFunction(std::move(commitFunction))
+  {
+    SetTooltip("Riser Release");
+  }
+
+  void OnMouseDrag(float x, float y, float dX, float dY, const IMouseMod& mod) override
+  {
+    const double gearing = IsFineControl(mod, false) ? mGearing * 10.0 : mGearing;
+    const IRECT dragBounds = GetKnobDragBounds();
+
+    if (mDirection == EDirection::Vertical)
+      mMouseDragValue += static_cast<double>(dY / static_cast<double>(dragBounds.T - dragBounds.B) / gearing);
+    else
+      mMouseDragValue += static_cast<double>(dX / static_cast<double>(dragBounds.R - dragBounds.L) / gearing);
+
+    mMouseDragValue = Clip(mMouseDragValue, 0.0, 1.0);
+    double value = mMouseDragValue;
+    if (const IParam* pParam = GetParam(); pParam && pParam->GetStepped() && pParam->GetStep() > 0.0)
+      value = pParam->ConstrainNormalized(value);
+
+    SetValue(value);
+    SetDirty(false);
+  }
+
+  void OnMouseUp(float x, float y, const IMouseMod& mod) override
+  {
+    const double releaseMs = GetParam()->FromNormalized(GetValue());
+    IKnobControlBase::OnMouseUp(x, y, mod);
+    Commit(releaseMs);
+  }
+
+  void OnMouseDblClick(float x, float y, const IMouseMod& mod) override
+  {
+    (void) x;
+    (void) y;
+    (void) mod;
+    Commit(GetParam()->GetDefault());
+  }
+
+  void OnMouseWheel(float x, float y, const IMouseMod& mod, float delta) override
+  {
+    (void) x;
+    (void) y;
+    (void) mod;
+    if (delta == 0.0f)
+      return;
+
+    const double releaseMs = std::clamp(
+      GetParam()->Value() + (delta > 0.0f ? GetParam()->GetStep() : -GetParam()->GetStep()),
+      GetParam()->GetMin(), GetParam()->GetMax()
+    );
+    Commit(releaseMs);
+  }
+
+  void Draw(IGraphics& g) override
+  {
+    IVKnobControl::Draw(g);
+
+    const IText endpointText(
+      9, rvrse::gui::kColorTextSecondary.WithOpacity(0.7f),
+      "Roboto-Regular", EAlign::Center, EVAlign::Middle
+    );
+    const IRECT endpoints = mRECT.GetFromBottom(12.0f);
+    g.DrawText(endpointText, "0", endpoints.GetFromLeft(14.0f));
+    g.DrawText(endpointText, "500", endpoints.GetFromRight(22.0f));
+
+    if (mLimited)
+    {
+      const IRECT icon = mRECT.GetFromTRHC(13.0f, 13.0f).GetTranslated(-2.0f, 2.0f);
+      g.FillCircle(rvrse::gui::kColorSteel, icon.MW(), icon.MH(), 6.0f);
+      const IText iconText(
+        9, rvrse::gui::kColorDark, "Roboto-Bold", EAlign::Center, EVAlign::Middle
+      );
+      g.DrawText(iconText, "!", icon);
+    }
+  }
+
+  void SetLimited(bool limited, int effectiveReleaseFrames, double sampleRate)
+  {
+    const int displayedEffectiveReleaseMs = limited && sampleRate > 0.0
+      ? static_cast<int>(std::lround(rvrse::FramesToTrimMs(effectiveReleaseFrames, sampleRate)))
+      : -1;
+
+    if (mLimited == limited && mDisplayedEffectiveReleaseMs == displayedEffectiveReleaseMs)
+      return;
+
+    mLimited = limited;
+    mDisplayedEffectiveReleaseMs = displayedEffectiveReleaseMs;
+    if (displayedEffectiveReleaseMs >= 0)
+    {
+      mTooltip.SetFormatted(
+        96, "Limited to %d ms by current Riser Length and tempo", displayedEffectiveReleaseMs
+      );
+      SetTooltip(mTooltip.Get());
+    }
+    else
+    {
+      SetTooltip("Riser Release");
+    }
+    SetDirty(false);
+  }
+
+private:
+  void Commit(double releaseMs)
+  {
+    SetValue(GetParam()->ToNormalized(releaseMs));
+    SetDirty(false);
+    if (mCommitFunction)
+      mCommitFunction(releaseMs);
+  }
+
+  CommitFunction mCommitFunction;
+  WDL_String mTooltip;
+  bool mLimited = false;
+  int mDisplayedEffectiveReleaseMs = -1;
+};
 #endif
 
 RVRSE::RVRSE(const InstanceInfo& info)
@@ -346,6 +474,13 @@ RVRSE::RVRSE(const InstanceInfo& info)
     IParam::ShapeLinear(), IParam::kUnitMilliseconds);
   GetParam(kParamTrimEndMs)->InitDouble("Trim End",
     0.0, 0.0, rvrse::kTrimMaxMs, 1.0, "ms", IParam::kFlagCannotAutomate, "",
+    IParam::ShapeLinear(), IParam::kUnitMilliseconds);
+  GetParam(kParamRiserReleaseMs)->InitDouble("Riser Release",
+    rvrse::kRiserReleaseDefaultMs,
+    rvrse::kRiserReleaseMinMs,
+    rvrse::kRiserReleaseMaxMs,
+    rvrse::kRiserReleaseStepMs,
+    "ms", IParam::kFlagCannotAutomate, "",
     IParam::ShapeLinear(), IParam::kUnitMilliseconds);
 
 #if IPLUG_EDITOR
@@ -464,12 +599,14 @@ RVRSE::RVRSE(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagOfflineSectionLabel)->SetTargetAndDrawRECTs(offlineLabelBounds);
       const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(80.f);
       pGraphics->GetControlWithTag(kCtrlTagLush)->SetTargetAndDrawRECTs(
-        offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(60.f, 80.f));
+        offlineKnobRow.GetGridCell(0, 1, 5).GetCentredInside(60.f, 80.f));
       pGraphics->GetControlWithTag(kCtrlTagRiserLength)->SetTargetAndDrawRECTs(
-        offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(60.f, 80.f));
+        offlineKnobRow.GetGridCell(1, 1, 5).GetCentredInside(60.f, 80.f));
       pGraphics->GetControlWithTag(kCtrlTagFadeIn)->SetTargetAndDrawRECTs(
-        offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(60.f, 80.f));
-      const IRECT stretchBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(90.f, 50.f);
+        offlineKnobRow.GetGridCell(2, 1, 5).GetCentredInside(60.f, 80.f));
+      pGraphics->GetControlWithTag(kCtrlTagRiserRelease)->SetTargetAndDrawRECTs(
+        offlineKnobRow.GetGridCell(3, 1, 5).GetCentredInside(60.f, 80.f));
+      const IRECT stretchBounds = offlineKnobRow.GetGridCell(4, 1, 5).GetCentredInside(80.f, 50.f);
       pGraphics->GetControlWithTag(kCtrlTagStretchQuality)->SetTargetAndDrawRECTs(stretchBounds);
       // Hit panel
       const IRECT hitLabelBounds = hitRect.GetPadded(-8.f).GetFromTop(20.f);
@@ -491,6 +628,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
 
     // ── First-time setup ───────────────────────────────────────────────
     pGraphics->SetLayoutOnResize(true);
+    pGraphics->EnableTooltips(true);
     pGraphics->AttachCornerResizer(EUIResizerMode::Size, true);
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
     pGraphics->LoadFont("Roboto-Bold", ROBOTO_BOLD_FN);
@@ -727,11 +865,12 @@ RVRSE::RVRSE(const InstanceInfo& info)
       .WithColor(kPR, kColorWhite)
       .WithWidgetFrac(0.8f);
 
-    // Row of offline knobs: Lush | Length | Fade In | [Stretch toggle]
+    // Row of offline controls: Lush | Length | Fade In | Release | Quality
     const IRECT offlineKnobRow = offlineArea.GetReducedFromTop(22.f).GetFromTop(80.f);
-    const IRECT lushBounds    = offlineKnobRow.GetGridCell(0, 1, 4).GetCentredInside(60.f, 80.f);
-    const IRECT lengthBounds  = offlineKnobRow.GetGridCell(1, 1, 4).GetCentredInside(60.f, 80.f);
-    const IRECT fadeInBounds  = offlineKnobRow.GetGridCell(2, 1, 4).GetCentredInside(60.f, 80.f);
+    const IRECT lushBounds    = offlineKnobRow.GetGridCell(0, 1, 5).GetCentredInside(60.f, 80.f);
+    const IRECT lengthBounds  = offlineKnobRow.GetGridCell(1, 1, 5).GetCentredInside(60.f, 80.f);
+    const IRECT fadeInBounds  = offlineKnobRow.GetGridCell(2, 1, 5).GetCentredInside(60.f, 80.f);
+    const IRECT releaseBounds = offlineKnobRow.GetGridCell(3, 1, 5).GetCentredInside(60.f, 80.f);
 
     pGraphics->AttachControl(new IVKnobControl(lushBounds, kParamLush,
       "LUSH", offlineKnobStyle, true), kCtrlTagLush);
@@ -739,6 +878,10 @@ RVRSE::RVRSE(const InstanceInfo& info)
       "LENGTH", offlineKnobStyle, true), kCtrlTagRiserLength);
     pGraphics->AttachControl(new IVKnobControl(fadeInBounds, kParamFadeIn,
       "FADE IN", offlineKnobStyle, true), kCtrlTagFadeIn);
+    pGraphics->AttachControl(new ReleaseKnobControl(
+      releaseBounds, kParamRiserReleaseMs, offlineKnobStyle,
+      [this](double releaseMs) { CommitRiserRelease(releaseMs); }
+    ), kCtrlTagRiserRelease);
 
     // Stretch Quality — horizontal tab switch (HIGH | LOW)
     const IVStyle toggleStyle = DEFAULT_STYLE
@@ -757,7 +900,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
       .WithLabelText(IText(11, kColorTextPrimary, "Roboto-Regular", EAlign::Center, EVAlign::Bottom))
       .WithValueText(IText(12, kColorTextSecondary, "Roboto-Regular", EAlign::Center, EVAlign::Middle));
 
-    const IRECT stretchBounds = offlineKnobRow.GetGridCell(3, 1, 4).GetCentredInside(90.f, 50.f);
+    const IRECT stretchBounds = offlineKnobRow.GetGridCell(4, 1, 5).GetCentredInside(80.f, 50.f);
     pGraphics->AttachControl(new IVTabSwitchControl(stretchBounds, kParamStretchQuality,
       {"HIGH", "LOW"}, "QUALITY", toggleStyle, EVShape::Rectangle, EDirection::Horizontal), kCtrlTagStretchQuality);
 
@@ -886,6 +1029,8 @@ void RVRSE::OnParamChange(int paramIdx, EParamSource source, int sampleOffset)
 
   if (paramIdx == kParamTrimStartMs || paramIdx == kParamTrimEndMs)
     QueueSequenceForCurrentTrim();
+  else if (paramIdx == kParamRiserReleaseMs && source == EParamSource::kUI)
+    mLegacyTransition.store(false, std::memory_order_release);
 }
 
 void RVRSE::ClearLoadedSampleState()
@@ -931,9 +1076,13 @@ bool RVRSE::HasReadyPreviewExportData() const
 {
   const auto playbackHit = std::atomic_load(&mPlaySample);
   const auto riser = std::atomic_load(&mRiserBuffer);
-  return mLoadState.load(std::memory_order_relaxed) == rvrse::ESampleLoadState::Ready &&
-         playbackHit && playbackHit->IsLoaded() &&
+  return playbackHit && playbackHit->IsLoaded() &&
          riser && riser->IsReady();
+}
+
+bool RVRSE::HasPendingRender() const
+{
+  return mProcessor.isProcessing() || mProcessor.isNewRiserReady();
 }
 
 rvrse::TrimRangeFrames RVRSE::GetCommittedTrimRangeForSample(
@@ -965,6 +1114,22 @@ void RVRSE::CommitTrimParameters(double trimStartMs, double trimEndMs)
 #else
   (void) trimStartMs;
   (void) trimEndMs;
+#endif
+}
+
+void RVRSE::CommitRiserRelease(double releaseMs)
+{
+#if IPLUG_EDITOR
+  mLegacyTransition.store(false, std::memory_order_release);
+  SendParameterValueFromUI(
+    kParamRiserReleaseMs,
+    GetParam(kParamRiserReleaseMs)->ToNormalized(releaseMs)
+  );
+  mProcessor.setRiserRelease(
+    releaseMs, rvrse::ETransitionMode::RiserRelease, GetRenderingOffline()
+  );
+#else
+  (void) releaseMs;
 #endif
 }
 
@@ -1049,7 +1214,9 @@ void RVRSE::QueueExportError(const char* errorMessage)
 void RVRSE::StartExportFromUI()
 {
 #if IPLUG_EDITOR
-  if (!GetUI() || !mExportUiState || mExportUiState->mInProgress.load(std::memory_order_acquire))
+  if (!GetUI() || !mExportUiState ||
+      mExportUiState->mInProgress.load(std::memory_order_acquire) ||
+      HasPendingRender())
     return;
 
   WDL_String fileName(BuildDefaultExportFileName(mSampleFilePath).c_str());
@@ -1059,6 +1226,11 @@ void RVRSE::StartExportFromUI()
     [this](const WDL_String& fileName, const WDL_String& path) {
       if (fileName.GetLength() == 0)
         return;
+      if (HasPendingRender())
+      {
+        QueueExportError("Export is unavailable until the current offline render completes.");
+        return;
+      }
 
       std::filesystem::path exportPath(fileName.Get());
       if (!exportPath.is_absolute() && path.GetLength() > 0)
@@ -1174,6 +1346,34 @@ void RVRSE::StartExportFromUI()
 #if IPLUG_EDITOR
 void RVRSE::OnIdle()
 {
+  const bool renderPending = HasPendingRender();
+  const auto now = std::chrono::steady_clock::now();
+  if (renderPending && !mRenderPending)
+  {
+    mRenderPending = true;
+    mRenderPendingSince = now;
+  }
+  else if (!renderPending && mRenderPending)
+  {
+    mRenderPending = false;
+    if (mRenderStatusVisible)
+    {
+      mRenderStatusVisible = false;
+      if (mActiveExportStatusText == "Rendering...")
+        mActiveExportStatusText.clear();
+    }
+  }
+
+  if (renderPending && !mRenderStatusVisible &&
+      now - mRenderPendingSince >= std::chrono::milliseconds(
+        static_cast<int>(rvrse::kRenderStatusDelayMs)) &&
+      !mExportUiState->mInProgress.load(std::memory_order_relaxed))
+  {
+    mRenderStatusVisible = true;
+    mActiveExportStatusText = "Rendering...";
+    mExportStatusFramesRemaining = -1;
+  }
+
   // Drain CC→UI param updates queued by the audio thread
   ParamTuple p;
   while (mCCParamQueue.Pop(p))
@@ -1363,7 +1563,7 @@ void RVRSE::OnIdle()
     if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagExportButton))
     {
       const bool exportInProgress = mExportUiState->mInProgress.load(std::memory_order_relaxed);
-      const bool shouldDisable = !hasReadyPreviewExport || exportInProgress;
+      const bool shouldDisable = !hasReadyPreviewExport || exportInProgress || renderPending;
       if (pCtrl->IsDisabled() != shouldDisable)
         pCtrl->SetDisabled(shouldDisable);
 
@@ -1469,10 +1669,34 @@ void RVRSE::OnIdle()
       pWaveform->SetHitVolumeDb(static_cast<float>(GetParam(kParamHitVolume)->Value()));
       pWaveform->SetFadeInFrac(static_cast<float>(GetParam(kParamFadeIn)->Value()) / 100.f);
 
+      if (riser && committedTrimRange.IsValid())
+      {
+        pWaveform->SetSequenceTiming(
+          riser->mBeatAnchorFrames,
+          riser->HitStartFrame(),
+          riser->mEffectiveReleaseFrames,
+          riser->SequenceFrames(committedTrimRange.NumFrames())
+        );
+      }
+      else
+      {
+        pWaveform->SetSequenceTiming(0, 0, 0, 0);
+      }
+
+      if (auto* pRelease = dynamic_cast<ReleaseKnobControl*>(
+            GetUI()->GetControlWithTag(kCtrlTagRiserRelease)))
+      {
+        pRelease->SetLimited(
+          riser && riser->IsReleaseLimited(),
+          riser ? riser->mEffectiveReleaseFrames : 0,
+          riser ? riser->mSampleRate : 0.0
+        );
+      }
+
       // Update playhead position
       if (riser && committedTrimRange.IsValid())
       {
-        const int totalFrames = riser->NumFrames() + committedTrimRange.NumFrames();
+        const int totalFrames = riser->SequenceFrames(committedTrimRange.NumFrames());
         if (totalFrames > 0)
         {
           float pos = -1.f;
@@ -1481,7 +1705,7 @@ void RVRSE::OnIdle()
           if (riserPos >= 0)
             pos = static_cast<float>(riserPos) / static_cast<float>(totalFrames);
           else if (hitPos >= 0)
-            pos = static_cast<float>(riser->NumFrames() + hitPos) / static_cast<float>(totalFrames);
+            pos = static_cast<float>(riser->HitStartFrame() + hitPos) / static_cast<float>(totalFrames);
           pWaveform->SetPlayheadPos(pos);
         }
       }
@@ -1612,12 +1836,14 @@ void RVRSE::LoadSampleFromFile(const char* filePath, bool preserveTrim)
 
 // --- State persistence (save/restore with DAW project) ---
 
-static constexpr int kStateChunkVersion = 1;
+static constexpr int kStateChunkVersion = 2;
 
 bool RVRSE::SerializeState(IByteChunk& chunk) const
 {
   chunk.Put(&kStateChunkVersion);
   chunk.PutStr(mSampleFilePath.c_str());
+  const int transitionMode = mLegacyTransition.load(std::memory_order_acquire) ? 1 : 0;
+  chunk.Put(&transitionMode);
   return SerializeParams(chunk);
 }
 
@@ -1627,47 +1853,82 @@ int RVRSE::UnserializeState(const IByteChunk& chunk, int startPos)
   startPos = chunk.Get(&version, startPos);
   if (startPos < 0) return startPos;
 
-  if (version >= 1)
+  if (version < 1 || version > kStateChunkVersion)
+    return -1;
+
+  WDL_String pathStr;
+  startPos = chunk.GetStr(pathStr, startPos);
+  if (startPos < 0) return startPos;
+
+  bool legacyTransition = version == 1;
+  if (version >= 2)
   {
-    WDL_String pathStr;
-    startPos = chunk.GetStr(pathStr, startPos);
+    int serializedMode = 0;
+    startPos = chunk.Get(&serializedMode, startPos);
     if (startPos < 0) return startPos;
+    legacyTransition = serializedMode != 0;
+  }
 
-    const std::string restoredPath(pathStr.Get());
+  const int serializedParamCount = version == 1
+    ? std::min(static_cast<int>(kParamRiserReleaseMs),
+               (chunk.Size() - startPos) / static_cast<int>(sizeof(double)))
+    : kNumParams;
 
-    if (!restoredPath.empty())
+  std::array<double, kNumParams> restoredValues {};
+  for (int paramIdx = 0; paramIdx < serializedParamCount; ++paramIdx)
+  {
+    startPos = chunk.Get(&restoredValues[static_cast<size_t>(paramIdx)], startPos);
+    if (startPos < 0) return startPos;
+  }
+
+  mLegacyTransition.store(legacyTransition, std::memory_order_release);
+  ENTER_PARAMS_MUTEX
+  for (int paramIdx = 0; paramIdx < serializedParamCount; ++paramIdx)
+    GetParam(paramIdx)->Set(restoredValues[static_cast<size_t>(paramIdx)]);
+  if (version == 1)
+    GetParam(kParamRiserReleaseMs)->Set(0.0);
+  OnParamReset(EParamSource::kPresetRecall);
+  LEAVE_PARAMS_MUTEX
+
+  const auto transitionMode = legacyTransition
+    ? rvrse::ETransitionMode::LegacyAdaptive
+    : rvrse::ETransitionMode::RiserRelease;
+  mProcessor.setRiserRelease(
+    GetParam(kParamRiserReleaseMs)->Value(), transitionMode, GetRenderingOffline()
+  );
+
+  const std::string restoredPath(pathStr.Get());
+  if (!restoredPath.empty())
+  {
+    if (std::filesystem::is_regular_file(restoredPath))
     {
-      if (std::filesystem::is_regular_file(restoredPath))
-      {
-        LoadSampleFromFile(restoredPath.c_str(), true);
-      }
-      else
-      {
-        ClearLoadedSampleState();
-        mSampleFilePath = restoredPath;
-        mLoadState.store(rvrse::ESampleLoadState::Error);
-
-        if (GetUI())
-        {
-          if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
-          {
-            WDL_String errStr;
-            errStr.SetFormatted(256, "Missing: %s",
-              rvrse::ExtractFileName(restoredPath).c_str());
-            pCtrl->As<ITextControl>()->SetStr(errStr.Get());
-            pCtrl->SetDirty(false);
-          }
-        }
-      }
+      LoadSampleFromFile(restoredPath.c_str(), true);
     }
     else
     {
-      // Empty path — host reset state/preset, clear everything
       ClearLoadedSampleState();
+      mSampleFilePath = restoredPath;
+      mLoadState.store(rvrse::ESampleLoadState::Error);
+
+      if (GetUI())
+      {
+        if (auto* pCtrl = GetUI()->GetControlWithTag(kCtrlTagSampleName))
+        {
+          WDL_String errStr;
+          errStr.SetFormatted(256, "Missing: %s",
+            rvrse::ExtractFileName(restoredPath).c_str());
+          pCtrl->As<ITextControl>()->SetStr(errStr.Get());
+          pCtrl->SetDirty(false);
+        }
+      }
     }
   }
+  else
+  {
+    ClearLoadedSampleState();
+  }
 
-  return UnserializeParams(chunk, startPos);
+  return startPos;
 }
 
 #if IPLUG_DSP
@@ -1910,8 +2171,13 @@ void RVRSE::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
       }
 #endif
 
-      // Precompute fade-in length (constant for this buffer)
-      const int fadeInLen = static_cast<int>(static_cast<float>(bufLen) * fadeInPct);
+      const int fadeInReferenceFrames = debugStage == rvrse::kDebugNormal ||
+                                        debugStage == rvrse::kDebugRiserOnly
+        ? riser->mBeatAnchorFrames
+        : bufLen;
+      const int fadeInLen = static_cast<int>(
+        static_cast<float>(fadeInReferenceFrames) * fadeInPct
+      );
 
       if (riserPos < bufLen)
       {

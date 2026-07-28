@@ -55,7 +55,8 @@ The built plugins appear in `build/RVRSE/` — see [Plugin Formats](#plugin-form
 3. **Preview** the sound either by clicking the waveform-panel **Play** button (centered below the waveform) or by playing a MIDI note.
 4. **Export** the current normal riser+hit result from the header **Export** button to a 24-bit WAV file in one step.
 5. The riser is your hit sample processed through reverb → reversed → time-stretched to match
-   the configured riser length (default: 4 beats at host BPM).
+   the configured riser length (default: 4 beats at host BPM), then released beneath the hit
+   for the requested post-beat duration (default: 50 ms).
 
 ```
 MIDI Note-On                                         Hit fires here
@@ -67,11 +68,11 @@ MIDI Note-On                                         Hit fires here
 Because the riser IS the hit reversed and reverbed, the timbral build-up always matches the
 impact perfectly.
 
-The upper waveform always shows the currently committed playable sequence (processed riser +
-trimmed hit), while the lower hit waveform is the edit surface for the original loaded sample.
-The current transition heuristic centers the seam around the beat: the riser is stretched slightly
-past the beat while the trimmed hit starts a few milliseconds early, so the midpoint of the hit's
-trim-edge fade-in lands on the beat instead of the raw sample start.
+The upper waveform is one shared timeline for the committed playable sequence: the processed
+riser and trimmed hit are drawn at their real offsets, with the effective Riser Release shaded
+after the Beat Anchor. The lower hit waveform remains the edit surface for the original sample.
+The dry hit's fixed 5 ms technical onset ramp is centered on the Beat Anchor; Riser Release
+changes only the riser decay and never attenuates the hit.
 
 ---
 
@@ -201,7 +202,9 @@ LoadSampleFromFile(path)                     [RVRSE.cpp]
 
 ## Offline Pipeline
 
-`RvrseProcessor` rebuilds the riser whenever the sample, BPM, Lush, or riser length changes:
+`RvrseProcessor` rebuilds the riser whenever the sample, BPM, Lush, riser length, or Riser
+Release changes. Release-only changes reuse the cached reversed buffer and rebuild from the
+stretch stage:
 
 ```
 Source sample (at native sample rate, e.g. 96 kHz)
@@ -415,6 +418,7 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 | Lush | 0–100% | 40% | Reverb amount — linearly blends from 100/0 to 50/100 dry/wet and triggers offline rebuild |
 | Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 | Time-stretch target — triggers offline rebuild |
 | Fade In | 0–100% | 60% | Linear ramp over portion of riser length |
+| Riser Release | 0–500 ms | 50 ms | Non-automatable post-anchor linear riser decay; commits on gesture end |
 | Riser Volume | -60 to +6 dB | 0 dB | Independent riser voice gain |
 | Hit Volume | -60 to +6 dB | 0 dB | Independent hit voice gain |
 | Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1) |

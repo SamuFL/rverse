@@ -12,17 +12,36 @@
 
 namespace rvrse {
 
+enum class ETransitionMode
+{
+  RiserRelease = 0,
+  LegacyAdaptive
+};
+
 struct TransitionTiming
 {
-  int mBeatAlignedFrames = 0;   ///< Exact musical beat anchor for the hit midpoint
-  int mEffectiveSeamFrames = 0; ///< Full seam-conditioning window (R)
-  int mRiserPostBeatFrames = 0; ///< Riser extension past the beat (R/2)
-  int mHitPreBeatFrames = 0;    ///< Early hit start before the beat (H/2)
-  double mStretchFactor = 1.0;  ///< Target stretch ratio for the final riser render
+  int mBeatAnchorFrames = 0;       ///< Exact musical anchor for the hit ramp midpoint
+  int mHitPreBeatFrames = 0;       ///< Early hit start before the anchor (H/2)
+  int mRequestedReleaseFrames = 0; ///< User-requested release before limiting
+  int mEffectiveReleaseFrames = 0; ///< Post-anchor riser duration after limiting
+  int mTailFadeFrames = 0;         ///< Fade length (differs from release only in legacy mode)
+  double mStretchFactor = 1.0;     ///< Target stretch ratio for the final riser render
+  ETransitionMode mMode = ETransitionMode::RiserRelease;
 
   int HitStartFrame() const
   {
-    return (std::max)(0, mBeatAlignedFrames - mHitPreBeatFrames);
+    return (std::max)(0, mBeatAnchorFrames - mHitPreBeatFrames);
+  }
+
+  int RiserEndFrame() const
+  {
+    return mBeatAnchorFrames + mEffectiveReleaseFrames;
+  }
+
+  bool IsReleaseLimited() const
+  {
+    return mMode == ETransitionMode::RiserRelease &&
+           mEffectiveReleaseFrames < mRequestedReleaseFrames;
   }
 };
 
@@ -43,28 +62,47 @@ inline int ComputeHitPreBeatFrames(double sampleRate)
 inline TransitionTiming CalculateTransitionTiming(int reversedFrames,
                                                   double riserLengthBeats,
                                                   double bpm,
-                                                  double sampleRate)
+                                                  double sampleRate,
+                                                  double requestedReleaseMs,
+                                                  ETransitionMode mode = ETransitionMode::RiserRelease)
 {
   TransitionTiming timing;
-  timing.mBeatAlignedFrames = BeatsToFrames(riserLengthBeats, bpm, sampleRate);
+  timing.mMode = mode;
+  timing.mBeatAnchorFrames = BeatsToFrames(riserLengthBeats, bpm, sampleRate);
   timing.mHitPreBeatFrames = ComputeHitPreBeatFrames(sampleRate);
+  timing.mRequestedReleaseFrames = TrimMsToFrames(
+    std::clamp(requestedReleaseMs, kRiserReleaseMinMs, kRiserReleaseMaxMs),
+    sampleRate
+  );
 
   if (reversedFrames <= 0 || riserLengthBeats <= 0.0 || bpm <= 0.0 || sampleRate <= 0.0)
     return timing;
 
-  const double baseStretchFactor = calcStretchFactor(reversedFrames, riserLengthBeats, bpm, sampleRate);
-  const double adaptiveOverlapBeats = (std::min)(
-    kRiserOverlapBeatsBase * (std::max)(1.0, baseStretchFactor),
-    kRiserOverlapBeatsMax
-  );
-  const double effectiveSeamBeats = (std::max)(kRiserTailFadeBeats, adaptiveOverlapBeats);
+  if (mode == ETransitionMode::LegacyAdaptive)
+  {
+    // Tagged v1.0 used the full adaptive overlap after the Beat Anchor. The
+    // later issue #42 half-seam heuristic is intentionally not the legacy mode.
+    const double baseStretchFactor = calcStretchFactor(
+      reversedFrames, riserLengthBeats, bpm, sampleRate
+    );
+    const double adaptiveOverlapBeats = (std::min)(
+      kRiserOverlapBeatsBase * (std::max)(1.0, baseStretchFactor),
+      kRiserOverlapBeatsMax
+    );
+    timing.mEffectiveReleaseFrames = BeatsToFrames(adaptiveOverlapBeats, bpm, sampleRate);
+    timing.mTailFadeFrames = BeatsToFrames(
+      (std::max)(kRiserTailFadeBeats, adaptiveOverlapBeats), bpm, sampleRate
+    );
+  }
+  else
+  {
+    timing.mEffectiveReleaseFrames = (std::min)(
+      timing.mRequestedReleaseFrames, timing.mBeatAnchorFrames
+    );
+    timing.mTailFadeFrames = timing.mEffectiveReleaseFrames;
+  }
 
-  timing.mEffectiveSeamFrames = BeatsToFrames(effectiveSeamBeats, bpm, sampleRate);
-  timing.mRiserPostBeatFrames = (std::max)(0, static_cast<int>(std::lround(
-    static_cast<double>(timing.mEffectiveSeamFrames) * 0.5
-  )));
-
-  const int totalTargetFrames = timing.mBeatAlignedFrames + timing.mRiserPostBeatFrames;
+  const int totalTargetFrames = timing.RiserEndFrame();
   if (totalTargetFrames > 0)
     timing.mStretchFactor = static_cast<double>(totalTargetFrames) / static_cast<double>(reversedFrames);
 

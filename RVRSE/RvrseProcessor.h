@@ -31,10 +31,11 @@ struct RiserData
   std::vector<float> mLeft;    ///< Left channel of final_riser[] (stretched + faded)
   std::vector<float> mRight;   ///< Right channel of final_riser[]
   double mSampleRate = 0.0;    ///< Sample rate of the riser data
-  int mBeatAlignedFrames = 0;  ///< Frame count at the exact musical beat anchor
-  int mEffectiveSeamFrames = 0; ///< Full seam-conditioning window (R)
-  int mRiserPostBeatFrames = 0; ///< Riser extension past the beat (R/2)
-  int mHitPreBeatFrames = 0;    ///< Early hit start before the beat (H/2)
+  int mBeatAnchorFrames = 0;       ///< Frame count at the exact musical beat anchor
+  int mHitPreBeatFrames = 0;       ///< Early hit start before the beat (H/2)
+  int mRequestedReleaseFrames = 0; ///< Requested release at render sample rate
+  int mEffectiveReleaseFrames = 0; ///< Effective post-anchor release
+  ETransitionMode mTransitionMode = ETransitionMode::RiserRelease;
   int mSequenceId = 0;         ///< Sequence token for coordinated riser+hit commits
 
 #ifndef NDEBUG
@@ -47,7 +48,13 @@ struct RiserData
 
   int NumFrames() const { return static_cast<int>(mLeft.size()); }
   bool IsReady() const { return !mLeft.empty() && mSampleRate > 0.0; }
-  int HitStartFrame() const { return std::max(0, mBeatAlignedFrames - mHitPreBeatFrames); }
+  int HitStartFrame() const { return std::max(0, mBeatAnchorFrames - mHitPreBeatFrames); }
+  int SequenceFrames(int hitFrames) const { return std::max(NumFrames(), HitStartFrame() + hitFrames); }
+  bool IsReleaseLimited() const
+  {
+    return mTransitionMode == ETransitionMode::RiserRelease &&
+           mEffectiveReleaseFrames < mRequestedReleaseFrames;
+  }
 
 #ifndef NDEBUG
   /// @return Number of frames in the reverbed debug buffer
@@ -207,6 +214,26 @@ public:
       rebuildAsync(EPipelineStage::Stretch);
   }
 
+  /// Set the requested post-anchor riser release and transition mode.
+  /// Numeric release changes rebuild only the stretch stage.
+  void setRiserRelease(double releaseMs,
+                       ETransitionMode mode = ETransitionMode::RiserRelease,
+                       bool offline = false)
+  {
+    {
+      std::lock_guard<std::mutex> lock(mParamMutex);
+      releaseMs = std::clamp(releaseMs, kRiserReleaseMinMs, kRiserReleaseMaxMs);
+      if (std::abs(mRiserReleaseMs - releaseMs) < 1e-9 && mTransitionMode == mode)
+        return;
+      mRiserReleaseMs = releaseMs;
+      mTransitionMode = mode;
+    }
+    if (offline)
+      rebuildStretchSync();
+    else
+      rebuildAsync(EPipelineStage::Stretch);
+  }
+
   // --- Audio-thread-safe polling ---
 
   /// @return true if a new riser buffer is ready to be consumed (lock-free).
@@ -228,7 +255,11 @@ public:
   }
 
   /// @return true if the pipeline is currently processing
-  bool isProcessing() const { return mProcessing.load(std::memory_order_acquire); }
+  bool isProcessing() const
+  {
+    return mCompletedGeneration.load(std::memory_order_acquire) <
+           mGeneration.load(std::memory_order_acquire);
+  }
 
 #ifdef RVRSE_TEST_BUILD
   std::shared_ptr<RiserData> RunReverbPipelineForTests(std::shared_ptr<SampleData> sample,
@@ -269,9 +300,7 @@ private:
   /// Launch a background thread to run the pipeline from the given stage.
   void rebuildAsync(EPipelineStage fromStage)
   {
-    // Increment the generation counter to invalidate any in-flight builds
-    mGeneration.fetch_add(1, std::memory_order_release);
-    const int myGen = mGeneration.load(std::memory_order_acquire);
+    const int myGen = mGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
 
     std::thread([this, fromStage, myGen]() {
       runPipeline(fromStage, myGen);
@@ -291,8 +320,9 @@ private:
 
     // Snapshot parameters under lock
     std::shared_ptr<SampleData> sample;
-    double riserLengthBeats, bpm, sampleRate;
+    double riserLengthBeats, bpm, sampleRate, riserReleaseMs;
     EStretchQuality quality;
+    ETransitionMode transitionMode;
     int sequenceId;
     std::vector<float> cachedRevL, cachedRevR;
 #ifndef NDEBUG
@@ -305,7 +335,9 @@ private:
       riserLengthBeats = mRiserLengthBeats;
       bpm = mBPM;
       sampleRate = mOutputSampleRate;
+      riserReleaseMs = mRiserReleaseMs;
       quality = mStretchQuality;
+      transitionMode = mTransitionMode;
       sequenceId = mSequenceId;
       cachedRevL = mCachedReversedL;
       cachedRevR = mCachedReversedR;
@@ -323,7 +355,8 @@ private:
     }
 
     const TransitionTiming transitionTiming = CalculateTransitionTiming(
-      static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate
+      static_cast<int>(cachedRevL.size()), riserLengthBeats, bpm, sampleRate,
+      riserReleaseMs, transitionMode
     );
 
     auto riser = std::make_shared<RiserData>();
@@ -331,10 +364,11 @@ private:
                         riser->mLeft, riser->mRight, sampleRate, quality);
     riser->mSampleRate = sampleRate;
     riser->mSequenceId = sequenceId;
-    riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;
-    riser->mEffectiveSeamFrames = transitionTiming.mEffectiveSeamFrames;
-    riser->mRiserPostBeatFrames = transitionTiming.mRiserPostBeatFrames;
+    riser->mBeatAnchorFrames = transitionTiming.mBeatAnchorFrames;
     riser->mHitPreBeatFrames = transitionTiming.mHitPreBeatFrames;
+    riser->mRequestedReleaseFrames = transitionTiming.mRequestedReleaseFrames;
+    riser->mEffectiveReleaseFrames = transitionTiming.mEffectiveReleaseFrames;
+    riser->mTransitionMode = transitionTiming.mMode;
 
 #ifndef NDEBUG
     riser->mReverbedL = std::move(cachedRvbL);
@@ -343,9 +377,17 @@ private:
     riser->mReversedR = std::move(cachedRevR);
 #endif
 
-    if (transitionTiming.mEffectiveSeamFrames > 0)
+    if (transitionTiming.mMode == ETransitionMode::LegacyAdaptive &&
+        transitionTiming.mTailFadeFrames > 0)
     {
-      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mEffectiveSeamFrames);
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mTailFadeFrames);
+    }
+    else if (transitionTiming.mEffectiveReleaseFrames > 0)
+    {
+      applyLinearFadeOutRangeStereo(
+        riser->mLeft, riser->mRight,
+        transitionTiming.mBeatAnchorFrames, transitionTiming.RiserEndFrame()
+      );
     }
 
     // Only publish if no newer rebuild has been requested
@@ -353,18 +395,18 @@ private:
 
     std::atomic_store(&mRiserOutput, riser);
     mNewRiserReady.store(true, std::memory_order_release);
+    completeIfCurrent(myGen);
   }
 
   /// Execute the pipeline synchronously (called on background thread).
   void runPipeline(EPipelineStage fromStage, int generation)
   {
-    mProcessing.store(true, std::memory_order_release);
-
     // Snapshot parameters under lock
     std::shared_ptr<SampleData> sample;
     float lush;
-    double riserLengthBeats, bpm, sampleRate, trimStartMs, trimEndMs;
+    double riserLengthBeats, bpm, sampleRate, trimStartMs, trimEndMs, riserReleaseMs;
     EStretchQuality quality;
+    ETransitionMode transitionMode;
     int sequenceId;
     std::vector<float> cachedRevL, cachedRevR;
 #ifndef NDEBUG
@@ -380,7 +422,9 @@ private:
       sampleRate = mOutputSampleRate;
       trimStartMs = mTrimStartMs;
       trimEndMs = mTrimEndMs;
+      riserReleaseMs = mRiserReleaseMs;
       quality = mStretchQuality;
+      transitionMode = mTransitionMode;
       sequenceId = mSequenceId;
 
       if (fromStage == EPipelineStage::Stretch)
@@ -397,16 +441,13 @@ private:
     // Bail early if no sample loaded
     if (!sample || !sample->IsLoaded())
     {
-      mProcessing.store(false, std::memory_order_release);
+      completeIfCurrent(generation);
       return;
     }
 
     // Check if this build has been superseded
     if (mGeneration.load(std::memory_order_acquire) != generation)
-    {
-      mProcessing.store(false, std::memory_order_release);
       return;
-    }
 
     std::vector<float> reversedL, reversedR;
 #ifndef NDEBUG
@@ -467,7 +508,7 @@ private:
       auto reverbEngine = MakeActiveReverbEngine();
       if (!reverbEngine)
       {
-        mProcessing.store(false, std::memory_order_release);
+        completeIfCurrent(generation);
         return;
       }
 
@@ -493,10 +534,7 @@ private:
 
       // Abort check
       if (mGeneration.load(std::memory_order_acquire) != generation)
-      {
-        mProcessing.store(false, std::memory_order_release);
         return;
-      }
 
       // --- Stage 2: Reverse ---
 #ifndef NDEBUG
@@ -512,6 +550,9 @@ private:
       // Cache the reversed + reverbed buffers for future stretch-only rebuilds
       {
         std::lock_guard<std::mutex> lock(mParamMutex);
+        if (mGeneration.load(std::memory_order_acquire) != generation)
+          return;
+
         mCachedReversedL = reversedL;
         mCachedReversedR = reversedR;
 #ifndef NDEBUG
@@ -533,13 +574,11 @@ private:
 
     // Abort check
     if (mGeneration.load(std::memory_order_acquire) != generation)
-    {
-      mProcessing.store(false, std::memory_order_release);
       return;
-    }
 
     const TransitionTiming transitionTiming = CalculateTransitionTiming(
-      static_cast<int>(reversedL.size()), riserLengthBeats, bpm, sampleRate
+      static_cast<int>(reversedL.size()), riserLengthBeats, bpm, sampleRate,
+      riserReleaseMs, transitionMode
     );
 
     auto riser = std::make_shared<RiserData>();
@@ -554,10 +593,11 @@ private:
 
     riser->mSampleRate = sampleRate;
     riser->mSequenceId = sequenceId;
-    riser->mBeatAlignedFrames = transitionTiming.mBeatAlignedFrames;
-    riser->mEffectiveSeamFrames = transitionTiming.mEffectiveSeamFrames;
-    riser->mRiserPostBeatFrames = transitionTiming.mRiserPostBeatFrames;
+    riser->mBeatAnchorFrames = transitionTiming.mBeatAnchorFrames;
     riser->mHitPreBeatFrames = transitionTiming.mHitPreBeatFrames;
+    riser->mRequestedReleaseFrames = transitionTiming.mRequestedReleaseFrames;
+    riser->mEffectiveReleaseFrames = transitionTiming.mEffectiveReleaseFrames;
+    riser->mTransitionMode = transitionTiming.mMode;
 
 #ifndef NDEBUG
     // Store intermediate buffers for debug playback
@@ -567,22 +607,33 @@ private:
     riser->mReversedR = std::move(reversedR);
 #endif
 
-    if (transitionTiming.mEffectiveSeamFrames > 0)
+    if (transitionTiming.mMode == ETransitionMode::LegacyAdaptive &&
+        transitionTiming.mTailFadeFrames > 0)
     {
-      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mEffectiveSeamFrames);
+      applyTailFadeOutStereo(riser->mLeft, riser->mRight, transitionTiming.mTailFadeFrames);
+    }
+    else if (transitionTiming.mEffectiveReleaseFrames > 0)
+    {
+      applyLinearFadeOutRangeStereo(
+        riser->mLeft, riser->mRight,
+        transitionTiming.mBeatAnchorFrames, transitionTiming.RiserEndFrame()
+      );
     }
 
     // Final abort check before publishing
     if (mGeneration.load(std::memory_order_acquire) != generation)
-    {
-      mProcessing.store(false, std::memory_order_release);
       return;
-    }
 
     // Publish the result (atomic store for lock-free audio-thread read)
     std::atomic_store(&mRiserOutput, riser);
     mNewRiserReady.store(true, std::memory_order_release);
-    mProcessing.store(false, std::memory_order_release);
+    completeIfCurrent(generation);
+  }
+
+  void completeIfCurrent(int generation)
+  {
+    if (mGeneration.load(std::memory_order_acquire) == generation)
+      mCompletedGeneration.store(generation, std::memory_order_release);
   }
 
   // --- Parameters (protected by mParamMutex) ---
@@ -594,6 +645,8 @@ private:
   double mOutputSampleRate = 44100.0;
   double mTrimStartMs = 0.0;
   double mTrimEndMs = 0.0;
+  double mRiserReleaseMs = kRiserReleaseDefaultMs;
+  ETransitionMode mTransitionMode = ETransitionMode::RiserRelease;
   EStretchQuality mStretchQuality = static_cast<EStretchQuality>(kStretchQualityDefault);
   int mSequenceId = 0;
 
@@ -611,7 +664,7 @@ private:
 
   // --- Build management ---
   std::atomic<int> mGeneration { 0 };   ///< Incremented on every rebuild request
-  std::atomic<bool> mProcessing { false };
+  std::atomic<int> mCompletedGeneration { 0 }; ///< Latest current generation that finished
 };
 
 } // namespace rvrse
