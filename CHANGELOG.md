@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Signed Windows release packaging with an Inno Setup installer, portable ZIP, signature verification, and automated install/uninstall checks (#36)
 - Riser Release — a persisted 0–500 ms offline control extends the riser past the Beat Anchor and applies a linear riser-only decay beneath the unattenuated dry hit; the shared timeline now visualizes the real overlap (#43)
 - Drag-and-drop sample loading — drag any WAV or AIFF file directly onto the plugin's header/footer/waveform areas to load it (rverse-aif)
 - macOS maintainer tooling for release signing/notarization: `scripts/sign-and-notarize.sh`, `scripts/build-macos-installer.sh`, and a minimal installer entitlements plist

@@ -721,10 +721,48 @@ and shared playback/export/waveform timing.
 
 ---
 
+## Test Scenario 13 — Signed Windows Installer
+
+**Goal:** Verify the official Windows installer establishes the expected verified
+publisher, installs every selected format, and uninstalls without orphaned files.
+
+### Pre-condition
+
+- Clean physical Windows 11 machine with no prior RVRSE installation
+- Current signed release-candidate installer
+- Cubase and Studio One installed
+
+### Tests
+
+1. Open the installer file properties and inspect **Digital Signatures**.
+   - Verify the signature is valid, uses SHA-256, is timestamped, and shows the expected legal publisher.
+2. Launch the installer.
+   - Record any SmartScreen reputation message separately; it does not invalidate an otherwise valid signature.
+   - Install all components using the default per-machine destinations.
+3. Verify the standalone app launches from `C:\Program Files\RVRSE\RVRSE.exe`.
+4. Rescan plugins in Cubase and Studio One.
+   - Verify the VST3 loads in both hosts.
+   - Load a sample by file dialog and drag-and-drop, then trigger one note.
+5. If a CLAP-capable host is available, verify it discovers the CLAP plugin.
+6. Uninstall RVRSE from **Installed apps**.
+7. Verify the RVRSE app directory, VST3 bundle, and CLAP file were removed.
+
+### Pass Criteria
+
+- [ ] 13.1 — Installer and contained binaries have valid timestamped signatures
+- [ ] 13.2 — Windows shows the expected verified legal publisher
+- [ ] 13.3 — Default install paths contain the standalone, VST3, and CLAP artifacts
+- [ ] 13.4 — VST3 loads and performs a smoke test in Cubase and Studio One
+- [ ] 13.5 — Uninstall removes all RVRSE files from system plugin/app directories
+- [ ] 13.6 — SmartScreen behavior is recorded without treating reputation as signature validity
+
+---
+
 ## Revision History
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
+| 2026-07-28 | Added Scenario 13: signed Windows install, DAW smoke test, and uninstall |
 | 2026-07-27 | Added Scenario 12: Riser Release, limiting, shared timeline, and pending renders |
 | 2026-05-18 | Added Scenario 10: UI preview transport                                 |
 | 2026-04-28 | Added Scenario 9: drag-and-drop sample loading                          |

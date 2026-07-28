@@ -10,12 +10,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Override version label for manual runs (defaults to manual-<run number>)'
-        required: false
+        description: 'SemVer label for the release candidate (for example 1.1.0-rc.1)'
+        required: true
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -126,7 +126,11 @@ jobs:
   # ---------------------------------------------------------------------------
   windows:
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 45
+    environment: production-signing
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout (with submodules)
@@ -152,30 +156,87 @@ jobs:
           cmake --build build/windows-vs2022 --config Release --target rvrse_tests
           ctest --test-dir build/windows-vs2022 -C Release --output-on-failure
 
-      - name: Package Windows zip
-        shell: bash
+      - name: Resolve package version
+        id: package-version
+        shell: pwsh
         run: |
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-            if [ -z "$VERSION" ]; then
-              VERSION="manual-${GITHUB_RUN_NUMBER}"
-            fi
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          cd build/windows-vs2022/out
-          cp "$GITHUB_WORKSPACE/RVRSE/installer/INSTALL-Windows.txt" INSTALL.txt
-          MANUAL="$GITHUB_WORKSPACE/RVRSE/manual/RVRSE manual.pdf"
-          [ -f "$MANUAL" ] && [ "$(wc -c < "$MANUAL")" -gt 10000 ] && cp "$MANUAL" .
-          7z a "$GITHUB_WORKSPACE/RVRSE-${VERSION}-Windows.zip" \
-            RVRSE.vst3 RVRSE.clap RVRSE.exe INSTALL.txt "RVRSE manual.pdf" 2>/dev/null || \
-          7z a "$GITHUB_WORKSPACE/RVRSE-${VERSION}-Windows.zip" RVRSE.vst3 INSTALL.txt
+          $match = Select-String -Path RVRSE/config.h -Pattern 'PLUG_VERSION_STR\s+"([^"]+)"'
+          $configVersion = $match.Matches[0].Groups[1].Value
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}".TrimStart([char]"v")
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "Package version is not SemVer: $version"
+          }
+          $baseVersion = ($version -split '[-+]')[0]
+          if ($baseVersion -ne $configVersion) {
+            throw "Package version $version does not match config.h version $configVersion"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Authenticate to Azure with GitHub OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign plugin and standalone binaries
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files: |
+            ${{ github.workspace }}\build\windows-vs2022\out\RVRSE.vst3\Contents\x86_64-win\RVRSE.vst3
+            ${{ github.workspace }}\build\windows-vs2022\out\RVRSE.clap
+            ${{ github.workspace }}\build\windows-vs2022\out\RVRSE.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Build Windows installer and portable zip
+        shell: pwsh
+        run: |
+          ./scripts/sign-and-package-win.ps1 `
+            -Action Package `
+            -BuildDirectory build/windows-vs2022/out `
+            -OutputDirectory build/windows-vs2022/dist `
+            -Version "${{ steps.package-version.outputs.version }}" `
+            -RequireSignedInputs
+
+      - name: Sign Windows installer
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\build\windows-vs2022\dist
+          files-folder-filter: RVRSE-*-Windows-Setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify signatures and install lifecycle
+        shell: pwsh
+        run: |
+          ./scripts/sign-and-package-win.ps1 `
+            -Action Verify `
+            -BuildDirectory build/windows-vs2022/out `
+            -OutputDirectory build/windows-vs2022/dist `
+            -Version "${{ steps.package-version.outputs.version }}" `
+            -RequireSignedInputs `
+            -TestInstall
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: RVRSE-Windows
-          path: RVRSE-*.zip
+          path: |
+            build/windows-vs2022/dist/RVRSE-*-Windows-Setup.exe
+            build/windows-vs2022/dist/RVRSE-*-Windows.zip
 
   # ---------------------------------------------------------------------------
   # Publish — GitHub Release
@@ -184,6 +245,8 @@ jobs:
     if: github.event_name == 'push'
     needs: [macos, windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v6
@@ -220,6 +283,7 @@ jobs:
             --title "RVRSE ${VERSION}" \
             --notes-file release-notes.md \
             RVRSE-macOS/RVRSE-${VERSION}-macOS.pkg \
+            RVRSE-Windows/RVRSE-${VERSION}-Windows-Setup.exe \
             RVRSE-Windows/RVRSE-${VERSION}-Windows.zip
 
           echo "✅ Published release ${GITHUB_REF_NAME}"
