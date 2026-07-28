@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The offline reverb seam now retains only the chosen Airwindows MatrixVerb path; rejected comparison engines and the legacy Schroeder implementation have been removed
 
 ### Fixed
+- Riser Release clamp tooltips now refresh when a sample-rate change alters the displayed effective duration (#43)
 - Sample loading via the file dialog now reliably updates the waveform, hit playback, and sample status UI after the drag-and-drop merge changes (rverse-aif)
 - Sample loading now reports clearer errors for unsupported compressed formats, including compressed/non-PCM `.wav` files that previously failed with a generic PCM-read error
 - Standalone macOS app metadata no longer requests microphone usage text for the installer/signing path

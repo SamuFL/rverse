@@ -405,15 +405,20 @@ public:
 
   void SetLimited(bool limited, int effectiveReleaseFrames, double sampleRate)
   {
-    if (mLimited == limited && mEffectiveReleaseFrames == effectiveReleaseFrames)
+    const int displayedEffectiveReleaseMs = limited && sampleRate > 0.0
+      ? static_cast<int>(std::lround(rvrse::FramesToTrimMs(effectiveReleaseFrames, sampleRate)))
+      : -1;
+
+    if (mLimited == limited && mDisplayedEffectiveReleaseMs == displayedEffectiveReleaseMs)
       return;
 
     mLimited = limited;
-    mEffectiveReleaseFrames = effectiveReleaseFrames;
-    if (limited && sampleRate > 0.0)
+    mDisplayedEffectiveReleaseMs = displayedEffectiveReleaseMs;
+    if (displayedEffectiveReleaseMs >= 0)
     {
-      const double effectiveMs = rvrse::FramesToTrimMs(effectiveReleaseFrames, sampleRate);
-      mTooltip.SetFormatted(96, "Limited to %.0f ms by current Riser Length and tempo", effectiveMs);
+      mTooltip.SetFormatted(
+        96, "Limited to %d ms by current Riser Length and tempo", displayedEffectiveReleaseMs
+      );
       SetTooltip(mTooltip.Get());
     }
     else
@@ -435,7 +440,7 @@ private:
   CommitFunction mCommitFunction;
   WDL_String mTooltip;
   bool mLimited = false;
-  int mEffectiveReleaseFrames = -1;
+  int mDisplayedEffectiveReleaseMs = -1;
 };
 #endif
 
