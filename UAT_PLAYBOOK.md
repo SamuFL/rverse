@@ -770,7 +770,8 @@ without losing detail at small sizes.
    a bundle icon.
 2. On macOS, inspect the standalone app in Finder, Applications, the Dock, and the
    installer output at standard and Retina display scales.
-3. Open the plugin UI and verify its footer mark matches the application artwork.
+3. Open the plugin UI and verify the original circular SamuFL logo remains in the
+   bottom-right footer; the application icon must not replace it.
 4. Inspect 16x16 and 32x32 presentations on both platforms.
    - Confirm the simplified gold/steel waveform remains recognizable and has no
      default iPlug2 lettering.
@@ -781,7 +782,7 @@ without losing detail at small sizes.
 
 - [ ] 14.1 — Windows application, installer, shell, and uninstall surfaces use the RVRSE icon
 - [ ] 14.2 — macOS Finder, Dock, Applications, and installer surfaces use the RVRSE icon
-- [ ] 14.3 — The in-plugin mark is visually consistent with the application icon
+- [ ] 14.3 — The plugin footer retains the original circular SamuFL logo
 - [ ] 14.4 — The icon remains recognizable at 16x16 and Retina sizes
 - [ ] 14.5 — Clean builds contain no default iPlug2 application or bundle icons
 

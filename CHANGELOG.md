@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Manual sample trimming — the lower hit waveform now exposes always-visible front/back trim handles with live dimmed-region preview and drag readout in milliseconds; the committed trim applies to both the dry hit and the derived riser source (#42)
 
 ### Changed
-- Replaced the default iPlug2 application, bundle, installer, and in-plugin icons with original RVRSE artwork across Windows, macOS, and iOS resources (#64)
+- Replaced the default iPlug2 application, bundle, and installer icons with original RVRSE artwork across Windows, macOS, and iOS resources while retaining the SamuFL logo in the plugin UI (#64)
 - Offline rebuilds now retain the last playable sequence for preview/MIDI, show delayed rendering feedback, and disable Export until the replacement sequence commits (#43)
 - v1 project states retain their adaptive riser-tail behavior until the user deliberately commits a Riser Release gesture (#43)
 - macOS release distribution now targets a signed, notarized, stapled `.pkg` installer instead of the manual zip + `xattr` workflow
