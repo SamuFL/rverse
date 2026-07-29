@@ -424,6 +424,7 @@ Maintainer setup and local packaging commands are documented in
 3. **Trigger playback** either from MIDI or from the waveform-panel **Play** button — the reverse-reverb riser plays immediately, and the dry hit fires at the beat boundary (default: 4 beats at host BPM).
 4. **Stop playback** either by releasing the MIDI note or by clicking the waveform-panel **Stop** button. Both paths use the same 5ms anti-click fade-out.
 5. Click the header **Export** button to save the current normal riser+hit render as a stereo 24-bit WAV. Export uses the ready offline riser buffer, ignores Master Volume, and stays available while playback is running.
+6. Click the circular **SamuFL logo** in the lower-right corner to open [samufl.com](https://samufl.com).
 
 ### DAW Parameters
 

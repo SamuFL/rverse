@@ -772,10 +772,12 @@ without losing detail at small sizes.
    installer output at standard and Retina display scales.
 3. Open the plugin UI and verify the original circular SamuFL logo remains in the
    bottom-right footer; the application icon must not replace it.
-4. Inspect 16x16 and 32x32 presentations on both platforms.
+4. Hover over the SamuFL logo and verify the pointer changes to a hand, then click
+   it and verify the default browser opens `https://samufl.com`.
+5. Inspect 16x16 and 32x32 presentations on both platforms.
    - Confirm the simplified gold/steel waveform remains recognizable and has no
      default iPlug2 lettering.
-5. Perform a clean build and confirm no generated application or bundle uses the
+6. Perform a clean build and confirm no generated application or bundle uses the
    default iPlug2 icon.
 
 ### Pass Criteria
@@ -785,6 +787,7 @@ without losing detail at small sizes.
 - [ ] 14.3 — The plugin footer retains the original circular SamuFL logo
 - [ ] 14.4 — The icon remains recognizable at 16x16 and Retina sizes
 - [ ] 14.5 — Clean builds contain no default iPlug2 application or bundle icons
+- [ ] 14.6 — Clicking the SamuFL footer logo opens `https://samufl.com`
 
 ---
 
