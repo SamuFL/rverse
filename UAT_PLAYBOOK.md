@@ -758,10 +758,40 @@ publisher, installs every selected format, and uninstalls without orphaned files
 
 ---
 
+## Test Scenario 14 — Application and Bundle Icons
+
+**Goal:** Verify the production RVRSE artwork replaces every default iPlug2 icon
+without losing detail at small sizes.
+
+### Tests
+
+1. On Windows, inspect the installer, UAC prompt, standalone executable, Start menu,
+   taskbar, Installed apps entry, uninstaller, and VST3 bundle where Explorer displays
+   a bundle icon.
+2. On macOS, inspect the standalone app in Finder, Applications, the Dock, and the
+   installer output at standard and Retina display scales.
+3. Open the plugin UI and verify its footer mark matches the application artwork.
+4. Inspect 16x16 and 32x32 presentations on both platforms.
+   - Confirm the simplified gold/steel waveform remains recognizable and has no
+     default iPlug2 lettering.
+5. Perform a clean build and confirm no generated application or bundle uses the
+   default iPlug2 icon.
+
+### Pass Criteria
+
+- [ ] 14.1 — Windows application, installer, shell, and uninstall surfaces use the RVRSE icon
+- [ ] 14.2 — macOS Finder, Dock, Applications, and installer surfaces use the RVRSE icon
+- [ ] 14.3 — The in-plugin mark is visually consistent with the application icon
+- [ ] 14.4 — The icon remains recognizable at 16x16 and Retina sizes
+- [ ] 14.5 — Clean builds contain no default iPlug2 application or bundle icons
+
+---
+
 ## Revision History
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
+| 2026-07-29 | Added Scenario 14: cross-platform RVRSE icon verification               |
 | 2026-07-28 | Added Scenario 13: signed Windows install, DAW smoke test, and uninstall |
 | 2026-07-27 | Added Scenario 12: Riser Release, limiting, shared timeline, and pending renders |
 | 2026-05-18 | Added Scenario 10: UI preview transport                                 |

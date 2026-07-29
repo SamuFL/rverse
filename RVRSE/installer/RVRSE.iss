@@ -29,6 +29,7 @@ LicenseFile={#RepoRoot}\LICENSE
 SetupLogging=yes
 ShowComponentSizes=no
 WizardStyle=modern
+SetupIconFile={#RepoRoot}\RVRSE\resources\RVRSE.ico
 UninstallDisplayIcon={app}\RVRSE.exe
 
 [Types]
