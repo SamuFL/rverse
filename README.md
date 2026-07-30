@@ -387,6 +387,8 @@ Build artefacts are in `build/RVRSE/`.
 ### macOS Installation
 
 Release downloads for macOS ship as a signed and notarized `.pkg` installer.
+The installer contains universal `arm64` and `x86_64` binaries and supports
+macOS 10.15 or later on Intel Macs and macOS 11 or later on Apple Silicon.
 Run the installer and keep the default system-wide install locations unless you
 have a specific reason to customize them:
 

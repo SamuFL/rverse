@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Manual sample trimming — the lower hit waveform now exposes always-visible front/back trim handles with live dimmed-region preview and drag readout in milliseconds; the committed trim applies to both the dry hit and the derived riser source (#42)
 
 ### Changed
+- macOS builds are now universal (`arm64` + `x86_64`), supporting Intel from macOS 10.15 and Apple Silicon from macOS 11; the Intel slice is compile- and runtime-validated under Rosetta in CI because physical Intel hardware was not available for pre-release testing (#59)
 - Windows releases now ship as a ZIP containing VST3, CLAP, standalone, installation instructions, and the PDF manual; the signed installer is deferred to the next version (#36)
 - Replaced the default iPlug2 application and bundle icons with original RVRSE artwork across Windows, macOS, and iOS resources while retaining the SamuFL logo in the plugin UI and linking it to the SamuFL homepage (#64)
 - Offline rebuilds now retain the last playable sequence for preview/MIDI, show delayed rendering feedback, and disable Export until the replacement sequence commits (#43)
