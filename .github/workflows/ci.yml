@@ -91,7 +91,7 @@ jobs:
           cp -R -L build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
           codesign --force --deep -s - ~/Library/Audio/Plug-Ins/Components/RVRSE.component
           for registrar_pid in $(pgrep -x AudioComponentRegistrar || true); do
-            kill "${registrar_pid}" 2>/dev/null || true
+            sudo kill "${registrar_pid}" 2>/dev/null || true
           done
           sleep 2
           pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
