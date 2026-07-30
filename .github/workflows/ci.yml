@@ -145,6 +145,15 @@ jobs:
       - name: Validate VST3 (pluginval)
         run: ./pluginval.exe --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/windows-vs2022/out/RVRSE.vst3"
 
+      - name: Build and verify Windows ZIP
+        shell: pwsh
+        run: |
+          $match = Select-String -Path RVRSE/config.h -Pattern 'PLUG_VERSION_STR\s+"([^"]+)"'
+          ./scripts/package-windows-zip.ps1 `
+            -BuildDirectory build/windows-vs2022/out `
+            -OutputDirectory build/windows-vs2022/dist `
+            -Version $match.Matches[0].Groups[1].Value
+
       - name: Upload pluginval logs
         if: always()
         uses: actions/upload-artifact@v6

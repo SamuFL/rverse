@@ -1,7 +1,7 @@
 RVRSE — Installation Guide (Windows)
 -------------------------------------
 
-Thank you for downloading RVRSE!
+Thank you for downloading RVRSE! This release uses manual ZIP installation.
 
 Copy the plugin format(s) you use to the standard Windows plugin directories:
 
@@ -10,7 +10,11 @@ Copy the plugin format(s) you use to the standard Windows plugin directories:
 
 The standalone app (RVRSE.exe) can be placed anywhere you like.
 
+Administrator access is required to copy plugins into the system directories.
 Then relaunch your DAW and scan for new plugins.
+
+The Windows binaries are unsigned in this release. A signed installer is
+planned for the next version.
 
 Links
 -----

@@ -395,4 +395,4 @@ Three companion files provide the **authoritative visual reference** for the GUI
 7. Web-specific CSS effects (backdrop-blur, animate-pulse, CSS clip-path waveforms) → use NanoVG equivalents where practical; prioritize functionality over pixel-perfect CSS replication.
 
 ### Logo
-A **SamuFL brand logo** image is available in `RVRSE/resources/img/`. It is displayed in the Hit panel (bottom-right area) as a bitmap loaded via `IBitmapControl`. The implementation uses `logo.png` defined as `LOGO_FN` in the resource configuration.
+A **SamuFL brand logo** image is available in `RVRSE/resources/img/`. It is displayed in the Hit panel (bottom-right area) as a clickable bitmap that opens `https://samufl.com`. The implementation uses `logo.png` defined as `LOGO_FN` in the resource configuration.

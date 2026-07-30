@@ -241,6 +241,33 @@ private:
   RVRSE* mPlugin; ///< Non-owning; lifetime guaranteed by plugin > GUI
 };
 
+class HomepageLogoControl final : public IBitmapControl
+{
+public:
+  HomepageLogoControl(const IRECT& bounds, const IBitmap& bitmap)
+  : IBitmapControl(bounds, bitmap)
+  {
+    SetTooltip("Visit samufl.com");
+  }
+
+  void OnMouseDown(float, float, const IMouseMod&) override
+  {
+    GetUI()->OpenURL(PLUG_URL_STR);
+  }
+
+  void OnMouseOver(float x, float y, const IMouseMod& mod) override
+  {
+    GetUI()->SetMouseCursor(ECursor::HAND);
+    IBitmapControl::OnMouseOver(x, y, mod);
+  }
+
+  void OnMouseOut() override
+  {
+    GetUI()->SetMouseCursor();
+    IBitmapControl::OnMouseOut();
+  }
+};
+
 class IconButtonControl final : public IButtonControlBase
 {
 public:
@@ -936,11 +963,12 @@ RVRSE::RVRSE(const InstanceInfo& info)
       });
     }
 
-    // Logo (PNG bitmap) — lower-right
+    // Logo (PNG bitmap) — lower-right, linked to the SamuFL homepage
     const IBitmap logoBitmap = pGraphics->LoadBitmap(LOGO_FN);
     const IRECT bottomArea = hitRect.GetPadded(-10.f).GetFromBottom(80.f);
     const IRECT logoArea = bottomArea.GetFromRight(120.f);
-    pGraphics->AttachControl(new IBitmapControl(logoArea.GetCentredInside(80.f, 80.f), logoBitmap), kCtrlTagLogo);
+    pGraphics->AttachControl(new HomepageLogoControl(
+      logoArea.GetCentredInside(80.f, 80.f), logoBitmap), kCtrlTagLogo);
 
     // Donate button — lower-left, vertically centered with logo
     const IVStyle supportStyle = DEFAULT_STYLE
@@ -979,8 +1007,7 @@ RVRSE::RVRSE(const InstanceInfo& info)
            kCtrlTagHitSectionLabel,
            kCtrlTagExportStatus,
            kCtrlTagMasterVolLabel,
-            kCtrlTagMasterVolValue,
-            kCtrlTagLogo
+           kCtrlTagMasterVolValue
           })
     {
       if (auto* pCtrl = pGraphics->GetControlWithTag(tag))

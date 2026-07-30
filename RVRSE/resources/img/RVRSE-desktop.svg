@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="plate" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#12190F"></stop>
+      <stop offset="1" stop-color="#0A100A"></stop>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="22"></feGaussianBlur>
+    </filter>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#plate)"></rect>
+  <g filter="url(#glow)">
+    <rect x="482" y="326" width="60" height="374" rx="30" fill="#FFCC53" opacity="0.55"></rect>
+    <rect x="566" y="220" width="60" height="480" rx="30" fill="#A0AEC0" opacity="0.65"></rect>
+    <rect x="650" y="546" width="60" height="154" rx="30" fill="#A0AEC0" opacity="0.4"></rect>
+  </g>
+  <rect x="146" y="642" width="60" height="58" rx="30" fill="#FFCC53"></rect>
+  <rect x="230" y="594" width="60" height="106" rx="30" fill="#FFCC53"></rect>
+  <rect x="314" y="527" width="60" height="173" rx="30" fill="#FFCC53"></rect>
+  <rect x="398" y="436" width="60" height="264" rx="30" fill="#FFCC53"></rect>
+  <rect x="482" y="326" width="60" height="374" rx="30" fill="#FFCC53"></rect>
+  <rect x="566" y="220" width="60" height="480" rx="30" fill="#A0AEC0"></rect>
+  <rect x="650" y="546" width="60" height="154" rx="30" fill="#A0AEC0" opacity="0.7"></rect>
+  <rect x="734" y="652" width="60" height="48" rx="24" fill="#A0AEC0" opacity="0.4"></rect>
+  <rect x="818" y="686" width="60" height="14" rx="7" fill="#A0AEC0" opacity="0.2"></rect>
+</svg>
