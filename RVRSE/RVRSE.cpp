@@ -250,7 +250,7 @@ public:
     SetTooltip("Visit samufl.com");
   }
 
-  void OnMouseDown(float x, float y, const IMouseMod& mod) override
+  void OnMouseDown(float, float, const IMouseMod&) override
   {
     GetUI()->OpenURL(PLUG_URL_STR);
   }
