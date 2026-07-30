@@ -92,6 +92,7 @@ jobs:
             sudo kill "${registrar_pid}" 2>/dev/null || true
           done
           sleep 2
+          /usr/bin/auval -v aumu 5SpI SmFL
           pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
 
       - name: Validate Intel VST3 under Rosetta
@@ -103,6 +104,7 @@ jobs:
             sudo kill "${registrar_pid}" 2>/dev/null || true
           done
           sleep 2
+          arch -x86_64 /usr/bin/auval -v aumu 5SpI SmFL
           arch -x86_64 pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs-x86 ~/Library/Audio/Plug-Ins/Components/RVRSE.component
 
       - name: Upload pluginval logs
