@@ -26,6 +26,7 @@
       },
       "cacheVariables": {
         "CMAKE_OSX_DEPLOYMENT_TARGET": "10.15",
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
         "IPLUG_DEPLOY_METHOD": "SYMLINK"
       }
     },
@@ -59,16 +60,6 @@
       "description": "macOS build with Xcode generator (NanoVG/Metal)",
       "inherits": "base-macos",
       "generator": "Xcode"
-    },
-    {
-      "name": "macos-xcode-universal",
-      "displayName": "macOS Universal (Xcode)",
-      "description": "macOS Universal (arm64+x86_64) build with Xcode generator",
-      "inherits": "base-macos",
-      "generator": "Xcode",
-      "cacheVariables": {
-        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64"
-      }
     },
     {
       "name": "ios-xcode",
@@ -190,11 +181,6 @@
     {
       "name": "macos-xcode",
       "configurePreset": "macos-xcode",
-      "configuration": "Release"
-    },
-    {
-      "name": "macos-xcode-universal",
-      "configurePreset": "macos-xcode-universal",
       "configuration": "Release"
     },
     {

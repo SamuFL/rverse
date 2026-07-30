@@ -31,3 +31,11 @@ _Avoid_: Loading
 **Legacy Transition**:
 The adaptive riser-tail behavior preserved for playable sequences restored from v1 project state. It does not restore older hit conditioning and remains distinct from numeric Riser Release until the user chooses a Riser Release value.
 _Avoid_: Zero release, default release
+
+**Universal macOS Build**:
+A macOS build whose executable artifacts contain native `arm64` and `x86_64` slices in the same distribution.
+_Avoid_: Apple Silicon build, Intel build, dual build
+
+**Intel Validation**:
+Evidence that the `x86_64` slice executes successfully in an Intel-compatible macOS environment. It does not imply testing on physical Intel hardware unless stated explicitly.
+_Avoid_: Intel build check

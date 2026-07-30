@@ -788,10 +788,50 @@ without losing detail at small sizes.
 
 ---
 
+## Test Scenario 15 — Universal macOS Distribution
+
+**Goal:** Verify that macOS build and installer artifacts support Apple Silicon
+and Intel, and record the limits of Intel validation.
+
+### Pre-condition
+
+- Current macOS release-candidate `.pkg`
+- Apple Silicon Mac with Rosetta installed
+- CI architecture and x86_64 validation jobs passing
+
+### Tests
+
+1. Inspect the build outputs for VST3, AU, CLAP, standalone, and unit tests with
+   `lipo -archs` and `vtool -show-build`.
+   - Verify every executable reports both `arm64` and `x86_64`.
+   - Verify the Intel slice targets macOS 10.15 and the Apple Silicon slice
+     targets macOS 11.
+2. Expand the signed `.pkg` with `pkgutil --expand-full`.
+   - Verify the packaged VST3, AU, CLAP, and standalone executables report both
+     architectures.
+3. Run the unit-test binary with `arch -x86_64`.
+4. Run VST3 and AU pluginval at strictness 5 with `arch -x86_64`.
+5. Install the `.pkg` on Apple Silicon and complete the normal macOS DAW smoke
+   test.
+6. Record in the release notes that Intel execution was validated under Rosetta
+   and not on physical Intel hardware.
+
+### Pass Criteria
+
+- [ ] 15.1 — Every macOS build output contains `arm64` and `x86_64`
+- [ ] 15.2 — Every executable in the signed installer payload is universal
+- [ ] 15.3 — The x86_64 unit-test suite passes under Rosetta
+- [ ] 15.4 — x86_64 VST3 and AU pluginval pass at strictness 5 under Rosetta
+- [ ] 15.5 — Native Apple Silicon installation and DAW smoke tests pass
+- [ ] 15.6 — Release notes disclose the absence of physical Intel hardware testing
+
+---
+
 ## Revision History
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
+| 2026-07-30 | Added Scenario 15: universal macOS artifacts and Rosetta validation     |
 | 2026-07-30 | Added Scenario 13: Windows ZIP contents, manual install, and DAW smoke test |
 | 2026-07-29 | Added Scenario 14: cross-platform RVRSE icon verification               |
 | 2026-07-27 | Added Scenario 12: Riser Release, limiting, shared timeline, and pending renders |

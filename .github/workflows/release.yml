@@ -22,8 +22,8 @@ jobs:
   # macOS — Ninja, Release
   # ---------------------------------------------------------------------------
   macos:
-    runs-on: macos-14
-    timeout-minutes: 60
+    runs-on: macos-15
+    timeout-minutes: 75
 
     steps:
       - name: Checkout (with submodules)
@@ -50,6 +50,47 @@ jobs:
         run: |
           cmake --build build/macos-ninja --config Release --target rvrse_tests
           ctest --test-dir build/macos-ninja --output-on-failure
+
+      - name: Verify universal build outputs
+        run: scripts/verify-macos-universal.sh --build-dir build/macos-ninja
+
+      - name: Install Rosetta
+        run: softwareupdate --install-rosetta --agree-to-license
+
+      - name: Run Intel tests under Rosetta
+        run: arch -x86_64 build/macos-ninja/tests/rvrse_tests
+
+      - name: Download pluginval (pinned v1.0.4)
+        run: |
+          curl -fsSL "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip" -o pluginval.zip
+          echo "3c4c533bda0c5059eea3ddaea752d757ee2025041f0f47e6bcb0e87f6082b29f  pluginval.zip" | shasum -a 256 --check
+          unzip -q pluginval.zip
+
+      - name: Validate native VST3
+        run: pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs "build/macos-ninja/out/RVRSE.vst3"
+
+      - name: Validate native AU
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          rm -rf ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+          cp -R -L build/macos-ninja/out/RVRSE.component ~/Library/Audio/Plug-Ins/Components/
+          codesign --force --deep -s - ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+          for registrar_pid in $(pgrep -x AudioComponentRegistrar || true); do
+            sudo kill "${registrar_pid}" 2>/dev/null || true
+          done
+          scripts/validate-macos-au.sh
+          pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs ~/Library/Audio/Plug-Ins/Components/RVRSE.component
+
+      - name: Validate Intel VST3 under Rosetta
+        run: arch -x86_64 pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs-x86 "build/macos-ninja/out/RVRSE.vst3"
+
+      - name: Validate Intel AU under Rosetta
+        run: |
+          for registrar_pid in $(pgrep -x AudioComponentRegistrar || true); do
+            sudo kill "${registrar_pid}" 2>/dev/null || true
+          done
+          scripts/validate-macos-au.sh --architecture x86_64
+          arch -x86_64 pluginval.app/Contents/MacOS/pluginval --validate-in-process --strictness-level 5 --skip-gui-tests --output-dir ./pluginval-logs-x86 ~/Library/Audio/Plug-Ins/Components/RVRSE.component
 
       - name: Import signing certificates
         env:
@@ -94,6 +135,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build signed macOS installer
+        id: macos-package
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
@@ -103,9 +145,17 @@ jobs:
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
+          PACKAGE_PATH="build/macos-ninja/dist/RVRSE-${VERSION}-macOS.pkg"
           scripts/sign-and-notarize.sh \
             --build-dir build/macos-ninja \
-            --output "build/macos-ninja/dist/RVRSE-${VERSION}-macOS.pkg"
+            --output "${PACKAGE_PATH}"
+          echo "package=${PACKAGE_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify signed installer architecture
+        run: |
+          scripts/verify-macos-universal.sh \
+            --build-dir build/macos-ninja \
+            --package "${{ steps.macos-package.outputs.package }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
@@ -120,6 +170,14 @@ jobs:
           name: RVRSE-macOS-notary-logs
           path: build/macos-ninja/dist/notarytool-*.json
           if-no-files-found: ignore
+
+      - name: Upload pluginval logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RVRSE-release-macOS-pluginval-logs
+          path: pluginval-logs*/**
+          retention-days: 14
 
   # ---------------------------------------------------------------------------
   # Windows — Visual Studio 2022, Release
