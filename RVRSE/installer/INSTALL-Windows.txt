@@ -14,7 +14,7 @@ Administrator access is required to copy plugins into the system directories.
 Then relaunch your DAW and scan for new plugins.
 
 The Windows binaries are unsigned in this release. A signed installer is
-planned for the next version.
+planned for v1.2.0. Example samples are not bundled in the Windows ZIP.
 
 Links
 -----

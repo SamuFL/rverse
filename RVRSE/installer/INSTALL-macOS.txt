@@ -13,15 +13,15 @@ Thank you for downloading RVRSE!
   App:   /Applications/RVRSE.app
   Demo samples: /Library/Application Support/RVRSE/Examples/
 
-3. Relaunch your DAW and rescan plugins if needed.
+3. The bundled example WAV files are installed only with the macOS package.
+
+4. Relaunch your DAW and rescan plugins if needed.
 
 
 macOS Security (Gatekeeper)
 ---------------------------
 Official RVRSE release installers are signed with Apple Developer ID,
 notarized by Apple, and stapled before distribution.
-
-No `xattr` workaround should be required for the official installer.
 
 If Gatekeeper still warns after a fresh release download, please report
 it at:

@@ -26,7 +26,7 @@ Anything not listed here is **out of scope** for v1.1.0 and lives in the v1.2.0 
 | C-2 | Clear error handling for compressed file formats  | BUG-004                                        |
 | C-3 | Drag & drop sample loading                        | FR-010                                         |
 | C-4 | Sample trimming (auto-remove dead air front/back) | FR-002                                         |
-| C-5 | Crossfade control (reverse → dry transition)      | FR-003                                         |
+| C-5 | Riser Release (post-anchor riser decay)           | FR-003, #43                                    |
 | C-6 | Play / Export from the UI                         | FR-011, FR-012                                 |
 | C-7 | Improved reverb engine                            | (technical debt — **optional, see Section 5**) |
 
@@ -54,9 +54,9 @@ Anything not listed here is **out of scope** for v1.1.0 and lives in the v1.2.0 
 
 #### Features
 
-- **C-3:** Drag & drop sample loading (`yyahav` PR `#TBD` — already implemented, in review)
+- **C-3:** Drag & drop sample loading (`yyahav` PR #24, follow-up PR #28)
 - **C-4:** Sample trimming — remove silence at front and back, manually "cut into" the sample
-- **C-5:** Crossfade control between reversed tail and dry hit
+- **C-5:** Riser Release — a riser-only post-anchor decay; the dry hit is not crossfaded (#43)
 - **C-6a:** UI play button (preview without MIDI)
 - **C-6b:** Render/export to file from the UI (drag-out can come in v1.2)
 - **C-7:** Reverb engine replacement — see Section 5 (Risk & Spike)
@@ -121,7 +121,7 @@ Goal: ship the headline features.
 
 - C-3 (drag & drop — merge `yyahav` PR after UAT)
 - C-4 (sample trimming)
-- C-5 (crossfade)
+- C-5 (Riser Release)
 - C-6a (UI play button)
 - C-6b (export/render via system save dialog — confirmed in scope)
 - C-2 (compressed file format error handling — small, lands here)
@@ -131,7 +131,8 @@ Goal: ship the headline features.
 
 **Optional spike (Days 3–7 if pursued):** reverb engine evaluation per Section 5. Hard cutoff: if no clear win by end of Day 7, drop C-7 from v1.1.0 entirely.
 
-**Exit criteria:** All headline features merged to `develop`, signed installer producing notarized artefacts.
+**Exit criteria:** All headline features merged to `develop`, signed/notarized macOS installer
+and validated Windows ZIP produced by CI.
 
 ### Phase 2 — "UAT & release" (Days 10–14)
 
@@ -173,7 +174,7 @@ Goal: validate, polish, ship.
 6. UI play button works (new in v1.1)
 7. Export/render produces valid WAV (new in v1.1)
 8. Trim controls work (new in v1.1)
-9. Crossfade works (new in v1.1)
+9. Riser Release works without fading the dry hit (new in v1.1)
 10. Plugin state saves/loads with the project
 11. No crashes on close/reload
 
@@ -214,7 +215,7 @@ A v1.1.0 release is done when:
 5. README, install docs, and in-plugin help reviewed and updated
 6. Windows-as-smoke-tested-only documented in README
 7. CHANGELOG.md updated
-8. GitHub release created with VST3, AU, CLAP, and `.pkg` artefacts attached
+8. GitHub release created with the signed macOS `.pkg` and unsigned Windows ZIP attached
 9. Blog post + newsletter announcing the release
 10. The archived Beads tracker is clearly documented in README; all v1.1.0 work is tracked in GitHub Issues against the milestone
 11. `yyahav` credited in release notes

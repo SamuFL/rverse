@@ -1,0 +1,117 @@
+RVRSE 1.1.0 USER GUIDE
+======================
+
+RVRSE is a free, open-source rise-and-hit designer. It turns one loaded hit
+sample into a tempo-synced reverse-reverb riser and plays the original hit at
+the Beat Anchor.
+
+SUPPORTED FORMATS AND SYSTEMS
+-----------------------------
+
+Audio input: uncompressed WAV or AIFF, mono or stereo, up to 30 seconds.
+Plugin formats: VST3, AU (macOS), CLAP, and standalone.
+
+macOS is the primary supported platform. The universal installer supports
+Intel Macs on macOS 10.15 or newer and Apple Silicon on macOS 11 or newer.
+Windows x64 is supported but smoke-tested only for this release. Linux, AAX,
+AUv3/iPadOS, ARA, external reverb input, and convolution IR loading are not
+supported.
+
+INSTALLATION
+------------
+
+macOS:
+Open the signed and notarized RVRSE .pkg and follow the prompts. It installs
+VST3, AU, CLAP, the standalone app, and two example WAV files. The examples
+are placed in:
+
+  /Library/Application Support/RVRSE/Examples/
+
+Windows:
+Extract RVRSE-1.1.0-Windows.zip. Copy RVRSE.vst3 to:
+
+  C:\Program Files\Common Files\VST3\
+
+Copy RVRSE.clap to:
+
+  C:\Program Files\Common Files\CLAP\
+
+RVRSE.exe may run from any writable folder. Administrator access is normally
+required for the system plugin folders. Windows binaries are unsigned in
+v1.1.0, and example samples are not bundled in the Windows ZIP.
+
+QUICK START
+-----------
+
+1. Add RVRSE to an instrument or MIDI track.
+2. Click LOAD SAMPLE, or drag an uncompressed WAV/AIFF onto the header,
+   footer, or either waveform.
+3. Use the lower waveform's left and right handles to trim the source.
+4. Click Play or trigger a MIDI note.
+5. Adjust the riser and hit controls.
+6. Click Export to save the committed sequence as a stereo 24-bit WAV.
+
+SAMPLE LOADING AND TRIM
+-----------------------
+
+The lower waveform always shows the original sample. Drag either trim handle
+to preview a non-destructive edit; excluded regions are dimmed. Release the
+handle to commit the trim and start one offline rebuild. Double-click a handle
+to reset that edge. The same trimmed region feeds both the dry hit and the
+riser pipeline.
+
+While a replacement is rendering, the upper waveform and Play/MIDI continue
+to use the last complete playable sequence. Export is disabled until the new
+sequence commits. Unsupported or compressed files produce a clear error.
+
+PLAYBACK AND TRANSITION
+-----------------------
+
+Play starts the riser immediately. The dry hit fires at the Beat Anchor after
+the selected Riser Length. Stop or MIDI note-off applies a short anti-click
+fade.
+
+Riser Release controls the riser's post-anchor decay from 0 to 500 ms. It
+allows the riser to continue beneath the dry hit, but never fades the hit
+itself. This is an additive riser-only release, not a two-sided crossfade.
+
+CONTROLS
+--------
+
+Master Volume     Overall output level.
+Lush              Reverb blend; changing it triggers an offline rebuild.
+Riser Length      1/4 to 16 beats; sets the pre-anchor duration.
+Fade In           Portion of the riser used for its linear fade-in.
+Riser Release     0-500 ms post-anchor riser-only decay. Commits on gesture
+                  end and rebuilds from the cached stretch stage.
+Riser Volume      Independent riser gain, -60 to +6 dB.
+Hit Volume        Independent dry-hit gain, -60 to +6 dB.
+Stutter Rate      Real-time gate rate, 0-30 Hz.
+Stutter Depth     Real-time gate depth, 0-1.
+Stretch Quality   High for quality; Low for faster offline rendering.
+
+MIDI CONTROL
+------------
+
+CC1 (Mod Wheel) controls Stutter Rate.
+CC11 (Expression) controls Stutter Depth.
+
+These mappings update the DSP and visible knobs in real time. They are fixed
+in v1.1.0; user-assignable CC mappings are planned for v1.2.0.
+
+EXPORT
+------
+
+Export writes the current normal riser-and-hit sequence as a stereo 24-bit
+WAV through the system save dialog. It uses the committed offline render,
+ignores Master Volume, and can run while playback is active. It is unavailable
+while a replacement offline render is pending.
+
+SUPPORT AND SOURCE
+------------------
+
+Homepage: https://samufl.com
+Issues:   https://github.com/SamuFL/rverse/issues
+Source:   https://github.com/SamuFL/rverse
+
+RVRSE is licensed under the MIT License.

@@ -3,13 +3,13 @@
 **Free, open-source audio plugin (VST3 / AU / CLAP) built with iPlug2 and C++17.**
 
 RVRSE generates a reverse-reverb riser automatically from any loaded hit sample, then fires the
-original hit at a tempo-synced beat boundary. One sample in → complete transition out. No manual
-editing, no extra samples needed.
+original hit at a tempo-synced beat boundary. One sample in → complete transition out. No external
+audio editing or extra samples needed.
 
-> **Status:** `v1.0.0` released. Core DSP pipeline, stutter gate, IGraphics GUI, and all DAW
-> parameters working. CI builds on macOS (Apple Silicon) + Windows (VS2022), with release-tag macOS
-> builds packaged as a signed and notarized installer.
-> Dark-themed native GUI with waveform display, dual control panels, and hit preview.
+> **Status:** `v1.1.0` release candidate in preparation. CI builds universal macOS binaries
+> (`arm64` + `x86_64`) and Windows x64 binaries. Release-tag macOS builds ship in a signed and
+> notarized installer; Windows builds ship as an unsigned ZIP for manual installation.
+> The dark-themed native GUI includes drag-and-drop loading, manual trim, preview, and export.
 > See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
 ---
@@ -26,11 +26,12 @@ editing, no extra samples needed.
 8. [Build Instructions](#build-instructions)
 9. [Plugin Formats](#plugin-formats)
 10. [Usage in a DAW](#usage-in-a-daw)
-11. [Project Structure](#project-structure)
-12. [Roadmap — v1.0 Release (Historical)](#roadmap--v10-release-historical)
-13. [Project Management](#project-management)
-14. [Contributing](#contributing)
-15. [License](#license)
+11. [Platform Support](#platform-support)
+12. [Project Structure](#project-structure)
+13. [Roadmap — v1.0 Release (Historical)](#roadmap--v10-release-historical)
+14. [Project Management](#project-management)
+15. [Contributing](#contributing)
+16. [License](#license)
 
 ---
 
@@ -44,17 +45,22 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ```
 
-The built plugins appear in `build/RVRSE/` — see [Plugin Formats](#plugin-formats) for paths.
+Build outputs appear under `<build-directory>/out/` — see [Plugin Formats](#plugin-formats).
 
 ---
 
 ## How It Works
 
-1. **Load** a one-shot hit sample (uncompressed WAV or AIFF) via the LOAD SAMPLE button.
-2. **Trim** the source on the lower hit waveform by dragging the front/back handles; the dimmed outer regions are excluded, but the original file stays preserved internally.
+1. **Load** a one-shot hit sample (uncompressed WAV or AIFF) via the **LOAD SAMPLE** button,
+   or drag the file onto the header, footer, or either waveform.
+2. **Trim** the source on the lower hit waveform by dragging the front/back handles. The
+   dimmed outer regions are excluded non-destructively. Release a handle to rebuild; double-click
+   either handle to reset that edge.
 3. **Preview** the sound either by clicking the waveform-panel **Play** button (centered below the waveform) or by playing a MIDI note.
 4. **Export** the current normal riser+hit result from the header **Export** button to a 24-bit WAV file in one step.
-5. The riser is your hit sample processed through reverb → reversed → time-stretched to match
+5. **Shape the transition** with Riser Release. It lets the riser decay beneath the hit after
+   the Beat Anchor; it does not fade or crossfade the dry hit.
+6. The riser is your hit sample processed through reverb → reversed → time-stretched to match
    the configured riser length (default: 4 beats at host BPM), then released beneath the hit
    for the requested post-beat duration (default: 50 ms).
 
@@ -286,7 +292,7 @@ Per-sample loop (s = 0 to nFrames):
 
 | Tool | Minimum Version | Notes |
 |---|---|---|
-| **CMake** | 3.16+ | Build system generator |
+| **CMake** | 3.25+ | Build system generator |
 | **C++17 compiler** | Clang 10+ / GCC 9+ / MSVC 2019+ | |
 | **Ninja** (recommended) | 1.10+ | Faster than Make; optional |
 | **Xcode** (macOS) | 13+ | Required for AU format and `ibtool` |
@@ -331,7 +337,7 @@ cmake --build build --config Release
 
 ### Running Tests
 
-RVRSE includes a Catch2 unit test suite covering all DSP modules (42 tests).
+RVRSE includes a Catch2 unit test suite covering all DSP modules (71 tests).
 Tests compile standalone — no iPlug2 or DAW required.
 
 ```bash
@@ -382,7 +388,8 @@ The build produces four plugin formats:
 | **CLAP** | `/Library/Audio/Plug-Ins/CLAP/` | `C:\Program Files\Common Files\CLAP\` |
 | **Standalone** | `/Applications/` | Build output directory |
 
-Build artefacts are in `build/RVRSE/`.
+Build artifacts are written to `<build-directory>/out/`. Preset examples include
+`build/macos-ninja/out/` and `build/windows-vs2022/out/`.
 
 ### macOS Installation
 
@@ -398,8 +405,6 @@ have a specific reason to customize them:
 - **Standalone:** `/Applications/`
 - **Bundled example samples:** `/Library/Application Support/RVRSE/Examples/`
 
-No `xattr` workaround should be needed for official release installers.
-
 ### Windows Installation
 
 Windows releases ship as `RVRSE-<version>-Windows.zip`. Extract it, then copy
@@ -412,22 +417,40 @@ the plugin formats you use to the standard system directories:
 Administrator access is required when copying plugins into the system
 directories. The ZIP also includes `INSTALL.txt` and the PDF user manual.
 Windows binaries are unsigned in this release; a signed installer is planned
-for the next version.
+for v1.2.0. The Windows ZIP does not currently bundle example samples; the two
+example WAV files are included only by the macOS installer.
 
 ---
 
 ## Usage in a DAW
 
 1. **Insert RVRSE** as a virtual instrument on an instrument/MIDI track.
-2. Click **LOAD SAMPLE** and select an uncompressed WAV or AIFF hit sample (up to 30 seconds, mono or stereo).
-3. **Trigger playback** either from MIDI or from the waveform-panel **Play** button — the reverse-reverb riser plays immediately, and the dry hit fires at the beat boundary (default: 4 beats at host BPM).
-4. **Stop playback** either by releasing the MIDI note or by clicking the waveform-panel **Stop** button. Both paths use the same 5ms anti-click fade-out.
-5. Click the header **Export** button to save the current normal riser+hit render as a stereo 24-bit WAV. Export uses the ready offline riser buffer, ignores Master Volume, and stays available while playback is running.
-6. Click the circular **SamuFL logo** in the lower-right corner to open [samufl.com](https://samufl.com).
+2. Load an uncompressed WAV or AIFF hit sample (up to 30 seconds, mono or stereo):
+   - click **LOAD SAMPLE** and use the file picker; or
+   - drag the file onto the plugin header, footer, or either waveform.
+   Unsupported and compressed files show a clear error instead of entering the render pipeline.
+3. On the lower waveform, drag the left or right trim handle to preview a non-destructive source
+   trim. Dimmed audio is excluded. Releasing the handle commits the trim and starts one offline
+   rebuild; double-clicking a handle resets that edge. The upper waveform keeps showing the last
+   playable sequence until the replacement render is ready.
+4. **Trigger playback** either from MIDI or from the waveform-panel **Play** button. The
+   reverse-reverb riser starts immediately and the dry hit fires at the Beat Anchor (default:
+   four beats after the trigger at host BPM).
+5. **Stop playback** either by releasing the MIDI note or by clicking the waveform-panel **Stop**
+   button. Both paths use the same 5 ms anti-click fade-out.
+6. Set **Riser Release** to control how long the riser continues and fades beneath the dry hit
+   after the Beat Anchor. It is an additive riser-only release, not a two-sided crossfade.
+7. Click the header **Export** button to save the current normal riser+hit sequence as a stereo
+   24-bit WAV. Export uses the committed offline render, ignores Master Volume, and remains
+   available during playback. It is disabled while a replacement render is pending.
+8. Click the circular **SamuFL logo** in the lower-right corner to open
+   [samufl.com](https://samufl.com).
 
 ### DAW Parameters
 
-All parameters are exposed in the DAW's generic editor and can be automated:
+Most parameters are exposed in the DAW's generic editor and can be automated. Riser Release is
+persisted but intentionally non-automatable; manual trim is edited on the lower waveform and is
+also persisted rather than automated.
 
 | Parameter | Range | Default | Notes |
 |---|---|---|---|
@@ -435,7 +458,7 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 | Lush | 0–100% | 40% | Reverb amount — linearly blends from 100/0 to 50/100 dry/wet and triggers offline rebuild |
 | Riser Length | 1/4, 1/2, 1, 2, 4, 8, 16 beats (discrete) | 4 | Time-stretch target — triggers offline rebuild |
 | Fade In | 0–100% | 60% | Linear ramp over portion of riser length |
-| Riser Release | 0–500 ms | 50 ms | Non-automatable post-anchor linear riser decay; commits on gesture end |
+| Riser Release | 0–500 ms | 50 ms | Non-automatable post-anchor linear riser decay; commits on gesture end and rebuilds from the cached stretch stage |
 | Riser Volume | -60 to +6 dB | 0 dB | Independent riser voice gain |
 | Hit Volume | -60 to +6 dB | 0 dB | Independent hit voice gain |
 | Stutter Rate | 0–30 Hz | 0 (off) | Per-sample gate rate (also via MIDI CC1) |
@@ -443,7 +466,40 @@ All parameters are exposed in the DAW's generic editor and can be automated:
 | Debug Stage | Normal / Reverbed / Reversed / Riser Only | Normal | Diagnostic: audition intermediate pipeline buffers |
 | Stretch Quality | High / Low | High | High = best quality (larger FFT), Low = faster (~2×) for real-time tweaking |
 
-### Current Limitations
+### MIDI Control
+
+The v1.1.0 mappings are fixed:
+
+| MIDI CC | Control | Behavior |
+|---|---|---|
+| **CC1 (Mod Wheel)** | Stutter Rate | Maps 0–127 to 0–30 Hz |
+| **CC11 (Expression)** | Stutter Depth | Maps 0–127 to 0–1 |
+
+Both mappings update the DSP and visible knobs in real time. User-assignable MIDI CC mappings
+are planned for [v1.2.0](https://github.com/SamuFL/rverse/issues/31).
+
+## Platform Support
+
+- **macOS is the primary supported platform.** v1.1.0 ships universal Intel and Apple Silicon
+  binaries in a signed and notarized installer. Intel requires macOS 10.15 or newer; Apple
+  Silicon requires macOS 11 or newer.
+- **Windows x64 is supported, but smoke-tested only for v1.1.0.** It ships as an unsigned ZIP
+  containing VST3, CLAP, standalone, installation instructions, and the PDF manual.
+- **Linux is not supported.** Community-maintained support is welcome through pull requests.
+
+### Not Supported
+
+The following are explicitly outside the RVRSE roadmap:
+
+- **AAX / Pro Tools** — Avid SDK and iLok distribution overhead are not sustainable for this
+  free, single-maintainer project.
+- **iPadOS / AUv3** — a touch UI, App Store distribution, and ongoing mobile maintenance would
+  constitute a separate product.
+- **External or sidechain reverb input** — RVRSE intentionally derives the riser from the loaded hit.
+- **ARA integration** — not aligned with the focused instrument workflow.
+- **Convolution reverb or impulse-response loading** — RVRSE uses its built-in algorithmic reverb.
+
+### Current Product Limitations
 
 - No preset system.
 - No pitch shift (planned).
@@ -559,6 +615,7 @@ GitHub is the **single source of truth** for active RVRSE planning and execution
 
 - [Issues](https://github.com/SamuFL/rverse/issues)
 - [v1.1.0 milestone](https://github.com/SamuFL/rverse/milestone/1)
+- [v1.2.0 milestone](https://github.com/SamuFL/rverse/milestone/2)
 - [RVRSE Development project board](https://github.com/users/SamuFL/projects/1)
 
 The previous Beads tracker is preserved for historical reference only at

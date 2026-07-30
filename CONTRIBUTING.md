@@ -7,10 +7,11 @@ source under the [MIT License](LICENSE).
 
 1. **Fork** the repository and clone your fork.
 2. Set up the build environment — see [README.md](README.md) for prerequisites.
-3. Create a **feature branch** from `develop`:
+3. Find or open a GitHub issue for the work, then create a **feature branch** from `develop`
+   using its issue number:
    ```bash
    git checkout develop && git pull
-   git checkout -b feature/your-feature-name
+   git checkout -b feature/123-your-feature-name
    ```
 
 ## Development Workflow
@@ -21,7 +22,7 @@ This project follows **git-flow**:
 |---|---|
 | `main` | Tagged releases only |
 | `develop` | Integration branch — all feature work merges here |
-| `feature/<name>` | One branch per task or feature |
+| `feature/<issue-number>-<name>` | One branch per GitHub issue |
 | `release/<version>` | Release candidates (bug fixes only) |
 | `hotfix/<name>` | Emergency fixes against `main` |
 
@@ -59,12 +60,16 @@ cmake --build build --target rvrse_tests && ctest --test-dir build
 2. Ensure all **tests pass**.
 3. Update `CHANGELOG.md` under `[Unreleased]` if your change affects
    user-facing behaviour.
-4. Open a pull request targeting `develop`.
-5. Describe what you changed and why.
+4. Include the issue number in each commit subject, for example
+   `Improve sample loading (#123)`.
+5. Open a pull request targeting `develop` and link the issue with
+   `Closes #123` when the PR completes it.
+6. Describe the behavior change, implementation, and validation performed.
 
 ## Reporting Issues
 
-Please open a GitHub issue with:
+Please use the repository's [GitHub issue templates](https://github.com/SamuFL/rverse/issues/new/choose)
+and include:
 - Steps to reproduce
 - Expected vs actual behaviour
 - DAW, OS, and plugin format (VST3 / AU / CLAP)
