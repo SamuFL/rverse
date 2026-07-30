@@ -77,7 +77,7 @@ assert_universal() {
   [[ "${arm_minimum}" == "11.0" ]] ||
     die "${binary_path} has unexpected arm64 minimum macOS ${arm_minimum}"
 
-  echo "universal (${architectures}; x86_64 >= 10.15, arm64 >= 11.0): ${binary_path}"
+  echo "universal (${architectures}; x86_64 minos ${x86_minimum}, arm64 minos ${arm_minimum}): ${binary_path}"
 }
 
 assert_universal "${build_dir}/out/RVRSE.vst3/Contents/MacOS/RVRSE"
