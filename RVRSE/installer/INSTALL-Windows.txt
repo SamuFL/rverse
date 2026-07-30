@@ -1,22 +1,20 @@
-RVRSE - Installation Guide (Windows)
-------------------------------------
+RVRSE — Installation Guide (Windows)
+-------------------------------------
 
-Thank you for downloading RVRSE!
+Thank you for downloading RVRSE! This release uses manual ZIP installation.
 
-Recommended: run the signed RVRSE Windows Setup executable. It installs:
+Copy the plugin format(s) you use to the standard Windows plugin directories:
 
   VST3:  C:\Program Files\Common Files\VST3\RVRSE.vst3\
   CLAP:  C:\Program Files\Common Files\CLAP\RVRSE.clap
-  App:   C:\Program Files\RVRSE\RVRSE.exe
 
-The portable zip contains the same signed binaries for manual installation.
-Administrator access is required to copy them to the system plugin folders.
+The standalone app (RVRSE.exe) can be placed anywhere you like.
 
+Administrator access is required to copy plugins into the system directories.
 Then relaunch your DAW and scan for new plugins.
 
-Windows may show a reputation warning for a newly issued signing identity even
-when the signature is valid. Check that Windows reports a valid signature and
-the expected verified legal publisher before continuing.
+The Windows binaries are unsigned in this release. A signed installer is
+planned for the next version.
 
 Links
 -----
@@ -24,4 +22,4 @@ Links
   Source code: https://github.com/SamuFL/rverse
   Issues:      https://github.com/SamuFL/rverse/issues
 
-License: MIT - see https://github.com/SamuFL/rverse/blob/main/LICENSE
+License: MIT — see https://github.com/SamuFL/rverse/blob/main/LICENSE

@@ -126,11 +126,7 @@ jobs:
   # ---------------------------------------------------------------------------
   windows:
     runs-on: windows-2022
-    timeout-minutes: 45
-    environment: production-signing
-    permissions:
-      contents: read
-      id-token: write
+    timeout-minutes: 30
 
     steps:
       - name: Checkout (with submodules)
@@ -164,7 +160,7 @@ jobs:
           $configVersion = $match.Matches[0].Groups[1].Value
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $version = "${{ inputs.version }}"
-          } else {
+          else
             $version = "${{ github.ref_name }}".TrimStart([char]"v")
           }
           if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
@@ -176,67 +172,19 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Authenticate to Azure with GitHub OIDC
-        uses: azure/login@v3
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Sign plugin and standalone binaries
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
-          files: |
-            ${{ github.workspace }}\build\windows-vs2022\out\RVRSE.vst3\Contents\x86_64-win\RVRSE.vst3
-            ${{ github.workspace }}\build\windows-vs2022\out\RVRSE.clap
-            ${{ github.workspace }}\build\windows-vs2022\out\RVRSE.exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-
-      - name: Build Windows installer and portable zip
+      - name: Package Windows ZIP
         shell: pwsh
         run: |
-          ./scripts/sign-and-package-win.ps1 `
-            -Action Package `
+          ./scripts/package-windows-zip.ps1 `
             -BuildDirectory build/windows-vs2022/out `
             -OutputDirectory build/windows-vs2022/dist `
-            -Version "${{ steps.package-version.outputs.version }}" `
-            -RequireSignedInputs
-
-      - name: Sign Windows installer
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
-          files-folder: ${{ github.workspace }}\build\windows-vs2022\dist
-          files-folder-filter: RVRSE-*-Windows-Setup.exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-
-      - name: Verify signatures and install lifecycle
-        shell: pwsh
-        run: |
-          ./scripts/sign-and-package-win.ps1 `
-            -Action Verify `
-            -BuildDirectory build/windows-vs2022/out `
-            -OutputDirectory build/windows-vs2022/dist `
-            -Version "${{ steps.package-version.outputs.version }}" `
-            -RequireSignedInputs `
-            -TestInstall
+            -Version "${{ steps.package-version.outputs.version }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: RVRSE-Windows
-          path: |
-            build/windows-vs2022/dist/RVRSE-*-Windows-Setup.exe
-            build/windows-vs2022/dist/RVRSE-*-Windows.zip
+          path: build/windows-vs2022/dist/RVRSE-*-Windows.zip
 
   # ---------------------------------------------------------------------------
   # Publish — GitHub Release
@@ -283,7 +231,6 @@ jobs:
             --title "RVRSE ${VERSION}" \
             --notes-file release-notes.md \
             RVRSE-macOS/RVRSE-${VERSION}-macOS.pkg \
-            RVRSE-Windows/RVRSE-${VERSION}-Windows-Setup.exe \
             RVRSE-Windows/RVRSE-${VERSION}-Windows.zip
 
           echo "✅ Published release ${GITHUB_REF_NAME}"

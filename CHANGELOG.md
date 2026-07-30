@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Signed Windows release packaging with an Inno Setup installer, portable ZIP, signature verification, and automated install/uninstall checks (#36)
 - Riser Release — a persisted 0–500 ms offline control extends the riser past the Beat Anchor and applies a linear riser-only decay beneath the unattenuated dry hit; the shared timeline now visualizes the real overlap (#43)
 - Drag-and-drop sample loading — drag any WAV or AIFF file directly onto the plugin's header/footer/waveform areas to load it (rverse-aif)
 - macOS maintainer tooling for release signing/notarization: `scripts/sign-and-notarize.sh`, `scripts/build-macos-installer.sh`, and a minimal installer entitlements plist
@@ -17,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Manual sample trimming — the lower hit waveform now exposes always-visible front/back trim handles with live dimmed-region preview and drag readout in milliseconds; the committed trim applies to both the dry hit and the derived riser source (#42)
 
 ### Changed
-- Replaced the default iPlug2 application, bundle, and installer icons with original RVRSE artwork across Windows, macOS, and iOS resources while retaining the SamuFL logo in the plugin UI and linking it to the SamuFL homepage (#64)
+- Windows releases now ship as a ZIP containing VST3, CLAP, standalone, installation instructions, and the PDF manual; the signed installer is deferred to the next version (#36)
+- Replaced the default iPlug2 application and bundle icons with original RVRSE artwork across Windows, macOS, and iOS resources while retaining the SamuFL logo in the plugin UI and linking it to the SamuFL homepage (#64)
 - Offline rebuilds now retain the last playable sequence for preview/MIDI, show delayed rendering feedback, and disable Export until the replacement sequence commits (#43)
 - v1 project states retain their adaptive riser-tail behavior until the user deliberately commits a Riser Release gesture (#43)
 - macOS release distribution now targets a signed, notarized, stapled `.pkg` installer instead of the manual zip + `xattr` workflow

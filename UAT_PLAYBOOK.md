@@ -721,40 +721,38 @@ and shared playback/export/waveform timing.
 
 ---
 
-## Test Scenario 13 — Signed Windows Installer
+## Test Scenario 13 — Windows ZIP Distribution
 
-**Goal:** Verify the official Windows installer establishes the expected verified
-publisher, installs every selected format, and uninstalls without orphaned files.
+**Goal:** Verify the official Windows ZIP contains every supported format and
+clear manual-installation documentation.
 
 ### Pre-condition
 
-- Clean physical Windows 11 machine with no prior RVRSE installation
-- Current signed release-candidate installer
+- Clean Windows 11 machine with no prior RVRSE installation
+- Current Windows release-candidate ZIP
 - Cubase and Studio One installed
 
 ### Tests
 
-1. Open the installer file properties and inspect **Digital Signatures**.
-   - Verify the signature is valid, uses SHA-256, is timestamped, and shows the expected legal publisher.
-2. Launch the installer.
-   - Record any SmartScreen reputation message separately; it does not invalidate an otherwise valid signature.
-   - Install all components using the default per-machine destinations.
-3. Verify the standalone app launches from `C:\Program Files\RVRSE\RVRSE.exe`.
+1. Extract the ZIP and verify it contains `RVRSE.vst3`, `RVRSE.clap`,
+   `RVRSE.exe`, `INSTALL.txt`, and `RVRSE manual.pdf`.
+2. Follow `INSTALL.txt` to copy the VST3 and CLAP formats to their standard
+   system directories.
+3. Launch `RVRSE.exe` directly from the extracted folder.
 4. Rescan plugins in Cubase and Studio One.
    - Verify the VST3 loads in both hosts.
    - Load a sample by file dialog and drag-and-drop, then trigger one note.
 5. If a CLAP-capable host is available, verify it discovers the CLAP plugin.
-6. Uninstall RVRSE from **Installed apps**.
-7. Verify the RVRSE app directory, VST3 bundle, and CLAP file were removed.
+6. Remove the manually copied plugin files and verify they are gone.
 
 ### Pass Criteria
 
-- [ ] 13.1 — Installer and contained binaries have valid timestamped signatures
-- [ ] 13.2 — Windows shows the expected verified legal publisher
-- [ ] 13.3 — Default install paths contain the standalone, VST3, and CLAP artifacts
+- [ ] 13.1 — ZIP contains the standalone, VST3, CLAP, install guide, and manual
+- [ ] 13.2 — `INSTALL.txt` identifies the correct system plugin directories
+- [ ] 13.3 — Manually copied plugins are discovered from the documented paths
 - [ ] 13.4 — VST3 loads and performs a smoke test in Cubase and Studio One
-- [ ] 13.5 — Uninstall removes all RVRSE files from system plugin/app directories
-- [ ] 13.6 — SmartScreen behavior is recorded without treating reputation as signature validity
+- [ ] 13.5 — Standalone runs from the extracted folder
+- [ ] 13.6 — Manual removal leaves no RVRSE files in the plugin directories
 
 ---
 
@@ -765,9 +763,8 @@ without losing detail at small sizes.
 
 ### Tests
 
-1. On Windows, inspect the installer, UAC prompt, standalone executable, Start menu,
-   taskbar, Installed apps entry, uninstaller, and VST3 bundle where Explorer displays
-   a bundle icon.
+1. On Windows, inspect the ZIP, standalone executable, taskbar, and VST3 bundle
+   where Explorer displays a bundle icon.
 2. On macOS, inspect the standalone app in Finder, Applications, the Dock, and the
    installer output at standard and Retina display scales.
 3. Open the plugin UI and verify the original circular SamuFL logo remains in the
@@ -782,7 +779,7 @@ without losing detail at small sizes.
 
 ### Pass Criteria
 
-- [ ] 14.1 — Windows application, installer, shell, and uninstall surfaces use the RVRSE icon
+- [ ] 14.1 — Windows application, taskbar, and supported shell surfaces use the RVRSE icon
 - [ ] 14.2 — macOS Finder, Dock, Applications, and installer surfaces use the RVRSE icon
 - [ ] 14.3 — The plugin footer retains the original circular SamuFL logo
 - [ ] 14.4 — The icon remains recognizable at 16x16 and Retina sizes
@@ -795,8 +792,8 @@ without losing detail at small sizes.
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
+| 2026-07-30 | Added Scenario 13: Windows ZIP contents, manual install, and DAW smoke test |
 | 2026-07-29 | Added Scenario 14: cross-platform RVRSE icon verification               |
-| 2026-07-28 | Added Scenario 13: signed Windows install, DAW smoke test, and uninstall |
 | 2026-07-27 | Added Scenario 12: Riser Release, limiting, shared timeline, and pending renders |
 | 2026-05-18 | Added Scenario 10: UI preview transport                                 |
 | 2026-04-28 | Added Scenario 9: drag-and-drop sample loading                          |

@@ -7,8 +7,8 @@ original hit at a tempo-synced beat boundary. One sample in → complete transit
 editing, no extra samples needed.
 
 > **Status:** `v1.0.0` released. Core DSP pipeline, stutter gate, IGraphics GUI, and all DAW
-> parameters working. CI builds on macOS (Apple Silicon) + Windows (VS2022), with release-tag
-> builds packaged as signed platform installers.
+> parameters working. CI builds on macOS (Apple Silicon) + Windows (VS2022), with release-tag macOS
+> builds packaged as a signed and notarized installer.
 > Dark-themed native GUI with waveform display, dual control panels, and hit preview.
 > See [CHANGELOG.md](./CHANGELOG.md) for the full release history.
 
@@ -380,7 +380,7 @@ The build produces four plugin formats:
 | **VST3** | `/Library/Audio/Plug-Ins/VST3/` | `C:\Program Files\Common Files\VST3\` |
 | **AU** | `/Library/Audio/Plug-Ins/Components/` | *(macOS only)* |
 | **CLAP** | `/Library/Audio/Plug-Ins/CLAP/` | `C:\Program Files\Common Files\CLAP\` |
-| **Standalone** | `/Applications/` | `C:\Program Files\RVRSE\` |
+| **Standalone** | `/Applications/` | Build output directory |
 
 Build artefacts are in `build/RVRSE/`.
 
@@ -394,26 +394,23 @@ have a specific reason to customize them:
 - **AU:** `/Library/Audio/Plug-Ins/Components/`
 - **CLAP:** `/Library/Audio/Plug-Ins/CLAP/`
 - **Standalone:** `/Applications/`
-- **Bundled example samples, when included:** `/Library/Application Support/RVRSE/Examples/`
+- **Bundled example samples:** `/Library/Application Support/RVRSE/Examples/`
 
 No `xattr` workaround should be needed for official release installers.
 
 ### Windows Installation
 
-Official Windows releases include a signed `RVRSE-<version>-Windows-Setup.exe`.
-Run it as an administrator and keep the default per-machine destinations:
+Windows releases ship as `RVRSE-<version>-Windows.zip`. Extract it, then copy
+the plugin formats you use to the standard system directories:
 
 - **VST3:** `C:\Program Files\Common Files\VST3\RVRSE.vst3\`
 - **CLAP:** `C:\Program Files\Common Files\CLAP\RVRSE.clap`
-- **Standalone:** `C:\Program Files\RVRSE\RVRSE.exe`
+- **Standalone:** Run `RVRSE.exe` from any writable folder.
 
-The release also includes a portable ZIP containing the same signed binaries for
-manual installation. A newly issued signing identity can still trigger a
-reputation-based SmartScreen warning. Before continuing, confirm that Windows
-reports a valid signature and the expected verified legal publisher.
-
-Maintainer setup and local packaging commands are documented in
-[`docs/windows-signing.md`](docs/windows-signing.md).
+Administrator access is required when copying plugins into the system
+directories. The ZIP also includes `INSTALL.txt` and the PDF user manual.
+Windows binaries are unsigned in this release; a signed installer is planned
+for the next version.
 
 ---
 
