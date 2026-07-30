@@ -736,6 +736,8 @@ clear manual-installation documentation.
 
 1. Extract the ZIP and verify it contains `RVRSE.vst3`, `RVRSE.clap`,
    `RVRSE.exe`, `INSTALL.txt`, and `RVRSE manual.pdf`.
+   - Verify the manual is non-empty and identifies itself as the v1.1.0 guide.
+   - Verify the ZIP does not claim to include example samples.
 2. Follow `INSTALL.txt` to copy the VST3 and CLAP formats to their standard
    system directories.
 3. Launch `RVRSE.exe` directly from the extracted folder.
@@ -753,6 +755,7 @@ clear manual-installation documentation.
 - [ ] 13.4 — VST3 loads and performs a smoke test in Cubase and Studio One
 - [ ] 13.5 — Standalone runs from the extracted folder
 - [ ] 13.6 — Manual removal leaves no RVRSE files in the plugin directories
+- [ ] 13.7 — Install guide and manual disclose unsigned binaries and no bundled Windows examples
 
 ---
 
@@ -827,10 +830,50 @@ and Intel, and record the limits of Intel validation.
 
 ---
 
+## Test Scenario 16 — v1.1.0 Release Documentation
+
+**Goal:** Verify that every user-facing documentation surface matches the
+release candidate before publication.
+
+### Pre-condition
+
+- Release-candidate macOS installer and Windows ZIP
+- Repository checkout at the release-candidate commit
+
+### Tests
+
+1. Open the plugin and verify the footer reports `RVRSE v1.1.0`.
+2. Read `README.md`, both packaged `INSTALL.txt` files, and `RVRSE manual.pdf`.
+3. Verify all three surfaces describe:
+   - signed/notarized universal macOS PKG installation;
+   - unsigned Windows ZIP manual installation;
+   - macOS-only bundled example samples;
+   - drag-and-drop loading, manual trim, Play/Stop, Export, and Riser Release;
+   - CC1 for Stutter Rate and CC11 for Stutter Depth.
+4. Verify Riser Release is described as a riser-only post-anchor decay, not a
+   dry-hit crossfade.
+5. Verify the README support matrix identifies macOS as primary, Windows as
+   smoke-tested only, and Linux/AAX/AUv3/ARA/sidechain/convolution as unsupported.
+6. Open every user-facing homepage, support, issue, milestone, and project-board link.
+7. Verify the changelog credits `yyahav` for drag-and-drop and contains no
+   unresolved placeholder issue references.
+
+### Pass Criteria
+
+- [ ] 16.1 — In-plugin and satellite version strings report 1.1.0
+- [ ] 16.2 — Platform packaging and example-sample statements match shipped artifacts
+- [ ] 16.3 — v1.1.0 features and MIDI mappings are documented accurately
+- [ ] 16.4 — Support exclusions and Windows validation scope are explicit
+- [ ] 16.5 — User-facing links resolve
+- [ ] 16.6 — Contributor credit and issue references are complete
+
+---
+
 ## Revision History
 
 | Date       | Change                                                                  |
 |------------|-------------------------------------------------------------------------|
+| 2026-07-30 | Added Scenario 16: v1.1.0 release-documentation verification           |
 | 2026-07-30 | Added Scenario 15: universal macOS artifacts and Rosetta validation     |
 | 2026-07-30 | Added Scenario 13: Windows ZIP contents, manual install, and DAW smoke test |
 | 2026-07-29 | Added Scenario 14: cross-platform RVRSE icon verification               |

@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+> Planned for v1.1.0.
+
 ### Added
 - Riser Release — a persisted 0–500 ms offline control extends the riser past the Beat Anchor and applies a linear riser-only decay beneath the unattenuated dry hit; the shared timeline now visualizes the real overlap (#43)
-- Drag-and-drop sample loading — drag any WAV or AIFF file directly onto the plugin's header/footer/waveform areas to load it (rverse-aif)
+- Drag-and-drop sample loading — contributed by [yyahav](https://github.com/yyahav) in PR #24 — loads WAV or AIFF files dropped onto the plugin header, footer, or waveform areas
 - macOS maintainer tooling for release signing/notarization: `scripts/sign-and-notarize.sh`, `scripts/build-macos-installer.sh`, and a minimal installer entitlements plist
 - Waveform-panel preview transport — small Play/Stop buttons let users audition the riser+hit path without configuring MIDI, while preserving the existing MIDI-triggered playback behavior
 - Header export action — a blue Export button now writes the current normal riser+hit result to a stereo 24-bit WAV via the native save dialog, using the same readiness gate as Play and ignoring Master Volume
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - v1 project states retain their adaptive riser-tail behavior until the user deliberately commits a Riser Release gesture (#43)
 - macOS release distribution now targets a signed, notarized, stapled `.pkg` installer instead of the manual zip + `xattr` workflow
 - README and macOS install instructions now document the `.pkg` installer flow and remove the quarantine workaround
+- Active planning moved from the archived Beads snapshot to public GitHub Issues, milestones, and the project board (#26)
 - The top waveform now reflects only the last fully committed playable sequence, while trim edits happen on the lower/original hit waveform and take effect on the next armed preview/note after the offline rebuild finishes (#42)
 - The issue #42 seam-centering heuristic has been replaced by the Riser Release model; the trimmed hit still starts half of its technical edge fade early so the Beat Anchor remains at the fade midpoint (#42, #43)
 - The Airwindows MatrixVerb evaluation build now removes its explicit wet-path input pre-delay, disables vibrato modulation, brightens the wet tuning, boosts the wet output level, leaves the stretched riser onset unshifted so the render can run naturally into the hit without the diagnostic onset-correction gap, and applies a fixed 25 ms technical head fade to soften the riser start
@@ -33,8 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Riser Release clamp tooltips now refresh when a sample-rate change alters the displayed effective duration (#43)
 - Sample loading via the file dialog now reliably updates the waveform, hit playback, and sample status UI after the drag-and-drop merge changes (rverse-aif)
 - Sample loading now reports clearer errors for unsupported compressed formats, including compressed/non-PCM `.wav` files that previously failed with a generic PCM-read error
+- Studio One detection could not be reproduced with the signed/notarized macOS build; v1.1.0 treats the new distribution flow as the resolution and retains explicit UAT coverage (#40)
 - Standalone macOS app metadata no longer requests microphone usage text for the installer/signing path
 - Quiet input samples no longer lose the reverse-reverb riser entirely at higher Lush settings because offline tail trimming now scales its silence threshold relative to the reverbed peak
+
+### Notes
+- macOS is the primary supported platform. Windows x64 is supported but smoke-tested only for v1.1.0 and ships as an unsigned ZIP.
+- The Beads tracker is archived for historical reference; active work is tracked in GitHub (#26).
 
 ## [1.0.0] - 2026-04-09
 
