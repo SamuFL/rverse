@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-> Planned for v1.1.0.
+## [1.1.0] - 2026-08-02
 
 ### Added
 - Riser Release — a persisted 0–500 ms offline control extends the riser past the Beat Anchor and applies a linear riser-only decay beneath the unattenuated dry hit; the shared timeline now visualizes the real overlap (#43)
@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Notes
 - macOS is the primary supported platform. Windows x64 is supported but smoke-tested only for v1.1.0 and ships as an unsigned ZIP.
 - The Beads tracker is archived for historical reference; active work is tracked in GitHub (#26).
+- Loading an invalid sample can temporarily produce incorrect UI rendering; audio processing remains unaffected (#69).
+- Riser Release does not always clamp to the available source audio when the hit is trimmed (#71).
+- Exported WAV files do not include the real-time stutter effect (#72).
 
 ## [1.0.0] - 2026-04-09
 
