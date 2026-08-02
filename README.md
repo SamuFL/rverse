@@ -6,7 +6,7 @@ RVRSE generates a reverse-reverb riser automatically from any loaded hit sample,
 original hit at a tempo-synced beat boundary. One sample in → complete transition out. No external
 audio editing or extra samples needed.
 
-> **Status:** `v1.1.0` release candidate in preparation. CI builds universal macOS binaries
+> **Current release:** `v1.1.0`. CI builds universal macOS binaries
 > (`arm64` + `x86_64`) and Windows x64 binaries. Release-tag macOS builds ship in a signed and
 > notarized installer; Windows builds ship as an unsigned ZIP for manual installation.
 > The dark-themed native GUI includes drag-and-drop loading, manual trim, preview, and export.
@@ -504,6 +504,12 @@ The following are explicitly outside the RVRSE roadmap:
 - No preset system.
 - No pitch shift (planned).
 - Single-voice only — overlapping notes cut the previous voice.
+- Loading an invalid sample can temporarily produce incorrect UI rendering; audio processing
+  remains unaffected ([#69](https://github.com/SamuFL/rverse/issues/69)).
+- Riser Release does not always clamp to the available source audio when the hit is trimmed
+  ([#71](https://github.com/SamuFL/rverse/issues/71)).
+- Exported WAV files do not include the real-time stutter effect
+  ([#72](https://github.com/SamuFL/rverse/issues/72)).
 
 ---
 
